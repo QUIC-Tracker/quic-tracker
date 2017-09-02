@@ -3,11 +3,55 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+	"fmt"
 )
 
 type Frame interface {
 	FrameType() FrameType
 	writeTo(buffer *bytes.Buffer)
+}
+func NewFrame(buffer *bytes.Reader) *Frame {
+	typeByte, err := buffer.ReadByte()
+	if err == io.EOF {
+		return nil
+	} else if err != nil {
+		panic(err)
+	}
+	buffer.UnreadByte()
+	frameType := FrameType(typeByte)
+	switch {
+	case frameType == PaddingFrameType:
+		return &Frame(NewPaddingFrame(buffer))
+	case frameType == ResetStreamType:
+		return &Frame(NewResetStream(buffer))
+	case frameType == ConnectionCloseType:
+		return &Frame(NewConnectionCloseFrame(buffer))
+	case frameType == MaxDataType:
+		return &Frame(NewMaxDataFrame(buffer))
+	case frameType == MaxStreamDataType:
+		return &Frame(NewMaxStreamDataFrame(buffer))
+	case frameType == MaxStreamIdType:
+		return &Frame(NewMaxStreamIdFrame(buffer))
+	case frameType == PingType:
+		return &Frame(NewPingFrame(buffer))
+	case frameType == BlockedType:
+		return &Frame(NewBlockedFrame(buffer))
+	case frameType == StreamBlockedType:
+		return &Frame(NewStreamBlockedFrame(buffer))
+	case frameType == StreamIdNeededType:
+		return &Frame(NewStreamIdNeededFrame(buffer))
+	case frameType == NewConnectionIdType:
+		return &Frame(NewNewConnectionIdFrame(buffer))
+	case frameType == StopSendingType:
+		return &Frame(NewStopSendingFrame(buffer))
+	case frameType == AckType:
+		return &Frame(NewAckFrame(buffer))
+	case frameType == StreamType:
+		return &Frame(NewStreamFrame(buffer))
+	default:
+		panic(fmt.Sprintf("Unknown frame type %d", typeByte))
+	}
 }
 type FrameType uint8
 

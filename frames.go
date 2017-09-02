@@ -11,7 +11,7 @@ type Frame interface {
 	FrameType() FrameType
 	writeTo(buffer *bytes.Buffer)
 }
-func NewFrame(buffer *bytes.Reader) *Frame {
+func NewFrame(buffer *bytes.Reader) Frame {
 	typeByte, err := buffer.ReadByte()
 	if err == io.EOF {
 		return nil
@@ -22,33 +22,33 @@ func NewFrame(buffer *bytes.Reader) *Frame {
 	frameType := FrameType(typeByte)
 	switch {
 	case frameType == PaddingFrameType:
-		return &Frame(NewPaddingFrame(buffer))
+		return Frame(NewPaddingFrame(buffer))
 	case frameType == ResetStreamType:
-		return &Frame(NewResetStream(buffer))
+		return Frame(NewResetStream(buffer))
 	case frameType == ConnectionCloseType:
-		return &Frame(NewConnectionCloseFrame(buffer))
+		return Frame(NewConnectionCloseFrame(buffer))
 	case frameType == MaxDataType:
-		return &Frame(NewMaxDataFrame(buffer))
+		return Frame(NewMaxDataFrame(buffer))
 	case frameType == MaxStreamDataType:
-		return &Frame(NewMaxStreamDataFrame(buffer))
+		return Frame(NewMaxStreamDataFrame(buffer))
 	case frameType == MaxStreamIdType:
-		return &Frame(NewMaxStreamIdFrame(buffer))
+		return Frame(NewMaxStreamIdFrame(buffer))
 	case frameType == PingType:
-		return &Frame(NewPingFrame(buffer))
+		return Frame(NewPingFrame(buffer))
 	case frameType == BlockedType:
-		return &Frame(NewBlockedFrame(buffer))
+		return Frame(NewBlockedFrame(buffer))
 	case frameType == StreamBlockedType:
-		return &Frame(NewStreamBlockedFrame(buffer))
+		return Frame(NewStreamBlockedFrame(buffer))
 	case frameType == StreamIdNeededType:
-		return &Frame(NewStreamIdNeededFrame(buffer))
+		return Frame(NewStreamIdNeededFrame(buffer))
 	case frameType == NewConnectionIdType:
-		return &Frame(NewNewConnectionIdFrame(buffer))
+		return Frame(NewNewConnectionIdFrame(buffer))
 	case frameType == StopSendingType:
-		return &Frame(NewStopSendingFrame(buffer))
+		return Frame(NewStopSendingFrame(buffer))
 	case frameType == AckType:
-		return &Frame(NewAckFrame(buffer))
+		return Frame(NewAckFrame(buffer))
 	case frameType == StreamType:
-		return &Frame(NewStreamFrame(buffer))
+		return Frame(NewStreamFrame(buffer))
 	default:
 		panic(fmt.Sprintf("Unknown frame type %d", typeByte))
 	}
@@ -118,8 +118,8 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)
-	if frame.reasonPhraseLength {
-		var reasonBytes [frame.reasonPhraseLength]string
+	if frame.reasonPhraseLength > 0 {
+		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
 		frame.reasonPhrase = string(reasonBytes)
 	}
@@ -386,7 +386,8 @@ func (frame *StreamFrame) writeTo(buffer *bytes.Buffer) {
 	case 1:
 		binary.Write(buffer, binary.BigEndian, uint16(frame.streamId))
 	case 2:
-		binary.Write(buffer, binary.BigEndian, [3]byte(frame.streamId))
+		//binary.Write(buffer, binary.BigEndian, [3]byte(frame.streamId))
+		panic("TODO")
 	case 3:
 		binary.Write(buffer, binary.BigEndian, uint32(frame.streamId))
 	}
@@ -419,10 +420,11 @@ func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
 		var id uint16
 		binary.Read(buffer, binary.BigEndian, &id)
 		frame.streamId = uint32(id)
-	case 2:
+	case 2:/*
 		var id [3]byte
 		binary.Read(buffer, binary.BigEndian, &id)
-		frame.streamId = uint32(id)
+		frame.streamId = uint32(id)*/
+		panic("TODO")
 	case 3:
 		binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	}
@@ -438,7 +440,7 @@ func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
 	case 3:
 		binary.Read(buffer, binary.BigEndian, &frame.offset)
 	}
-	var data [frame.dataLength]byte
+	data := make([]byte, frame.dataLength, frame.dataLength)
 	binary.Read(buffer, binary.BigEndian, data)
 	return frame
 }

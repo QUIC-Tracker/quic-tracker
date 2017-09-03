@@ -16,10 +16,19 @@ type PacketEncoder interface {
 	encode() []byte
 }
 
+type Packet interface {
+	Header() Header
+	Acknowledger
+	PacketEncoder
+}
+
 type abstractPacket struct {
 	header Header
 	Acknowledger
 	PacketEncoder
+}
+func (p abstractPacket) Header() Header {
+	return p.header
 }
 func (p abstractPacket) encodeHeader() []byte {
 	return p.header.encode()
@@ -36,8 +45,8 @@ type VersionNegotationPacket struct {
 	supportedVersion []SupportedVersion
 }
 type SupportedVersion uint32
-func (p *VersionNegotationPacket) shouldBeAcknowledged() bool   { return false }
-func (p *VersionNegotationPacket) encodePayload() []byte {
+func (p VersionNegotationPacket) shouldBeAcknowledged() bool   { return false }
+func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, version := range p.supportedVersion {
 		binary.Write(buffer, binary.BigEndian, version)
@@ -71,8 +80,8 @@ type ClientInitialPacket struct {
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
-func (p *ClientInitialPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ClientInitialPacket) encodePayload() []byte {
+func (p ClientInitialPacket) shouldBeAcknowledged() bool   { return false }
+func (p ClientInitialPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
@@ -119,8 +128,8 @@ type ServerCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p *ServerCleartextPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ServerCleartextPacket) encodePayload() []byte {
+func (p ServerCleartextPacket) shouldBeAcknowledged() bool   { return false }
+func (p ServerCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
@@ -162,8 +171,8 @@ type ClientCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p *ClientCleartextPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ClientCleartextPacket) encodePayload() []byte {
+func (p ClientCleartextPacket) shouldBeAcknowledged() bool   { return false }
+func (p ClientCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)

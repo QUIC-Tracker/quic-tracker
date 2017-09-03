@@ -77,6 +77,7 @@ func (frame *PaddingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
+	buffer.ReadByte()  // Discard frame payload
 	return new(PaddingFrame)
 }
 
@@ -336,16 +337,32 @@ func NewAckFrame(buffer *bytes.Reader) *AckFrame {
 		binary.Read(buffer, binary.BigEndian, &frame.largestAcknowledged)
 	}
 	binary.Read(buffer, binary.BigEndian, &frame.ackDelay)
-	for i := 0; i < int(frame.numAckBlocks); i++ {
+	for i := 0; i < int(frame.numAckBlocks) + 1; i++ {  // First ACK Block Length is always present, see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-8.13.1
 		ack := AckBlock{}
 		if i > 0 {
 			ack.gap, _ = buffer.ReadByte()
 		}
-		binary.Read(buffer, binary.BigEndian, &ack.ack)
+		switch frame.AckBlockLength {
+		case 0:
+			var value uint8
+			binary.Read(buffer, binary.BigEndian, &value)
+			ack.ack = uint64(value)
+		case 1:
+			var value uint16
+			binary.Read(buffer, binary.BigEndian, &value)
+			ack.ack = uint64(value)
+		case 2:
+			var value uint32
+			binary.Read(buffer, binary.BigEndian, &value)
+			ack.ack = uint64(value)
+		case 3:
+			binary.Read(buffer, binary.BigEndian, &ack.ack)
+		}
 		frame.ackBlocks = append(frame.ackBlocks, ack)
 	}
 	for i:= 0; i < int(frame.numTimestamps); i++ {
 		timestamp := Timestamp{}
+		binary.Read(buffer, binary.BigEndian, &timestamp.deltaLargestAcknowledged)
 		if i > 0 {
 			var timeSince uint16
 			binary.Read(buffer, binary.BigEndian, &timeSince)
@@ -420,11 +437,10 @@ func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
 		var id uint16
 		binary.Read(buffer, binary.BigEndian, &id)
 		frame.streamId = uint32(id)
-	case 2:/*
+	case 2:
 		var id [3]byte
 		binary.Read(buffer, binary.BigEndian, &id)
-		frame.streamId = uint32(id)*/
-		panic("TODO")
+		frame.streamId = uint32((id[0] << 16) + (id[1] << 8) + id[2])
 	case 3:
 		binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	}
@@ -440,7 +456,8 @@ func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
 	case 3:
 		binary.Read(buffer, binary.BigEndian, &frame.offset)
 	}
-	data := make([]byte, frame.dataLength, frame.dataLength)
-	binary.Read(buffer, binary.BigEndian, data)
+	binary.Read(buffer, binary.BigEndian, &frame.dataLength)
+	frame.streamData = make([]byte, frame.dataLength, frame.dataLength)
+	buffer.Read(frame.streamData)
 	return frame
 }

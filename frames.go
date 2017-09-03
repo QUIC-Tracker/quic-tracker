@@ -11,7 +11,7 @@ type Frame interface {
 	FrameType() FrameType
 	writeTo(buffer *bytes.Buffer)
 }
-func NewFrame(buffer *bytes.Reader) Frame {
+func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
 	typeByte, err := buffer.ReadByte()
 	if err == io.EOF {
 		return nil
@@ -48,7 +48,7 @@ func NewFrame(buffer *bytes.Reader) Frame {
 	case frameType == AckType:
 		return Frame(NewAckFrame(buffer))
 	case frameType == StreamType:
-		return Frame(NewStreamFrame(buffer))
+		return Frame(ReadStreamFrame(buffer, conn))
 	default:
 		panic(fmt.Sprintf("Unknown frame type %d", typeByte))
 	}
@@ -421,7 +421,7 @@ func (frame *StreamFrame) writeTo(buffer *bytes.Buffer) {
 	}
 	binary.Write(buffer, binary.BigEndian, frame.streamData)
 }
-func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
+func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame := new(StreamFrame)
 	typeByte, _ := buffer.ReadByte()
 	frame.finBit = (typeByte & 0x20) == 0x20
@@ -456,8 +456,35 @@ func NewStreamFrame(buffer *bytes.Reader) *StreamFrame {
 	case 3:
 		binary.Read(buffer, binary.BigEndian, &frame.offset)
 	}
-	binary.Read(buffer, binary.BigEndian, &frame.dataLength)
+
+	if frame.dataLengthPresent {
+		binary.Read(buffer, binary.BigEndian, &frame.dataLength)
+	} else {
+		panic(frame)
+	}
 	frame.streamData = make([]byte, frame.dataLength, frame.dataLength)
 	buffer.Read(frame.streamData)
+
+	stream, ok := conn.streams[frame.streamId]
+	if !ok {
+		panic(frame)
+	}
+	if frame.offset == stream.readOffset {
+		stream.readOffset += uint64(frame.dataLength)
+	}
+
+	return frame
+}
+func NewStreamFrame(streamId uint32, stream *Stream, data []byte, finBit bool) *StreamFrame {
+	frame := new(StreamFrame)
+	frame.finBit = finBit
+	frame.streamIdLength = 3  // TODO: Make a cleverer use of these
+	frame.offsetLength = 3
+	frame.dataLengthPresent = true
+	frame.streamId = streamId
+	frame.offset = stream.writeOffset
+	frame.dataLength = uint16(len(data))
+	frame.streamData = data
+	stream.writeOffset += uint64(frame.dataLength)
 	return frame
 }

@@ -91,7 +91,7 @@ func (p ClientInitialPacket) encodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func ReadClientInitialPacket(buffer *bytes.Reader) *ClientInitialPacket {
+func ReadClientInitialPacket(buffer *bytes.Reader, conn *Connection) *ClientInitialPacket {
 	p := new(ClientInitialPacket)
 	p.header = ReadLongHeader(buffer)
 	for {
@@ -103,7 +103,7 @@ func ReadClientInitialPacket(buffer *bytes.Reader) *ClientInitialPacket {
 		}
 		buffer.UnreadByte()
 		if FrameType(typeByte) != PaddingFrameType {
-			p.streamFrames = append(p.streamFrames, *NewStreamFrame(buffer))
+			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
 		} else {
 			p.padding = append(p.padding, *NewPaddingFrame(buffer))
 		}
@@ -142,7 +142,7 @@ func (p ServerCleartextPacket) encodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func ReadServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
+func ReadServerCleartextPacket(buffer *bytes.Reader, conn *Connection) *ServerCleartextPacket {
 	p := new(ServerCleartextPacket)
 	p.header = ReadLongHeader(buffer)
 	for {
@@ -157,7 +157,7 @@ func ReadServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
 		case 0xa0 <= typeByte && typeByte <= 0xbf:
 			p.ackFrames = append(p.ackFrames, *NewAckFrame(buffer))
 		case 0xc0 <= typeByte && typeByte <= 0xff:
-			p.streamFrames = append(p.streamFrames, *NewStreamFrame(buffer))
+			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
 		default:
 			p.padding = append(p.padding, *NewPaddingFrame(buffer))
 		}
@@ -206,11 +206,11 @@ func (p *ProtectedPacket) encodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func ReadProtectedPacket(buffer *bytes.Reader) *ProtectedPacket {
+func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
 	p.header = ReadHeader(buffer)
 	for {
-		frame := NewFrame(buffer)
+		frame := NewFrame(buffer, conn)
 		if frame == nil {
 			break
 		}

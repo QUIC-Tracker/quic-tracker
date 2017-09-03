@@ -16,6 +16,7 @@ type Connection struct {
 	tlsBuffer	  	 *connBuffer
 	tls     	  	 *mint.Conn
 	aead             cipher.AEAD
+	streams			 map[uint32]*Stream
 	connectionId  	 uint64
 	packetNumber  	 uint64
 	version       	 uint32
@@ -35,19 +36,10 @@ func (c *Connection) sendAEADSealedPacket(header []byte, payload []byte, packetN
 func (c *Connection) sendClientInitialPacket() {
 	c.tls.Handshake()
 	handshakeResult := c.tlsBuffer.getOutput()
-	handshakeFrame := StreamFrame{
-		false,
-		3,
-		3,
-		true,
-		0,
-		0,
-		uint16(len(handshakeResult)),
-		handshakeResult,
-	}
+	handshakeFrame := NewStreamFrame(0, c.streams[0], handshakeResult, false)
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
-	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, handshakeFrame)
+	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
 	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + 8)
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
@@ -63,10 +55,14 @@ func (c *Connection) completeServerHello(packet *ServerCleartextPacket) {
 
 	c.tlsBuffer.input(serverData)
 	c.tls.Handshake()
-	_ = c.tlsBuffer.getOutput()
+	tlsOutput := c.tlsBuffer.getOutput()
 
 	// TODO: Prepare new crypto state
+
 	// TODO: Send tls output on stream 0
+	outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
+	clearTestPacket := NewClientCleartextPacket([]StreamFrame{*outputFrame}, nil, nil, c)
+	c.sendAEADSealedPacket(clearTestPacket.encodeHeader(), clearTestPacket.encodePayload(), clearTestPacket.header.PacketNumber())
 }
 func (c *Connection) readNextPacket() Packet {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
@@ -90,7 +86,7 @@ func (c *Connection) readNextPacket() Packet {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-		return ReadServerCleartextPacket(buffer)
+		return ReadServerCleartextPacket(buffer, c)
 	} else {
 		panic(header.packetType)
 	}
@@ -126,6 +122,9 @@ func NewConnection(address string, serverName string) *Connection {
 	c.version = QuicVersion
 	c.omitConnectionId = false
 
+	c.streams = make(map[uint32]*Stream)
+	c.streams[0] = &Stream{}
+
 	return c
 }
 
@@ -136,7 +135,7 @@ func main() {
 	if packet, ok := packet.(*ServerCleartextPacket); ok {
 		conn.completeServerHello(packet)
 	} else {
-		//spew.Dump(packet)
+		spew.Dump(packet)
 		panic(packet)
 	}
 

@@ -6,26 +6,47 @@ import (
 	"io"
 )
 
-type Packet interface {
+type Acknowledger interface {
 	shouldBeAcknowledged() bool // Indicates whether or not the packet type should be acknowledged by the mean of sending an ack
-	Encoder
+}
+
+type PacketEncoder interface {
+	encodeHeader() []byte
+	encodePayload() []byte
+	encode() []byte
+}
+
+type abstractPacket struct {
+	header Header
+	Acknowledger
+	PacketEncoder
+}
+func (p *abstractPacket) encodeHeader() []byte {
+	return p.header.encode()
+}
+func (p *abstractPacket) encode() []byte {
+	buffer := new(bytes.Buffer)
+	buffer.Write(p.encodeHeader())
+	buffer.Write(p.encodePayload())
+	return buffer.Bytes()
 }
 
 type VersionNegotationPacket struct {
-	header           *LongHeader
+	*abstractPacket
 	supportedVersion []SupportedVersion
 }
 type SupportedVersion uint32
 func (p *VersionNegotationPacket) shouldBeAcknowledged() bool   { return false }
-func (p *VersionNegotationPacket) writeTo(buffer *bytes.Buffer) {
-	p.header.writeTo(buffer)
+func (p *VersionNegotationPacket) encodePayload() []byte {
+	buffer := new(bytes.Buffer)
 	for _, version := range p.supportedVersion {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
+	return buffer.Bytes()
 }
-func NewVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
+func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
-	p.header = NewLongHeader(buffer)
+	p.header = ReadLongHeader(buffer)
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
@@ -38,42 +59,32 @@ func NewVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	}
 	return p
 }
-
-type CleartextPacket struct {
-	// TODO: https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.4
-	header         *LongHeader
-	integrityCheck uint64 // TODO: https://tools.ietf.org/html/draft-ietf-quic-tls-05#section-6.2
-}
-func (p *CleartextPacket) shouldBeAcknowledged() bool   { return false } // TODO: Should they be ?
-func (p *CleartextPacket) writeTo(buffer *bytes.Buffer) {
-	p.header.writeTo(buffer)
-	binary.Write(buffer, binary.BigEndian, p.integrityCheck)
-}
-func NewCleartextPacket(buffer *bytes.Reader) *CleartextPacket {
-	p := new(CleartextPacket)
-	p.header = NewLongHeader(buffer)
-	binary.Read(buffer, binary.BigEndian, p.integrityCheck)
+func NewVersionNegotationPacket(versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
+	p := new(VersionNegotationPacket)
+	p.header = NewLongHeader(VersionNegotiation, conn)
+	p.supportedVersion = versions
 	return p
 }
 
 type ClientInitialPacket struct {
-	header       *LongHeader
+	*abstractPacket
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
 func (p *ClientInitialPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ClientInitialPacket) writeTo(buffer *bytes.Buffer) {
-	p.header.writeTo(buffer)
+func (p *ClientInitialPacket) encodePayload() []byte {
+	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
 	}
 	for _, frame := range p.padding {
 		frame.writeTo(buffer)
 	}
+	return buffer.Bytes()
 }
-func NewClientInitialPacket(buffer *bytes.Reader) *ClientInitialPacket {
+func ReadClientInitialPacket(buffer *bytes.Reader) *ClientInitialPacket {
 	p := new(ClientInitialPacket)
-	p.header = NewLongHeader(buffer)
+	p.header = ReadLongHeader(buffer)
 	for {
 		typeByte, err := buffer.ReadByte()
 		if err == io.EOF {
@@ -90,20 +101,27 @@ func NewClientInitialPacket(buffer *bytes.Reader) *ClientInitialPacket {
 	}
 	return p
 }
+func NewClientInitialPacket(streamFrames []StreamFrame, padding []PaddingFrame, conn *Connection) *ClientInitialPacket {
+	p := new(ClientInitialPacket)
+	p.header = NewLongHeader(ClientInitial, conn)
+	p.streamFrames = streamFrames
+	p.padding = padding
+	return p
+}
 
 type ServerStatelessRetryPacket struct {
 	// TODO: https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.4.2
 }
 
 type ServerCleartextPacket struct {
-	header       *LongHeader
+	*abstractPacket
 	streamFrames []StreamFrame
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
 func (p *ServerCleartextPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ServerCleartextPacket) writeTo(buffer *bytes.Buffer) {
-	p.header.writeTo(buffer)
+func (p *ServerCleartextPacket) encodePayload() []byte {
+	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
 	}
@@ -113,10 +131,11 @@ func (p *ServerCleartextPacket) writeTo(buffer *bytes.Buffer) {
 	for _, frame := range p.padding {
 		frame.writeTo(buffer)
 	}
+	return buffer.Bytes()
 }
-func NewServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
+func ReadServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
 	p := new(ServerCleartextPacket)
-	p.header = NewLongHeader(buffer)
+	p.header = ReadLongHeader(buffer)
 	for {
 		typeByte, err := buffer.ReadByte()
 		if err == io.EOF {
@@ -138,14 +157,14 @@ func NewServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
 }
 
 type ClientCleartextPacket struct {
-	header       LongHeader
+	*abstractPacket
 	streamFrames []StreamFrame
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
 func (p *ClientCleartextPacket) shouldBeAcknowledged() bool   { return false }
-func (p *ClientCleartextPacket) writeTo(buffer *bytes.Buffer) {
-	p.header.writeTo(buffer)
+func (p *ClientCleartextPacket) encodePayload() []byte {
+	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
 	}
@@ -155,21 +174,32 @@ func (p *ClientCleartextPacket) writeTo(buffer *bytes.Buffer) {
 	for _, frame := range p.padding {
 		frame.writeTo(buffer)
 	}
+	return buffer.Bytes()
+}
+func NewClientCleartextPacket(streamFrames []StreamFrame, ackFrames []AckFrame, padding []PaddingFrame, conn *Connection) *ClientCleartextPacket {
+	p := new(ClientCleartextPacket)
+	p.header = NewLongHeader(ClientCleartext, conn)
+	p.streamFrames = streamFrames
+	p.ackFrames = ackFrames
+	p.padding = padding
+	return p
 }
 
 type ProtectedPacket struct {
-	header *Header
+	*abstractPacket
 	frames []Frame
 }
 func (p *ProtectedPacket) shouldBeAcknowledged() bool   { return false } // TODO: Should they be ?
-func (p *ProtectedPacket) writeTo(buffer *bytes.Buffer) {
+func (p *ProtectedPacket) encodePayload() []byte {
+	buffer := new(bytes.Buffer)
 	for _, frame := range p.frames {
 		frame.writeTo(buffer)
 	}
+	return buffer.Bytes()
 }
-func NewProtectedPacket(buffer *bytes.Reader) *ProtectedPacket {
+func ReadProtectedPacket(buffer *bytes.Reader) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewHeader(buffer)
+	p.header = ReadHeader(buffer)
 	for {
 		frame := NewFrame(buffer)
 		if frame == nil {

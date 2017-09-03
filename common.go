@@ -1,12 +1,5 @@
 package main
 
-type Encoder interface {
-	toBytes() []byte
-}
-
-//func fromBytes(b *[]byte) Decoder
-
-
 const QuicVersion uint32 = 0xff000005  // See https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-4
 const QuicALPNToken string = "hq-05"  // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 const MinimumClientInitialLength int = 1252  // TODO IPv6 is 1232 and should be supported as well

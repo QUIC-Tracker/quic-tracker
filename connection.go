@@ -4,30 +4,27 @@ import (
 	"github.com/bifurcation/mint"
 	"net"
 	"math/rand"
-	"bytes"
 	"time"
+	"crypto/cipher"
 )
 
-func main() {
-	udpConn, err := net.Dial("udp", "quant.eggert.org:4433")
-	if err != nil {
-		panic(err)
-	}
-	udpConn.SetDeadline(time.Time{})
-
-	tlsBuf := newConnBuffer()
-	config := mint.Config{
-		ServerName:"quant.eggert.org",
-		NonBlocking: true,
-		NextProtos: []string{QuicALPNToken},
-	}
-	config.Init(true)
-	client := mint.Client(tlsBuf, &config)
-	connId := uint64(rand.Uint32())<<32 + uint64(rand.Uint32())
-	aead := &aeadFNV{}
-
-	client.Handshake()
-	handshakeResult := tlsBuf.getOutput()
+type Connection struct {
+	udpConnection 	 *net.Conn
+	tlsBuffer	  	 *connBuffer
+	tls     	  	 *mint.Conn
+	aead             cipher.AEAD
+	connectionId  	 uint64
+	packetNumber  	 uint64
+	version       	 uint32
+	omitConnectionId bool
+}
+func (c *Connection) nextPacketNumber() uint64 {
+	c.packetNumber++
+	return c.packetNumber
+}
+func (c *Connection) sendClientInitialPacket() {
+	c.tls.Handshake()
+	handshakeResult := c.tlsBuffer.getOutput()
 	handshakeFrame := StreamFrame{
 		false,
 		3,
@@ -38,30 +35,50 @@ func main() {
 		uint16(len(handshakeResult)),
 		handshakeResult,
 	}
-	longHeader := LongHeader{
-		ClientInitial,
-		connId,
-		uint32(connId & 0x7fffffff),
-		QuicVersion,
-	}
-	clientInitialPacket := ClientInitialPacket{}
-	clientInitialPacket.header = &longHeader
+
+	clientInitialPacket := NewClientInitialPacket(nil, nil, c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + 23 + len(handshakeResult))
+	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + 8)
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
 	}
-	buffer := new(bytes.Buffer)
-	clientInitialPacket.writeTo(buffer)
 
-	packetLen := buffer.Len()
-	hdr := buffer.Next(17)
-	payload := buffer.Next(packetLen - 17)
+	hdr := clientInitialPacket.encodeHeader()
+	payload := clientInitialPacket.encodePayload()
 
-	protectedPayload := aead.Seal(nil, encodeArgs(clientInitialPacket.header.packetNumber), payload, hdr)
+	protectedPayload := c.aead.Seal(nil, encodeArgs(clientInitialPacket.header.PacketNumber()), payload, hdr)
 	finalPacket := make([]byte, 0, 1500)
 	finalPacket = append(finalPacket, hdr...)
 	finalPacket = append(finalPacket, protectedPayload...)
+	(*c.udpConnection).Write(finalPacket)
+}
+func NewConnection(address string, serverName string) *Connection {
+	udpConn, err := net.Dial("udp", address)
+	if err != nil {
+		panic(err)
+	}
+	udpConn.SetDeadline(time.Time{})
 
-	udpConn.Write(finalPacket)
+	c := new(Connection)
+	c.udpConnection = &udpConn
+	c.tlsBuffer = newConnBuffer()
+	tlsConfig := mint.Config{
+		ServerName: serverName,
+		NonBlocking: true,
+		NextProtos: []string{QuicALPNToken},
+	}
+	tlsConfig.Init(true)
+	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
+	c.aead = &aeadFNV{}
+	c.connectionId = uint64(rand.Uint32()) << 32 + uint64(rand.Uint32())
+	c.packetNumber = c.connectionId & 0x7fffffff
+	c.version = QuicVersion
+	c.omitConnectionId = false
+
+	return c
+}
+
+func main() {
+	conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
+	conn.sendClientInitialPacket()
 }

@@ -9,7 +9,7 @@ type Header interface {
 	PacketNumber() uint32
 	encode() []byte
 }
-func ReadHeader(buffer *bytes.Reader) *Header {
+func ReadHeader(buffer *bytes.Reader) Header {
 	var h Header
 	typeByte, _ := buffer.ReadByte()
 	buffer.UnreadByte()
@@ -18,7 +18,7 @@ func ReadHeader(buffer *bytes.Reader) *Header {
 	} else {
 		h = ReadShortHeader(buffer)
 	}
-	return &h
+	return h
 }
 
 type LongHeader struct {
@@ -27,7 +27,7 @@ type LongHeader struct {
 	packetNumber uint32
 	version      uint32
 }
-func (h *LongHeader) encode() []byte {
+func (h LongHeader) encode() []byte {
 	buffer := new(bytes.Buffer)
 	typeByte := uint8(0x80)
 	typeByte |= uint8(h.packetType)
@@ -37,7 +37,7 @@ func (h *LongHeader) encode() []byte {
 	binary.Write(buffer, binary.BigEndian, h.version)
 	return buffer.Bytes()
 }
-func (h *LongHeader) PacketNumber() uint32 {
+func (h LongHeader) PacketNumber() uint32 {
 	return h.packetNumber
 }
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {

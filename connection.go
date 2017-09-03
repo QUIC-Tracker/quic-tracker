@@ -36,7 +36,7 @@ func (c *Connection) sendClientInitialPacket() {
 		handshakeResult,
 	}
 
-	clientInitialPacket := NewClientInitialPacket(nil, nil, c)
+	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, handshakeFrame)
 	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + 8)
 	for i := 0; i < paddingLength; i++ {

@@ -21,10 +21,10 @@ type abstractPacket struct {
 	Acknowledger
 	PacketEncoder
 }
-func (p *abstractPacket) encodeHeader() []byte {
+func (p abstractPacket) encodeHeader() []byte {
 	return p.header.encode()
 }
-func (p *abstractPacket) encode() []byte {
+func (p abstractPacket) encode() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.Write(p.encodeHeader())
 	buffer.Write(p.encodePayload())
@@ -32,7 +32,7 @@ func (p *abstractPacket) encode() []byte {
 }
 
 type VersionNegotationPacket struct {
-	*abstractPacket
+	abstractPacket
 	supportedVersion []SupportedVersion
 }
 type SupportedVersion uint32
@@ -67,7 +67,7 @@ func NewVersionNegotationPacket(versions []SupportedVersion, conn *Connection) *
 }
 
 type ClientInitialPacket struct {
-	*abstractPacket
+	abstractPacket
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
@@ -114,7 +114,7 @@ type ServerStatelessRetryPacket struct {
 }
 
 type ServerCleartextPacket struct {
-	*abstractPacket
+	abstractPacket
 	streamFrames []StreamFrame
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
@@ -157,7 +157,7 @@ func ReadServerCleartextPacket(buffer *bytes.Reader) *ServerCleartextPacket {
 }
 
 type ClientCleartextPacket struct {
-	*abstractPacket
+	abstractPacket
 	streamFrames []StreamFrame
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
@@ -186,7 +186,7 @@ func NewClientCleartextPacket(streamFrames []StreamFrame, ackFrames []AckFrame, 
 }
 
 type ProtectedPacket struct {
-	*abstractPacket
+	abstractPacket
 	frames []Frame
 }
 func (p *ProtectedPacket) shouldBeAcknowledged() bool   { return false } // TODO: Should they be ?

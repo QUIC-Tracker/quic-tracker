@@ -55,6 +55,19 @@ func (c *Connection) sendClientInitialPacket() {
 
 	c.sendAEADSealedPacket(clientInitialPacket.encodeHeader(), clientInitialPacket.encodePayload(), clientInitialPacket.header.PacketNumber())
 }
+func (c *Connection) completeServerHello(packet *ServerCleartextPacket) {
+	var serverData []byte
+	for _, frame := range packet.streamFrames {
+		serverData = append(serverData, frame.streamData...)
+	}
+
+	c.tlsBuffer.input(serverData)
+	c.tls.Handshake()
+	_ = c.tlsBuffer.getOutput()
+
+	// TODO: Prepare new crypto state
+	// TODO: Send tls output on stream 0
+}
 func (c *Connection) readNextPacket() Packet {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.udpConnection.ReadFromUDP(rec)
@@ -120,5 +133,11 @@ func main() {
 	conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
 	conn.sendClientInitialPacket()
 	packet := conn.readNextPacket()
-	spew.Dump(packet)
+	if packet, ok := packet.(*ServerCleartextPacket); ok {
+		conn.completeServerHello(packet)
+	} else {
+		//spew.Dump(packet)
+		panic(packet)
+	}
+
 }

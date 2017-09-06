@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/bifurcation/mint"
 	"crypto/rand"
-	"crypto/cipher"
 	"encoding/binary"
 	"net"
 	"bytes"
@@ -15,7 +14,11 @@ type Connection struct {
 	udpConnection 	 *net.UDPConn
 	tlsBuffer	  	 *connBuffer
 	tls     	  	 *mint.Conn
-	aead             cipher.AEAD
+
+	cleartext        *CryptoState
+	protected        *CryptoState
+	cipherSuite		 *mint.CipherSuiteParams
+
 	streams			 map[uint32]*Stream
 	connectionId  	 uint64
 	packetNumber  	 uint64
@@ -27,7 +30,14 @@ func (c *Connection) nextPacketNumber() uint64 {
 	return c.packetNumber
 }
 func (c *Connection) sendAEADSealedPacket(header []byte, payload []byte, packetNumber uint32) {
-	protectedPayload := c.aead.Seal(nil, encodeArgs(packetNumber), payload, header)
+	protectedPayload := c.cleartext.write.Seal(nil, encodeArgs(packetNumber), payload, header)
+	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
+	finalPacket = append(finalPacket, header...)
+	finalPacket = append(finalPacket, protectedPayload...)
+	c.udpConnection.Write(finalPacket)
+}
+func (c *Connection) sendProtectedPacket(header []byte, payload []byte, packetNumber uint32) {
+	protectedPayload := c.protected.write.Seal(nil, encodeArgs(packetNumber), payload, header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -57,9 +67,12 @@ func (c *Connection) completeServerHello(packet *ServerCleartextPacket) {
 	c.tls.Handshake()
 	tlsOutput := c.tlsBuffer.getOutput()
 
-	// TODO: Prepare new crypto state
+	state := c.tls.State()
+	// TODO: Check negotiated ALPN ?
+	c.cipherSuite = &state.CipherSuite
+	spew.Dump(c.cipherSuite)
+	c.protected = NewProtectedCryptoState(c)
 
-	// TODO: Send tls output on stream 0
 	outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
 	clearTestPacket := NewClientCleartextPacket([]StreamFrame{*outputFrame}, nil, nil, c)
 	c.sendAEADSealedPacket(clearTestPacket.encodeHeader(), clearTestPacket.encodePayload(), clearTestPacket.header.PacketNumber())
@@ -81,7 +94,7 @@ func (c *Connection) readNextPacket() Packet {
 
 	header := ReadLongHeader(bytes.NewReader(rec[:headerLen]))
 	if header.packetType == ServerCleartext {
-		payload, err := c.aead.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
+		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			panic(err)
 		}
@@ -114,7 +127,7 @@ func NewConnection(address string, serverName string) *Connection {
 	}
 	tlsConfig.Init(true)
 	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
-	c.aead = &aeadFNV{}
+	c.cleartext = NewCleartextCryptoState()
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
 	c.connectionId = uint64(binary.BigEndian.Uint64(cId))
@@ -128,8 +141,16 @@ func NewConnection(address string, serverName string) *Connection {
 	return c
 }
 
+func assert(value bool) {
+	if !value {
+		panic("")
+	}
+}
+
 func main() {
-	conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
+	//conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
+	conn := NewConnection("kotdt.com:4433", "kotdt.com")
+	//conn := NewConnection("localhost:4433", "quant.eggert.org")
 	conn.sendClientInitialPacket()
 	packet := conn.readNextPacket()
 	if packet, ok := packet.(*ServerCleartextPacket); ok {
@@ -139,4 +160,25 @@ func main() {
 		panic(packet)
 	}
 
+	packet = conn.readNextPacket()
+	if packet, ok := packet.(*ServerCleartextPacket); ok {
+		assert(len(packet.streamFrames) == 0)
+		assert(len(packet.ackFrames) == 1)
+	} else {
+		spew.Dump(packet)
+		panic(packet)
+	}
+	conn.streams[1] = &Stream{}
+	streamFrame := NewStreamFrame(1, conn.streams[1], []byte("Hello, world!\n"), false)
+	protectedPacket := NewProtectedPacket(conn)
+	protectedPacket.frames = append(protectedPacket.frames, streamFrame)
+	conn.sendProtectedPacket(protectedPacket.encodeHeader(), protectedPacket.encodePayload(), protectedPacket.header.PacketNumber())
+
+	packet = conn.readNextPacket()
+	if packet, ok := packet.(*ProtectedPacket); ok {
+		spew.Dump(packet)
+	} else {
+		spew.Dump(packet)
+		panic(packet)
+	}
 }

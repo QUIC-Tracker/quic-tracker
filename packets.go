@@ -155,7 +155,7 @@ func ReadServerCleartextPacket(buffer *bytes.Reader, conn *Connection) *ServerCl
 		buffer.UnreadByte()
 		switch {
 		case 0xa0 <= typeByte && typeByte <= 0xbf:
-			p.ackFrames = append(p.ackFrames, *NewAckFrame(buffer))
+			p.ackFrames = append(p.ackFrames, *ReadAckFrame(buffer))
 		case 0xc0 <= typeByte && typeByte <= 0xff:
 			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
 		default:
@@ -216,5 +216,10 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 		}
 		p.frames = append(p.frames, frame)
 	}
+	return p
+}
+func NewProtectedPacket(conn *Connection) *ProtectedPacket {  // TODO: Figure out the short header 1RTT variant
+	p := new(ProtectedPacket)
+	p.header = NewLongHeader(OneRTTProtectedKP0, conn)
 	return p
 }

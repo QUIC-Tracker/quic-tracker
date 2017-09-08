@@ -28,7 +28,7 @@ func NewProtectedCryptoState(conn *Connection) *CryptoState {
 }
 
 func newProtectedAead(label string, tls *mint.Conn, cipherSuite *mint.CipherSuiteParams) cipher.AEAD {
-	secret , err := tls.ComputeExporter(serverPpSecret0Label, []byte{}, cipherSuite.Hash.Size())
+	secret , err := tls.ComputeExporter(label, []byte{}, cipherSuite.Hash.Size())
 	if err != nil {
 		panic(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Frame interface {
@@ -45,11 +46,12 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
 		return Frame(NewNewConnectionIdFrame(buffer))
 	case frameType == StopSendingType:
 		return Frame(NewStopSendingFrame(buffer))
-	case frameType == AckType:
-		return Frame(NewAckFrame(buffer))
-	case frameType == StreamType:
+	case (frameType & AckType) == AckType:
+		return Frame(ReadAckFrame(buffer))
+	case (frameType & StreamType) == StreamType:
 		return Frame(ReadStreamFrame(buffer, conn))
 	default:
+		spew.Dump(buffer)
 		panic(fmt.Sprintf("Unknown frame type %d", typeByte))
 	}
 }
@@ -95,6 +97,7 @@ func (frame *ResetStream) writeTo(buffer *bytes.Buffer) {
 }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	binary.Read(buffer, binary.BigEndian, &frame.finalOffset)
@@ -117,6 +120,7 @@ func (frame *ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)
 	if frame.reasonPhraseLength > 0 {
@@ -138,6 +142,7 @@ func (frame *MaxDataFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.maximumData)
 	return frame
 }
@@ -154,6 +159,7 @@ func (frame *MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	binary.Read(buffer, binary.BigEndian, &frame.maximumStreamData)
 	return frame
@@ -169,6 +175,7 @@ func (frame *MaxStreamIdFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamIdFrame {
 	frame := new(MaxStreamIdFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.maximumStreamId)
 	return frame
 }
@@ -180,6 +187,7 @@ func (frame *PingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
+	buffer.ReadByte()  // Discard frame type
 	return new(PingFrame)
 }
 
@@ -189,6 +197,7 @@ func (frame *BlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewBlockedFrame(buffer *bytes.Reader) *BlockedFrame {
+	buffer.ReadByte()  // Discard frame type
 	return new(BlockedFrame)
 }
 
@@ -202,6 +211,7 @@ func (frame *StreamBlockedFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamBlockedFrame {
 	frame := new(StreamBlockedFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	return frame
 }
@@ -212,6 +222,7 @@ func (frame *StreamIdNeededFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdNeededFrame {
+	buffer.ReadByte()  // Discard frame type
 	return new(StreamIdNeededFrame)
 }
 
@@ -229,6 +240,7 @@ func (frame *NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.sequence)
 	binary.Read(buffer, binary.BigEndian, &frame.connectionId)
 	binary.Read(buffer, binary.BigEndian, &frame.statelessResetToken)
@@ -247,6 +259,7 @@ func (frame *StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
+	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.streamId)
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	return frame
@@ -299,7 +312,16 @@ func (frame *AckFrame) writeTo(buffer *bytes.Buffer) {
 		if index > 0 {
 			binary.Write(buffer, binary.BigEndian, block.gap)
 		}
-		binary.Write(buffer, binary.BigEndian, block.ack)
+		switch frame.AckBlockLength {
+		case 0:
+			binary.Write(buffer, binary.BigEndian, uint8(block.ack))
+		case 1:
+			binary.Write(buffer, binary.BigEndian, uint16(block.ack))
+		case 2:
+			binary.Write(buffer, binary.BigEndian, uint32(block.ack))
+		case 3:
+			binary.Write(buffer, binary.BigEndian, uint64(block.ack))
+		}
 	}
 	for index, timestamp := range frame.timestamps {
 		binary.Write(buffer, binary.BigEndian, timestamp.deltaLargestAcknowledged)
@@ -310,7 +332,7 @@ func (frame *AckFrame) writeTo(buffer *bytes.Buffer) {
 		}
 	}
 }
-func NewAckFrame(buffer *bytes.Reader) *AckFrame {
+func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	frame := new(AckFrame)
 	typeByte, _ := buffer.ReadByte()
 	frame.numBlocksPresent = typeByte & 0x10 == 0x10
@@ -372,6 +394,16 @@ func NewAckFrame(buffer *bytes.Reader) *AckFrame {
 		}
 		frame.timestamps = append(frame.timestamps, timestamp)
 	}
+	return frame
+}
+func NewAckFrame(largestAcknowledged uint64, ackBlockLength uint64) *AckFrame {
+	frame := new(AckFrame)
+	frame.numBlocksPresent = false
+	frame.largestAcknowledgedLength = 0x02
+	frame.AckBlockLength = 0x02
+	frame.numTimestamps = 0
+	frame.largestAcknowledged = largestAcknowledged
+	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockLength})
 	return frame
 }
 

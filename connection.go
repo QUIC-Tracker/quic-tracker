@@ -24,6 +24,7 @@ type Connection struct {
 	packetNumber  	 uint64
 	version       	 uint32
 	omitConnectionId bool
+	receivedPackets  uint64  // TODO: Implement proper ACK mechanism
 }
 func (c *Connection) nextPacketNumber() uint64 {
 	c.packetNumber++
@@ -57,25 +58,38 @@ func (c *Connection) sendClientInitialPacket() {
 
 	c.sendAEADSealedPacket(clientInitialPacket.encodeHeader(), clientInitialPacket.encodePayload(), clientInitialPacket.header.PacketNumber())
 }
-func (c *Connection) completeServerHello(packet *ServerCleartextPacket) {
+func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
 	var serverData []byte
 	for _, frame := range packet.streamFrames {
 		serverData = append(serverData, frame.streamData...)
 	}
 
+	var clearTextPacket *ClientCleartextPacket
+	ackFrame := NewAckFrame(uint64(packet.header.PacketNumber()), c.receivedPackets - 1)
+
 	c.tlsBuffer.input(serverData)
-	c.tls.Handshake()
-	tlsOutput := c.tlsBuffer.getOutput()
+	alert := c.tls.Handshake()
+	switch alert {
+	case mint.AlertNoAlert:
+		tlsOutput := c.tlsBuffer.getOutput()
 
-	state := c.tls.State()
-	// TODO: Check negotiated ALPN ?
-	c.cipherSuite = &state.CipherSuite
-	spew.Dump(c.cipherSuite)
-	c.protected = NewProtectedCryptoState(c)
+		state := c.tls.State()
+		// TODO: Check negotiated ALPN ?
+		c.cipherSuite = &state.CipherSuite
+		c.protected = NewProtectedCryptoState(c)
 
-	outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
-	clearTestPacket := NewClientCleartextPacket([]StreamFrame{*outputFrame}, nil, nil, c)
-	c.sendAEADSealedPacket(clearTestPacket.encodeHeader(), clearTestPacket.encodePayload(), clearTestPacket.header.PacketNumber())
+		outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
+
+		clearTextPacket = NewClientCleartextPacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
+		defer c.sendAEADSealedPacket(clearTextPacket.encodeHeader(), clearTextPacket.encodePayload(), clearTextPacket.header.PacketNumber())
+		return false
+	case mint.AlertWouldBlock:
+		clearTextPacket = NewClientCleartextPacket(nil, []AckFrame{*ackFrame}, nil, c)
+		defer c.sendAEADSealedPacket(clearTextPacket.encodeHeader(), clearTextPacket.encodePayload(), clearTextPacket.header.PacketNumber())
+		return true
+	default:
+		panic(alert)
+	}
 }
 func (c *Connection) readNextPacket() Packet {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
@@ -92,18 +106,31 @@ func (c *Connection) readNextPacket() Packet {
 		panic("TODO readNextPacket w/ short header")
 	}
 
+	c.receivedPackets++
 	header := ReadLongHeader(bytes.NewReader(rec[:headerLen]))
-	if header.packetType == ServerCleartext {
+	switch header.packetType {
+	case ServerCleartext:
 		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		return ReadServerCleartextPacket(buffer, c)
-	} else {
+	case OneRTTProtectedKP0:
+		payload, err := c.protected.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
+		if err != nil {
+			panic(err)
+		}
+		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+		return ReadProtectedPacket(buffer, c)
+	default:
 		panic(header.packetType)
 	}
-	return nil
+}
+func (c *Connection) sendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
+	protectedPacket := NewProtectedPacket(c)
+	protectedPacket.frames = append(protectedPacket.frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
+	c.sendProtectedPacket(protectedPacket.encodeHeader(), protectedPacket.encodePayload(), protectedPacket.header.PacketNumber())
 }
 
 func NewConnection(address string, serverName string) *Connection {
@@ -149,36 +176,38 @@ func assert(value bool) {
 
 func main() {
 	//conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
-	conn := NewConnection("kotdt.com:4433", "kotdt.com")
-	//conn := NewConnection("localhost:4433", "quant.eggert.org")
+	//conn := NewConnection("kotdt.com:4433", "kotdt.com")
+	conn := NewConnection("localhost:4433", "localhost")
 	conn.sendClientInitialPacket()
-	packet := conn.readNextPacket()
-	if packet, ok := packet.(*ServerCleartextPacket); ok {
-		conn.completeServerHello(packet)
-	} else {
-		spew.Dump(packet)
-		panic(packet)
+	var packet Packet
+
+	ongoingHandhake := true
+	for ongoingHandhake {
+		packet = conn.readNextPacket()
+		if packet, ok := packet.(*ServerCleartextPacket); ok {
+			ongoingHandhake = conn.processServerHello(packet)
+		} else {
+			spew.Dump(packet)
+			panic(packet)
+		}
 	}
 
-	packet = conn.readNextPacket()
-	if packet, ok := packet.(*ServerCleartextPacket); ok {
-		assert(len(packet.streamFrames) == 0)
-		assert(len(packet.ackFrames) == 1)
-	} else {
-		spew.Dump(packet)
-		panic(packet)
-	}
 	conn.streams[1] = &Stream{}
-	streamFrame := NewStreamFrame(1, conn.streams[1], []byte("Hello, world!\n"), false)
+	streamFrame := NewStreamFrame(1, conn.streams[1], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
+	ackFrame := NewAckFrame(uint64(packet.Header().PacketNumber()), conn.receivedPackets - 1)
+
 	protectedPacket := NewProtectedPacket(conn)
-	protectedPacket.frames = append(protectedPacket.frames, streamFrame)
+	protectedPacket.frames = append(protectedPacket.frames, streamFrame, ackFrame)
 	conn.sendProtectedPacket(protectedPacket.encodeHeader(), protectedPacket.encodePayload(), protectedPacket.header.PacketNumber())
 
-	packet = conn.readNextPacket()
-	if packet, ok := packet.(*ProtectedPacket); ok {
-		spew.Dump(packet)
-	} else {
-		spew.Dump(packet)
-		panic(packet)
+	for {
+		var ok bool
+		packet = conn.readNextPacket()
+		conn.sendAck(uint64(packet.Header().PacketNumber()))
+		packet, ok = packet.(*ProtectedPacket)
+		if ok {
+			spew.Dump(packet)
+		}
 	}
+
 }

@@ -65,8 +65,8 @@ const ServerStatelessRetry	LongPacketType = 0x03
 const ServerCleartext 		LongPacketType = 0x04
 const ClientCleartext 		LongPacketType = 0x05
 const ZeroRTTProtected 		LongPacketType = 0x06
-const OneRTTProtectedKP0 	LongPacketType = 0x06
-const OneRTTProtectedKP1 	LongPacketType = 0x07
+const OneRTTProtectedKP0 	LongPacketType = 0x07
+const OneRTTProtectedKP1 	LongPacketType = 0x08
 
 type ShortHeader struct {
 	connectionIdFlag 	bool

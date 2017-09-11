@@ -24,6 +24,7 @@ type Connection struct {
 	packetNumber  	 uint64
 	version       	 uint32
 	omitConnectionId bool
+	ackQueue		 []uint64  // Stores the packet numbers to be acked
 	receivedPackets  uint64  // TODO: Implement proper ACK mechanism
 }
 func (c *Connection) nextPacketNumber() uint64 {
@@ -51,7 +52,7 @@ func (c *Connection) sendClientInitialPacket() {
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + 8)
+	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.protected.write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
 	}
@@ -126,6 +127,27 @@ func (c *Connection) readNextPacket() Packet {
 	default:
 		panic(header.packetType)
 	}
+}
+func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on the packet number received
+	packetNumbers := reverse(c.ackQueue)
+	frame := new(AckFrame)
+	frame.ackBlocks = make([]AckBlock, 0, 255)
+	frame.largestAcknowledged = packetNumbers[0]
+
+	previous := frame.largestAcknowledged
+	ackBlock := AckBlock{}
+	for _, number := range packetNumbers[1:] {
+		if number - previous == 1 {
+			ackBlock.ack++
+		} else {
+			frame.ackBlocks = append(frame.ackBlocks, ackBlock)
+			ackBlock = AckBlock{uint8(number - previous - 1), 0}  // TODO: Handle gaps larger than 255 packets
+		}
+	}
+	frame.ackBlocks = append(frame.ackBlocks, ackBlock)
+	frame.numBlocksPresent = len(frame.ackBlocks) > 1
+	frame.numAckBlocks = uint8(len(frame.ackBlocks)-1)
+	return frame
 }
 func (c *Connection) sendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
 	protectedPacket := NewProtectedPacket(c)

@@ -20,3 +20,11 @@ type TransportParameter struct {
 	value uint16
 }
 
+func reverse(s []uint64) []uint64 {
+	rev := make([]uint64, 0, len(s))
+	last := len(s) - 1
+	for i := 0; i < len(s)/2; i++ {
+		rev = append(rev, s[last-i])
+	}
+	return rev
+}

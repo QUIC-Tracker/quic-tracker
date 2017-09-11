@@ -45,7 +45,7 @@ type VersionNegotationPacket struct {
 	supportedVersion []SupportedVersion
 }
 type SupportedVersion uint32
-func (p VersionNegotationPacket) shouldBeAcknowledged() bool   { return false }
+func (p VersionNegotationPacket) shouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, version := range p.supportedVersion {
@@ -80,7 +80,7 @@ type ClientInitialPacket struct {
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
-func (p ClientInitialPacket) shouldBeAcknowledged() bool   { return false }
+func (p ClientInitialPacket) shouldBeAcknowledged() bool { return true }
 func (p ClientInitialPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -128,7 +128,7 @@ type ServerCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ServerCleartextPacket) shouldBeAcknowledged() bool   { return false }
+func (p ServerCleartextPacket) shouldBeAcknowledged() bool { return true }
 func (p ServerCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -171,7 +171,7 @@ type ClientCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ClientCleartextPacket) shouldBeAcknowledged() bool   { return false }
+func (p ClientCleartextPacket) shouldBeAcknowledged() bool { return true }
 func (p ClientCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -198,7 +198,7 @@ type ProtectedPacket struct {
 	abstractPacket
 	frames []Frame
 }
-func (p *ProtectedPacket) shouldBeAcknowledged() bool   { return false } // TODO: Should they be ?
+func (p *ProtectedPacket) shouldBeAcknowledged() bool { return true }
 func (p *ProtectedPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.frames {

@@ -60,6 +60,8 @@ func (c *Connection) sendClientInitialPacket() {
 	c.sendAEADSealedPacket(clientInitialPacket.encodeHeader(), clientInitialPacket.encodePayload(), clientInitialPacket.header.PacketNumber())
 }
 func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
+	c.connectionId = packet.header.ConnectionId()  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+
 	var serverData []byte
 	for _, frame := range packet.streamFrames {
 		serverData = append(serverData, frame.streamData...)

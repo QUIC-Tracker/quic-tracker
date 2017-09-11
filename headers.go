@@ -7,6 +7,7 @@ import (
 
 type Header interface {
 	PacketNumber() uint32
+	ConnectionId() uint64
 	encode() []byte
 }
 func ReadHeader(buffer *bytes.Reader) Header {
@@ -39,6 +40,9 @@ func (h LongHeader) encode() []byte {
 }
 func (h LongHeader) PacketNumber() uint32 {
 	return h.packetNumber
+}
+func (h LongHeader) ConnectionId() uint64 {
+	return h.connectionId
 }
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h := new(LongHeader)
@@ -75,7 +79,7 @@ type ShortHeader struct {
 	connectionId 		uint64
 	packetNumber        uint32
 }
-func (h *ShortHeader) encode() []byte {
+func (h ShortHeader) encode() []byte {
 	buffer := new(bytes.Buffer)
 	var typeByte uint8
 	if h.connectionIdFlag {
@@ -97,8 +101,11 @@ func (h *ShortHeader) encode() []byte {
 	}
 	return buffer.Bytes()
 }
-func (h *ShortHeader) PacketNumber() uint32 {
+func (h ShortHeader) PacketNumber() uint32 {
 	return h.packetNumber
+}
+func (h ShortHeader) ConnectionId() uint64 {
+	return h.connectionId
 }
 func ReadShortHeader(buffer *bytes.Reader) *ShortHeader {
 	h := new(ShortHeader)

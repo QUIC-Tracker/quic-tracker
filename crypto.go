@@ -5,7 +5,7 @@ import (
 	"github.com/bifurcation/mint"
 )
 
-const (
+const (  // See https://tools.ietf.org/html/draft-ietf-quic-tls-05#section-5.2.2
 	clientPpSecret0Label = "EXPORTER-QUIC client 1-RTT Secret"
 	serverPpSecret0Label = "EXPORTER-QUIC server 1-RTT Secret"
 )

@@ -74,8 +74,8 @@ const StreamType FrameType = 0xc0
 
 type PaddingFrame byte
 
-func (frame *PaddingFrame) FrameType() FrameType { return PaddingFrameType }
-func (frame *PaddingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame PaddingFrame) FrameType() FrameType { return PaddingFrameType }
+func (frame PaddingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
@@ -88,8 +88,8 @@ type ResetStream struct {
 	errorCode   uint32
 	finalOffset uint64
 }
-func (frame *ResetStream) FrameType() FrameType { return ResetStreamType }
-func (frame *ResetStream) writeTo(buffer *bytes.Buffer) {
+func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
+func (frame ResetStream) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.streamId)
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
@@ -109,8 +109,8 @@ type ConnectionCloseFrame struct {
 	reasonPhraseLength uint16
 	reasonPhrase       string
 }
-func (frame *ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
-func (frame *ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
+func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
+func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
 	binary.Write(buffer, binary.BigEndian, frame.reasonPhraseLength)
@@ -135,8 +135,8 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 type MaxDataFrame struct {
 	maximumData uint64
 }
-func (frame *MaxDataFrame) FrameType() FrameType { return MaxDataType }
-func (frame *MaxDataFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxDataFrame) FrameType() FrameType { return MaxDataType }
+func (frame MaxDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.maximumData)
 }
@@ -151,8 +151,8 @@ type MaxStreamDataFrame struct {
 	streamId uint32
 	maximumStreamData uint64
 }
-func (frame *MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
-func (frame *MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
+func (frame MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.streamId)
 	binary.Write(buffer, binary.BigEndian, frame.maximumStreamData)
@@ -168,8 +168,8 @@ func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 type MaxStreamIdFrame struct {
 	maximumStreamId uint32
 }
-func (frame *MaxStreamIdFrame) FrameType() FrameType { return MaxStreamIdType }
-func (frame *MaxStreamIdFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxStreamIdFrame) FrameType() FrameType { return MaxStreamIdType }
+func (frame MaxStreamIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.maximumStreamId)
 }
@@ -182,8 +182,8 @@ func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamIdFrame {
 
 
 type PingFrame byte
-func (frame *PingFrame) FrameType() FrameType { return PingType }
-func (frame *PingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame PingFrame) FrameType() FrameType { return PingType }
+func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
@@ -192,8 +192,8 @@ func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 }
 
 type BlockedFrame byte
-func (frame *BlockedFrame) FrameType() FrameType { return BlockedType }
-func (frame *BlockedFrame) writeTo(buffer *bytes.Buffer) {
+func (frame BlockedFrame) FrameType() FrameType { return BlockedType }
+func (frame BlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewBlockedFrame(buffer *bytes.Reader) *BlockedFrame {
@@ -204,8 +204,8 @@ func NewBlockedFrame(buffer *bytes.Reader) *BlockedFrame {
 type StreamBlockedFrame struct {
 	streamId uint32
 }
-func (frame *StreamBlockedFrame) FrameType() FrameType { return StreamBlockedType }
-func (frame *StreamBlockedFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamBlockedFrame) FrameType() FrameType { return StreamBlockedType }
+func (frame StreamBlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.streamId)
 }
@@ -217,8 +217,8 @@ func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamBlockedFrame {
 }
 
 type StreamIdNeededFrame byte
-func (frame *StreamIdNeededFrame) FrameType() FrameType { return StreamIdNeededType }
-func (frame *StreamIdNeededFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamIdNeededFrame) FrameType() FrameType { return StreamIdNeededType }
+func (frame StreamIdNeededFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
 func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdNeededFrame {
@@ -231,8 +231,8 @@ type NewConnectionIdFrame struct {
 	connectionId        uint32
 	statelessResetToken [8]byte
 }
-func (frame *NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
-func (frame *NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
+func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
+func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.sequence)
 	binary.Write(buffer, binary.BigEndian, frame.connectionId)
@@ -251,8 +251,8 @@ type StopSendingFrame struct {
 	streamId  uint32
 	errorCode uint32
 }
-func (frame *StopSendingFrame) FrameType() FrameType { return StopSendingType }
-func (frame *StopSendingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
+func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.streamId)
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
@@ -284,8 +284,8 @@ type Timestamp struct {
 	deltaLargestAcknowledged uint8
 	timeSince                uint32
 }
-func (frame *AckFrame) FrameType() FrameType { return AckType }
-func (frame *AckFrame) writeTo(buffer *bytes.Buffer) {
+func (frame AckFrame) FrameType() FrameType { return AckType }
+func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	typeByte := byte(frame.FrameType())
 	if frame.numBlocksPresent {
 		typeByte |= 0x10
@@ -417,8 +417,8 @@ type StreamFrame struct {
 	dataLength uint16
 	streamData []byte
 }
-func (frame *StreamFrame) FrameType() FrameType { return StreamType }
-func (frame *StreamFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamFrame) FrameType() FrameType { return StreamType }
+func (frame StreamFrame) writeTo(buffer *bytes.Buffer) {
 	typeByte := byte(frame.FrameType())
 	if frame.finBit {
 		typeByte |= 0x20

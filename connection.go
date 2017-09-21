@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
 	"time"
+	"os"
+	"fmt"
 )
 
 type Connection struct {
@@ -22,6 +24,7 @@ type Connection struct {
 	streams			 map[uint32]*Stream
 	connectionId  	 uint64
 	packetNumber  	 uint64
+	expectedPacketNumber uint64
 	version       	 uint32
 	omitConnectionId bool
 	ackQueue		 []uint64  // Stores the packet numbers to be acked
@@ -110,6 +113,7 @@ func (c *Connection) readNextPacket() Packet {
 	}
 
 	c.receivedPackets++
+	var packet Packet
 	header := ReadLongHeader(bytes.NewReader(rec[:headerLen]))
 	switch header.packetType {
 	case ServerCleartext:
@@ -118,17 +122,33 @@ func (c *Connection) readNextPacket() Packet {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-		return ReadServerCleartextPacket(buffer, c)
+		packet = ReadServerCleartextPacket(buffer, c)
 	case OneRTTProtectedKP0:
 		payload, err := c.protected.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-		return ReadProtectedPacket(buffer, c)
+		packet = ReadProtectedPacket(buffer, c)
 	default:
 		panic(header.packetType)
 	}
+
+	fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+
+	for _, number := range c.ackQueue {
+		if number == fullPacketNumber  {
+			fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
+			spew.Dump(packet)
+			return c.readNextPacket()
+			// TODO: Should it be acked again ?
+		}
+	}
+
+	c.ackQueue = append(c.ackQueue, fullPacketNumber)
+	c.expectedPacketNumber = fullPacketNumber + 1
+
+	return packet
 }
 func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on the packet number received
 	packetNumbers := reverse(c.ackQueue)

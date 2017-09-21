@@ -128,7 +128,7 @@ type ServerCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ServerCleartextPacket) shouldBeAcknowledged() bool { return true }
+func (p ServerCleartextPacket) shouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
 func (p ServerCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -171,7 +171,7 @@ type ClientCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ClientCleartextPacket) shouldBeAcknowledged() bool { return true }
+func (p ClientCleartextPacket) shouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }
 func (p ClientCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -198,7 +198,14 @@ type ProtectedPacket struct {
 	abstractPacket
 	frames []Frame
 }
-func (p *ProtectedPacket) shouldBeAcknowledged() bool { return true }
+func (p *ProtectedPacket) shouldBeAcknowledged() bool {
+	for _, frame := range p.frames {
+		if _, ok :=  frame.(AckFrame); !ok {
+			return true
+		}
+	}
+	return false
+}
 func (p *ProtectedPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.frames {

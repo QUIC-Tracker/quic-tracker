@@ -34,15 +34,17 @@ func (c *Connection) nextPacketNumber() uint64 {
 	c.packetNumber++
 	return c.packetNumber
 }
-func (c *Connection) sendAEADSealedPacket(header []byte, payload []byte, packetNumber uint32) {
-	protectedPayload := c.cleartext.write.Seal(nil, encodeArgs(packetNumber), payload, header)
+func (c *Connection) sendAEADSealedPacket(packet Packet) {
+	header := packet.encodeHeader()
+	protectedPayload := c.cleartext.write.Seal(nil, encodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.udpConnection.Write(finalPacket)
 }
-func (c *Connection) sendProtectedPacket(header []byte, payload []byte, packetNumber uint32) {
-	protectedPayload := c.protected.write.Seal(nil, encodeArgs(packetNumber), payload, header)
+func (c *Connection) sendProtectedPacket(packet Packet) {
+	header := packet.encodeHeader()
+	protectedPayload := c.protected.write.Seal(nil, encodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -55,12 +57,12 @@ func (c *Connection) sendClientInitialPacket() {
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.protected.write.Overhead())
+	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.cleartext.write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
 	}
 
-	c.sendAEADSealedPacket(clientInitialPacket.encodeHeader(), clientInitialPacket.encodePayload(), clientInitialPacket.header.PacketNumber())
+	c.sendAEADSealedPacket(clientInitialPacket)
 }
 func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
 	c.connectionId = packet.header.ConnectionId()  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
@@ -87,11 +89,11 @@ func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { //
 		outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
 
 		clearTextPacket = NewClientCleartextPacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendAEADSealedPacket(clearTextPacket.encodeHeader(), clearTextPacket.encodePayload(), clearTextPacket.header.PacketNumber())
+		defer c.sendAEADSealedPacket(clearTextPacket)
 		return false
 	case mint.AlertWouldBlock:
 		clearTextPacket = NewClientCleartextPacket(nil, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendAEADSealedPacket(clearTextPacket.encodeHeader(), clearTextPacket.encodePayload(), clearTextPacket.header.PacketNumber())
+		defer c.sendAEADSealedPacket(clearTextPacket)
 		return true
 	default:
 		panic(alert)
@@ -150,7 +152,7 @@ func (c *Connection) readNextPacket() Packet {
 
 	return packet
 }
-func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on the packet number received
+func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on the packet numbers received
 	packetNumbers := reverse(c.ackQueue)
 	frame := new(AckFrame)
 	frame.ackBlocks = make([]AckBlock, 0, 255)
@@ -159,12 +161,13 @@ func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on
 	previous := frame.largestAcknowledged
 	ackBlock := AckBlock{}
 	for _, number := range packetNumbers[1:] {
-		if number - previous == 1 {
+		if previous - number == 1 {
 			ackBlock.ack++
 		} else {
 			frame.ackBlocks = append(frame.ackBlocks, ackBlock)
-			ackBlock = AckBlock{uint8(number - previous - 1), 0}  // TODO: Handle gaps larger than 255 packets
+			ackBlock = AckBlock{uint8(previous - number - 1), 0}  // TODO: Handle gaps larger than 255 packets
 		}
+		previous = number
 	}
 	frame.ackBlocks = append(frame.ackBlocks, ackBlock)
 	frame.numBlocksPresent = len(frame.ackBlocks) > 1
@@ -174,7 +177,7 @@ func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on
 func (c *Connection) sendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
 	protectedPacket := NewProtectedPacket(c)
 	protectedPacket.frames = append(protectedPacket.frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
-	c.sendProtectedPacket(protectedPacket.encodeHeader(), protectedPacket.encodePayload(), protectedPacket.header.PacketNumber())
+	c.sendProtectedPacket(protectedPacket)
 }
 
 func NewConnection(address string, serverName string) *Connection {
@@ -238,19 +241,25 @@ func main() {
 
 	conn.streams[1] = &Stream{}
 	streamFrame := NewStreamFrame(1, conn.streams[1], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
-	ackFrame := NewAckFrame(uint64(packet.Header().PacketNumber()), conn.receivedPackets - 1)
+	ackFrame := conn.getAckFrame()
 
 	protectedPacket := NewProtectedPacket(conn)
 	protectedPacket.frames = append(protectedPacket.frames, streamFrame, ackFrame)
-	conn.sendProtectedPacket(protectedPacket.encodeHeader(), protectedPacket.encodePayload(), protectedPacket.header.PacketNumber())
+	conn.sendProtectedPacket(protectedPacket)
 
 	for {
-		var ok bool
 		packet = conn.readNextPacket()
 		conn.sendAck(uint64(packet.Header().PacketNumber()))
-		packet, ok = packet.(*ProtectedPacket)
-		if ok {
-			spew.Dump(packet)
+
+		spew.Dump("---> Received packet")
+		spew.Dump(packet)
+
+		if packet.shouldBeAcknowledged() {
+			protectedPacket = NewProtectedPacket(conn)
+			protectedPacket.frames = append(protectedPacket.frames, conn.getAckFrame())
+			spew.Dump("<--- Send ack packet")
+			spew.Dump(protectedPacket)
+			conn.sendProtectedPacket(protectedPacket)
 		}
 	}
 

@@ -5,7 +5,7 @@ import asyncio
 
 async def scrape(url, user_agent='Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:54.0) Gecko/20100101 Firefox/54.0'):
     async with aiohttp.ClientSession(headers={'User-Agent': user_agent}, read_timeout=5, conn_timeout=5) as session:
-        async with session.get(url) as resp:
+        async with session.get(url, allow_redirects=url.startswith('https')) as resp:
             return resp.headers.get('Alt-Svc')
 
 if __name__ == "__main__":
@@ -19,22 +19,22 @@ if __name__ == "__main__":
     tasks_finished = [False] * max_events
 
     for i, domain in enumerate(domains[:max_events]):
-        def enqueue_next_domain(i):
+        def enqueue_next_domain(i, protocol='https'):
             def enqueue(previous_task):
                 if previous_task is not None:
                     try:
                         print(previous_task.url, previous_task.result())
                     except ssl.CertificateError:
-                        # TODO
-                        pass
+                        return enqueue_next_domain(previous_task.index, protocol='http')(None)
                     except Exception:
                         print(previous_task.url, None)
 
                 if i < len(domains):
                     domain = domains[i]
-                    url = 'https://%s' % domain
+                    url = '%s://%s' % (protocol, domain)
                     task = asyncio.run_coroutine_threadsafe(scrape(url), loop)
                     task.url = url
+                    task.index = i
                     task.add_done_callback(enqueue_next_domain(i + max_events))
                 else:
                     tasks_finished[i % max_events] = True

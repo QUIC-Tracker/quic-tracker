@@ -32,9 +32,9 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
 def get_record(url, results):
     peer4, header4, peer6, header6 = results
     record = {'url': url}
-    if peer4 and all(*peer4):
+    if peer4 and all(peer4):
         record['ipv4'] = {'peer': {'host': peer4[0], 'port': peer4[1]}, 'Alt-Svc': header4}
-    if peer6 and all(*peer6):
+    if peer6 and all(peer6):
         record['ipv6'] = {'peer': {'host': peer6[0], 'port': peer6[1]}, 'Alt-Svc': header6}
     return record
 
@@ -64,7 +64,8 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     tasks_finished = [False] * max_events
     count = 0
-    results = [None] * len(domains)
+    n_domains = len(domains)
+    results = {}
 
     for i, domain in enumerate(domains[:max_events]):
         def enqueue_next_domain(i, protocol='https'):
@@ -78,7 +79,7 @@ if __name__ == "__main__":
                         results[previous_task.index] = get_record(previous_task.url, (None,) * 4)
                         results[previous_task.index]['error'] = str(e)
                     count += 1
-                    print_progress(count, len(results))
+                    print_progress(count, n_domains)
 
                 if domains:
                     domain = domains.pop()
@@ -92,7 +93,7 @@ if __name__ == "__main__":
                     if all(tasks_finished):
                         loop.stop()
                         with open(output_file, 'w') as f:
-                            json.dump(results, f)
+                            json.dump([v for k, v in sorted(results.items(), key=lambda x: x[0])], f)
             return enqueue
         enqueue_next_domain(i)(None)
 

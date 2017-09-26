@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>QUIC Tracker</title>
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+    <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/bootstrap/dist/css/bootstrap.min.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='node_modules/font-awesome/css/font-awesome.min.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='node_modules/datatables.net-bs/css/dataTables.bootstrap.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/admin-lte/dist/css/AdminLTE.min.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='node_modules/admin-lte/dist/css/skins/skin-black.min.css') }}">
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700,300italic,400italic,600italic">
+    <style>
+        .info-box-content {
+            margin-left: initial;
+        }
+        .info-box .progress .progress-bar {
+            background: #337ab7;
+        }
+    </style>
+</head>
+
+<body class="hold-transition skin-black layout-top-nav">
+<div class="wrapper">
+
+    <header class="main-header">
+        <nav class="navbar navbar-static-top">
+            <div class="container">
+                <div class="navbar-header">
+                    <a href="/" class="navbar-brand"><b>QUIC</b> Tracker</a>
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+                            data-target="#navbar-collapse">
+                        <i class="fa fa-bars"></i>
+                    </button>
+                </div>
+
+                <div class="collapse navbar-collapse pull-left" id="navbar-collapse">
+                    <ul class="nav navbar-nav">
+                        <!--<li class="active"><a href="#">Link <span class="sr-only">(current)</span></a></li>
+                        <li><a href="#">Link</a></li>
+                        <li class="dropdown">
+                          <a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown <span class="caret"></span></a>
+                          <ul class="dropdown-menu" role="menu">
+                            <li><a href="#">Action</a></li>
+                            <li><a href="#">Another action</a></li>
+                            <li><a href="#">Something else here</a></li>
+                            <li class="divider"></li>
+                            <li><a href="#">Separated link</a></li>
+                            <li class="divider"></li>
+                            <li><a href="#">One more separated link</a></li>
+                          </ul>
+                        </li>-->
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="content-wrapper">
+        <section class="content-header">
+            {% block header %}{% endblock %}
+        </section>
+
+        <section class="content container-fluid">
+            {% block content %}{% endblock %}
+        </section>
+    </div>
+    <footer class="main-footer">
+        <strong>Copyright &copy; 2017 <a href="https://github.com/mpiraux">Maxime Piraux</a>.</strong> All rights
+        reserved.
+    </footer>
+</div>
+<script src="{{ url_for('static', filename='node_modules/jquery/dist/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='node_modules/bootstrap/dist/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='node_modules/datatables.net/js/jquery.dataTables.js') }}"></script>
+<script src="{{ url_for('static', filename='node_modules/datatables.net-bs/js/dataTables.bootstrap.js') }}"></script>
+<script src="{{ url_for('static', filename='node_modules/admin-lte/dist/js/adminlte.min.js') }}"></script>
+<script>
+    $(document).ready(function () {
+        $('table').DataTable();
+    })
+</script>
+</body>
+</html>

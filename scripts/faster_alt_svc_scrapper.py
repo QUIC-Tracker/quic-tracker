@@ -33,9 +33,9 @@ def get_record(url, results):
     peer4, header4, peer6, header6 = results
     record = {'url': url}
     if peer4 and all(peer4):
-        record['ipv4'] = {'peer': {'host': peer4[0], 'port': peer4[1]}, 'Alt-Svc': header4}
+        record['ipv4'] = {'peer': {'address': peer4[0], 'port': peer4[1]}, 'Alt-Svc': header4}
     if peer6 and all(peer6):
-        record['ipv6'] = {'peer': {'host': peer6[0], 'port': peer6[1]}, 'Alt-Svc': header6}
+        record['ipv6'] = {'peer': {'address': peer6[0], 'port': peer6[1]}, 'Alt-Svc': header6}
     return record
 
 

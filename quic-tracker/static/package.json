@@ -1,0 +1,12 @@
+{
+  "name": "quic-tracker",
+  "version": "0.1",
+  "main": "quic-tracker.py",
+  "repository": "https://github.com/mpiraux/master-thesis",
+  "author": "Maxime Piraux",
+  "license": "All rights reserved",
+  "private": true,
+  "dependencies": {
+    "admin-lte": "^2.4.0"
+  }
+}

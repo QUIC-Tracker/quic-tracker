@@ -1,5 +1,4 @@
 .idea
 data
-static/*
-!static/package.json
+static/node_modules
 yarn.lock

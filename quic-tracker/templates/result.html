@@ -3,16 +3,21 @@
     <h1>QUIC tracking results</h1>
     <smal>{{ date }}</smal>
 {% endblock %}
-{% macro mk_info_box(text, number, percentage=None) %}
+{% macro mk_info_box(text, stat, percentage=None) %}
     <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6">
         <div class="info-box">
             <div class="info-box-content">
                 <span class="info-box-text">{{ text|safe }}</span>
-                <span class="info-box-number">{{ number }}</span>
-                <div class="progress">
-                    <div class="progress-bar" style="width: {{ percentage }}%"></div>
-                </div>
-                <span class="progress-description">{{ '%.2f%%' % percentage }}</span>
+                <span class="info-box-number">{{ stat }}</span>
+                {% if percentage is not none %}
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {{ percentage }}%"></div>
+                    </div>
+                    <span class="progress-description">{{ '%.2f%%' % percentage }}</span>
+                {% else %}
+                    <div class="versions-bar"></div>
+                    <div class="stat-bar-viewport"></div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -20,7 +25,8 @@
 {% block content %}
     <div class="row">
             {{ mk_info_box('# of hosts advertising <b>GQUIC</b>', stats[0], stats[0]/(records|length) * 100) }}
-            {{ mk_info_box('# of hosts advertising <b>IEFT-QUIC</b>', stats[1], stats[1]/(records|length) * 100) }}
+            {{ mk_info_box('# of hosts advertising <b>IETF-QUIC</b>', stats[1], stats[1]/(records|length) * 100) }}
+            {{ mk_info_box('Versions advertised by hosts', stats[3]|join(', ')) }}
             {{ mk_info_box('# of hosts supporting <b>IPv6</b>', stats[2], stats[2]/(records|length) * 100) }}
     </div>
     <div class="box">
@@ -71,4 +77,16 @@
             </table>
         </div>
     </div>
+{% endblock %}
+{% block js %}
+    {{ super() }}
+    <script type="text/javascript">
+        //The JSON data variable
+        var myData = [
+            {name: "Element One", value: 20, color: "blue"},
+            {name: "Element Two", value: 30, color: "red"},
+            {name: "Element Three", value: 50, color: "green"}
+        ];
+        $('.versions-bar').singleStack(myData);
+    </script>
 {% endblock %}

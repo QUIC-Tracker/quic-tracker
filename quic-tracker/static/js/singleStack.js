@@ -58,7 +58,7 @@
 		for (var j = 0; j < graphData.series.data.length; j++) {
 			var percentage = ((graphData.series.data[j].y/total)*100).toFixed(2);
 			//append to graph proper
-			this.append('<span class="single-stack-slice '+sliceClassNames+'" style="width:'+percentage+'%; background-color:'+graphData.series.data[j].color+';">'+graphData.series.data[j].name+'</span>');
+			this.append('<span class="single-stack-slice '+sliceClassNames+'" style="width:'+percentage+'%; background-color:'+graphData.series.data[j].color+';" title="' + graphData.series.data[j].y + '">'+graphData.series.data[j].name+'</span>');
 			// append to stat bar
 			viewportElement.find('ol').append('<li class="single-stack-legend-strip"><span class="single-stack-legend-color" style="background-color:'+graphData.series.data[j].color+'"></span><span class="single-stack-legend-name">'+graphData.series.data[j].name+'</span><span class="percent">'+percentage+'%</span></li>');
 		}

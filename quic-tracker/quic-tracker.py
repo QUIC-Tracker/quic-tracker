@@ -27,7 +27,6 @@ def parse_alt_svc(header_value):
             advertise_gquic = True
         elif v.startswith('v="'):
             for version in re.match(r'v=\"(.*)\"', v).group(1).split(','):
-                print(version)
                 try:
                     versions.add(int(version))
                 except ValueError:
@@ -43,6 +42,7 @@ def compute_stats(records):
     ieft_quic_advertisements = 0
     ipv6_supports = 0
     unique_versions = set()
+    versions_count = {}
     for record in records:
         alt_svc_value = record.get('ipv4', record.get('ipv6', {})).get('Alt-Svc') or ''
         advertise_gquic, advertise_ietf_quic, versions = parse_alt_svc(alt_svc_value)
@@ -53,7 +53,9 @@ def compute_stats(records):
             ieft_quic_advertisements += 1
         if record.get('ipv6', {}).get('peer'):
             ipv6_supports += 1
-    return gquic_advertisements, ieft_quic_advertisements, ipv6_supports, unique_versions
+        for v in versions:
+            versions_count[v] = versions_count.get(v, 0) + 1
+    return gquic_advertisements, ieft_quic_advertisements, ipv6_supports, unique_versions, versions_count
 
 
 @app.route('/')

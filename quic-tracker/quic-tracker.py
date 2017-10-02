@@ -2,7 +2,7 @@ import os
 import json
 import re
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Flask
 from flask.templating import render_template
 
@@ -60,7 +60,7 @@ def compute_stats(records):
 
 @app.route('/')
 def index():
-    return result(date.today().strftime('%Y%m%d'))
+    return result((date.today() - timedelta(days=1)).strftime('%Y%m%d'))
 
 
 @app.route('/result/<int:d>')

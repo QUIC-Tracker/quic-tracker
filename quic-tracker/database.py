@@ -55,3 +55,7 @@ def load_results(date):
                    ipv6=record.get('ipv6', {}).get('peer', {}).get('address'),
                    header_v6=record.get('ipv6', {}).get('Alt-Svc'))
     return results
+
+
+def records_to_datatables_data(records):
+    return [[r.id, r.url, r.ipv4, r.header_v4, r.ipv6, r.header_v6] for r in records]

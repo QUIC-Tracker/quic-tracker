@@ -57,7 +57,7 @@
                 </tr>
                 </thead>
                 <tbody>
-                {% for record in records %}
+                {#{% for record in records %}
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td><a href="{{ record.url }}">{{ record.url }}</a></td>
@@ -66,7 +66,15 @@
                         <td>{{ record.ipv6 }}</td>
                         <td>{{ record.header_v6 }}</td>
                     </tr>
-                {% endfor %}
+                {% endfor %}#}
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
                 </tbody>
                 <tfoot>
                 <tr>
@@ -85,21 +93,30 @@
 {% block js %}
     {{ super() }}
     <script type="text/javascript">
-         	var myData = {
-                graph: {clickEvent: function (e) {}},
-
-                viewport: {
-                    className: 'graphLegend'
-                },
-
-                series: {
-                    data: [
-                        {% for k, v  in stats[4].items() %}
-                            {{ {'name': k, 'y': v, 'color': 'hsl(%d, 100%%, 40%%)' % (100 + (loop.index0 * 75))}|tojson }},
-                        {% endfor %}
-                    ]
+        var myData = {
+            graph: {
+                clickEvent: function (e) {
                 }
-            };
-            $('#graphContainer').singleStack(myData);
+            },
+
+            viewport: {
+                className: 'graphLegend'
+            },
+
+            series: {
+                data: [
+                    {% for k, v  in stats[4].items() %}
+                        {{ {'name': k, 'y': v, 'color': 'hsl(%d, 100%%, 40%%)' % (100 + (loop.index0 * 75))}|tojson }},
+                    {% endfor %}
+                ]
+            }
+        };
+        $('#graphContainer').singleStack(myData);
+        $(document).ready(function () {
+            $('table').DataTable({
+                serverSide: true,
+                ajax: '{{ ajax_url|safe }}'
+            });
+        })
     </script>
 {% endblock %}

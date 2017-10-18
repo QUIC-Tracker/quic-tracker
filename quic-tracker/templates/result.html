@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block header %}
     <h1>QUIC tracking results</h1>
-    <smal>{{ date }}</smal>
+    <small>{{ date }}</small>
 {% endblock %}
 {% macro mk_info_box(text, stat, percentage=None) %}
     <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6">
@@ -60,20 +60,10 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td><a href="{{ record.url }}">{{ record.url }}</a></td>
-                        {% if 'ipv4' in record %}
-                            <td>{{ record.ipv4.peer.address }}</td>
-                            <td>{{ record.ipv4.get('Alt-Svc') or '' }}</td>
-                        {% else %}
-                            <td></td>
-                            <td></td>
-                        {% endif %}
-                        {% if 'ipv6' in record %}
-                            <td>{{ record.ipv6.peer.address }}</td>
-                            <td>{{ record.ipv6.get('Alt-Svc') or '' }}</td>
-                        {% else %}
-                            <td></td>
-                            <td></td>
-                        {% endif %}
+                        <td>{{ record.ipv4 }}</td>
+                        <td>{{ record.header_v4 }}</td>
+                        <td>{{ record.ipv6 }}</td>
+                        <td>{{ record.header_v6 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>

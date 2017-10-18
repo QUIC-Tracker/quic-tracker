@@ -1,20 +1,21 @@
 import os
-import json
 import re
+from datetime import datetime
 
-from datetime import date, datetime, timedelta
 from flask import Flask
 from flask.templating import render_template
+from sqlobject import sqlhub
 
-
-def get_root_path():
-    return os.path.abspath(os.path.dirname(__file__))
-
-
-def join_root(*paths):
-    return os.path.join(get_root_path(), *paths)
+from database import setup_database, SQLObjectThreadConnection, Results, load_results
+from utils import find_latest_results_file
 
 app = Flask(__name__)
+setup_database()
+
+
+@app.before_request
+def setup_thread_request():
+    sqlhub.threadConnection = SQLObjectThreadConnection.get_conn()
 
 
 def parse_alt_svc(header_value):
@@ -37,21 +38,21 @@ def parse_alt_svc(header_value):
     return advertise_gquic, advertise_ietf_quic, versions
 
 
-def compute_stats(records):
+def compute_stats(records):  # TODO: Make it compute using SQL
     gquic_advertisements = 0
     ieft_quic_advertisements = 0
     ipv6_supports = 0
     unique_versions = set()
     versions_count = {}
     for record in records:
-        alt_svc_value = record.get('ipv4', record.get('ipv6', {})).get('Alt-Svc') or ''
+        alt_svc_value = (record.header_v4 if record.ipv4 else record.header_v6) or ''
         advertise_gquic, advertise_ietf_quic, versions = parse_alt_svc(alt_svc_value)
         unique_versions |= versions
         if advertise_gquic:
             gquic_advertisements += 1
         if advertise_ietf_quic:
             ieft_quic_advertisements += 1
-        if record.get('ipv6', {}).get('peer'):
+        if record.ipv6:
             ipv6_supports += 1
         for v in versions:
             versions_count[v] = versions_count.get(v, 0) + 1
@@ -60,14 +61,16 @@ def compute_stats(records):
 
 @app.route('/')
 def index():
-    return result((date.today() - timedelta(days=1)).strftime('%Y%m%d'))
+    return results(int(os.path.splitext(find_latest_results_file())[0]))
 
 
-@app.route('/result/<int:d>')
-def result(d):
-    with open(join_root('data', '%s.json' % d)) as f:
-        records = json.load(f)
-        return render_template('result.html', records=records, date=datetime.strptime(d, '%Y%m%d').date(), stats=compute_stats(records))
+@app.route('/results/<int:d>')
+def results(d):
+    r = Results.selectBy(date=d).getOne(None)
+    if r is None:
+        r = load_results(d)
+    return render_template('result.html', records=r.records, date=datetime.strptime(str(d), '%Y%m%d').date(),
+                           stats=compute_stats(r.records))
 
 
 if __name__ == '__main__':

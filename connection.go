@@ -16,6 +16,7 @@ type Connection struct {
 	udpConnection 	 *net.UDPConn
 	tlsBuffer	  	 *connBuffer
 	tls     	  	 *mint.Conn
+	tlsTPHandler	 *TLSTransportParameterHandler
 
 	cleartext        *CryptoState
 	protected        *CryptoState
@@ -201,6 +202,8 @@ func NewConnection(address string, serverName string) *Connection {
 	}
 	tlsConfig.Init(true)
 	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
+	c.tlsTPHandler = NewTLSTransportParameterHandler()
+	c.tls.SetExtensionHandler(c.tlsTPHandler)
 	c.cleartext = NewCleartextCryptoState()
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)

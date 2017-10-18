@@ -3,6 +3,7 @@
     <h1>QUIC tracking results</h1>
     <small>{{ date }}</small>
 {% endblock %}
+{% set quic_hosts = stats[0] + stats[1] %}
 {% macro mk_info_box(text, stat, percentage=None) %}
     <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6">
         <div class="info-box">
@@ -32,7 +33,7 @@
                     <span class="info-box-text">Versions advertised by hosts</span>
                     <span class="info-box-number">
                         {% for v in stats[3] %}
-                            <span style="color: {{ ('hsl(%d, 100%%, 40%%)'  % (100 + (loop.index0 * 75)))|safe }};" title="{{ stats[4][v] }}">{{ v }}</span>
+                            <span style="color: {{ ('hsl(%d, 100%%, 40%%)'  % (100 + (loop.index0 * 75)))|safe }};" title="{{ '%d: %.2f%%' % (stats[4][v], (stats[4][v] / quic_hosts) * 100) }}">{{ v }}</span>
                         {% endfor %}
                     </span>
                     <div id="graphContainer"></div>

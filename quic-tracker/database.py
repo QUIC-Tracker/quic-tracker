@@ -2,7 +2,9 @@ import json
 import tempfile
 import threading
 
-from sqlobject import SQLObject, IntCol, StringCol, ForeignKey, sqlhub, MultipleJoin
+import re
+from sqlobject import SQLObject, IntCol, StringCol, ForeignKey, sqlhub, MultipleJoin, sqlbuilder, BoolCol
+from sqlobject.sqlbuilder import Insert
 from sqlobject.sqlite.sqliteconnection import SQLiteConnection
 
 from utils import join_root
@@ -14,10 +16,14 @@ def setup_database():
     sqlhub.processConnection = create_connection()
     Results.createTable()
     Record.createTable()
+    SupportedVersion.createTable()
 
 
 def create_connection():
-    return SQLiteConnection(database_file)
+    conn = SQLiteConnection(database_file)
+    conn.queryOne('PRAGMA JOURNAL_MODE = OFF;')
+    conn.queryOne('PRAGMA SYNCHRONOUS = OFF;')
+    return conn
 
 
 class Results(SQLObject):
@@ -34,6 +40,15 @@ class Record(SQLObject):
     header_v6 = StringCol(default=None)
     error = StringCol(default=None)
 
+    advertise_gquic = BoolCol(default=False)
+    advertise_ietf_quic = BoolCol(default=False)
+    supported_versions = MultipleJoin('SupportedVersion')
+
+
+class SupportedVersion(SQLObject):
+    record = ForeignKey('Record', notNone=True)
+    version = StringCol(notNone=True)
+
 
 class SQLObjectThreadConnection(object):
     _local = threading.local()
@@ -45,15 +60,53 @@ class SQLObjectThreadConnection(object):
         return cls._local.conn
 
 
+def parse_alt_svc(header_value):
+    regex = r"([^\";,\s]*=\"?[^\";]*\"?)"
+    advertise_gquic = False
+    advertise_ietf_quic = False
+    versions = set()
+    for v in (m.group(1) for m in re.finditer(regex, header_value)):
+        if v.startswith('quic="'):
+            advertise_gquic = True
+        elif v.startswith('v="'):
+            for version in re.match(r'v=\"(.*)\"', v).group(1).split(','):
+                try:
+                    versions.add(int(version))
+                except ValueError:
+                    pass
+        elif v.startswith('hq'):
+            version = re.match(r'(hq-[0-9](?:-?.*)*)=\"(.*)\"', v).group(1)
+            versions.add(version)
+    return advertise_gquic, advertise_ietf_quic, versions
+
+
 def load_results(date):
     results = Results(date=date)
+    conn = sqlhub.threadConnection
     with open(join_root('data', '%s.json' % date)) as f:
         records = json.load(f)
-        for record in records:
-            Record(results=results, url=record['url'], ipv4=record.get('ipv4', {}).get('peer', {}).get('address'),
-                   header_v4=record.get('ipv4', {}).get('Alt-Svc'),
-                   ipv6=record.get('ipv6', {}).get('peer', {}).get('address'),
-                   header_v6=record.get('ipv6', {}).get('Alt-Svc'))
+    records_values = []
+    for record in records:
+        record_dict = {'results_id': results.id,
+                       'url': record['url'],
+                       'ipv4': record.get('ipv4', {}).get('peer', {}).get('address'),
+                       'header_v4': record.get('ipv4', {}).get('Alt-Svc'),
+                       'ipv6': record.get('ipv6', {}).get('peer', {}).get('address'),
+                       'header_v6': record.get('ipv6', {}).get('Alt-Svc')}
+        records_values.append(record_dict)
+
+    insert = Insert('record', valueList=records_values, template=('results_id', 'url', 'ipv4', 'header_v4', 'ipv6', 'header_v6'))
+    conn.query(conn.sqlrepr(insert))
+
+    for r in results.records:
+        alt_svc_value = (r.header_v4 if r.ipv4 else r.header_v6) or ''
+        advertise_gquic, advertise_ietf_quic, versions = parse_alt_svc(alt_svc_value)
+
+        r.advertise_gquic = advertise_gquic
+        r.advertise_ietf_quic = advertise_ietf_quic
+        for v in versions:
+            SupportedVersion(record=r, version=str(v))
+
     return results
 
 

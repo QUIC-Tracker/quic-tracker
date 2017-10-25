@@ -25,8 +25,8 @@
 {% endmacro %}
 {% block content %}
     <div class="row">
-        {{ mk_info_box('# of hosts advertising <b>GQUIC</b>', stats[0], stats[0]/(records|length) * 100) }}
-        {{ mk_info_box('# of hosts advertising <b>IETF-QUIC</b>', stats[1], stats[1]/(records|length) * 100) }}
+        {{ mk_info_box('# of hosts advertising <b>GQUIC</b>', stats[0], stats[0]/(records_length) * 100) }}
+        {{ mk_info_box('# of hosts advertising <b>IETF-QUIC</b>', stats[1], stats[1]/(records_length) * 100) }}
         <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6">
             <div class="info-box">
                 <div class="info-box-content">
@@ -41,7 +41,7 @@
                 </div>
             </div>
         </div>
-        {{ mk_info_box('# of hosts supporting <b>IPv6</b>', stats[2], stats[2]/(records|length) * 100) }}
+        {{ mk_info_box('# of hosts supporting <b>IPv6</b>', stats[2], stats[2]/(records_length) * 100) }}
     </div>
     <div class="box">
         <div class="box-body">
@@ -57,16 +57,6 @@
                 </tr>
                 </thead>
                 <tbody>
-                {#{% for record in records %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td><a href="{{ record.url }}">{{ record.url }}</a></td>
-                        <td>{{ record.ipv4 }}</td>
-                        <td>{{ record.header_v4 }}</td>
-                        <td>{{ record.ipv6 }}</td>
-                        <td>{{ record.header_v6 }}</td>
-                    </tr>
-                {% endfor %}#}
                 <tr>
                     <td></td>
                     <td></td>

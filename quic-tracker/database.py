@@ -14,7 +14,7 @@ database_file = tempfile.mkstemp()[1]
 
 def setup_database():
     sqlhub.processConnection = create_connection()
-    Results.createTable()
+    Result.createTable()
     Record.createTable()
     SupportedVersion.createTable()
 
@@ -26,13 +26,13 @@ def create_connection():
     return conn
 
 
-class Results(SQLObject):
+class Result(SQLObject):
     date = IntCol(notNone=True)
     records = MultipleJoin('Record')
 
 
 class Record(SQLObject):
-    results = ForeignKey('Results', notNone=True)
+    result = ForeignKey('Result', notNone=True)
     url = StringCol(notNone=True)
     ipv4 = StringCol(default=None)
     header_v4 = StringCol(default=None)
@@ -80,14 +80,14 @@ def parse_alt_svc(header_value):
     return advertise_gquic, advertise_ietf_quic, versions
 
 
-def load_results(date):
-    results = Results(date=date)
+def load_result(date):
+    result = Result(date=date)
     conn = sqlhub.threadConnection
     with open(join_root('data', '%s.json' % date)) as f:
         records = json.load(f)
     records_values = []
     for record in records:
-        record_dict = {'results_id': results.id,
+        record_dict = {'result_id': result.id,
                        'url': record['url'],
                        'ipv4': record.get('ipv4', {}).get('peer', {}).get('address'),
                        'header_v4': record.get('ipv4', {}).get('Alt-Svc'),
@@ -95,10 +95,10 @@ def load_results(date):
                        'header_v6': record.get('ipv6', {}).get('Alt-Svc')}
         records_values.append(record_dict)
 
-    insert = Insert('record', valueList=records_values, template=('results_id', 'url', 'ipv4', 'header_v4', 'ipv6', 'header_v6'))
+    insert = Insert('record', valueList=records_values, template=('result_id', 'url', 'ipv4', 'header_v4', 'ipv6', 'header_v6'))
     conn.query(conn.sqlrepr(insert))
 
-    for r in results.records:
+    for r in result.records:
         alt_svc_value = (r.header_v4 if r.ipv4 else r.header_v6) or ''
         advertise_gquic, advertise_ietf_quic, versions = parse_alt_svc(alt_svc_value)
 
@@ -107,7 +107,7 @@ def load_results(date):
         for v in versions:
             SupportedVersion(record=r, version=str(v))
 
-    return results
+    return result
 
 
 def records_to_datatables_data(records):

@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
 	h.packetType = packetType
 	h.connectionId = conn.connectionId
 	h.packetNumber = uint32(conn.nextPacketNumber())
-	h.version = conn.version
+	h.version = conn.Version
 	return h
 }
 

@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 )
 
 type Acknowledger interface {
-	shouldBeAcknowledged() bool // Indicates whether or not the packet type should be acknowledged by the mean of sending an ack
+	ShouldBeAcknowledged() bool // Indicates whether or not the packet type should be acknowledged by the mean of sending an ack
 }
 
 type PacketEncoder interface {
@@ -46,7 +46,7 @@ type VersionNegotationPacket struct {
 	supportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
-func (p VersionNegotationPacket) shouldBeAcknowledged() bool { return false }
+func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, version := range p.supportedVersions {
@@ -81,7 +81,7 @@ type ClientInitialPacket struct {
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
-func (p ClientInitialPacket) shouldBeAcknowledged() bool { return true }
+func (p ClientInitialPacket) ShouldBeAcknowledged() bool { return true }
 func (p ClientInitialPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -129,7 +129,7 @@ type ServerCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ServerCleartextPacket) shouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
+func (p ServerCleartextPacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
 func (p ServerCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -172,7 +172,7 @@ type ClientCleartextPacket struct {
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ClientCleartextPacket) shouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }
+func (p ClientCleartextPacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }
 func (p ClientCleartextPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
@@ -197,10 +197,10 @@ func NewClientCleartextPacket(streamFrames []StreamFrame, ackFrames []AckFrame, 
 
 type ProtectedPacket struct {
 	abstractPacket
-	frames []Frame
+	Frames []Frame
 }
-func (p *ProtectedPacket) shouldBeAcknowledged() bool {
-	for _, frame := range p.frames {
+func (p *ProtectedPacket) ShouldBeAcknowledged() bool {
+	for _, frame := range p.Frames {
 		if _, ok :=  frame.(AckFrame); !ok {
 			return true
 		}
@@ -209,7 +209,7 @@ func (p *ProtectedPacket) shouldBeAcknowledged() bool {
 }
 func (p *ProtectedPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
-	for _, frame := range p.frames {
+	for _, frame := range p.Frames {
 		frame.writeTo(buffer)
 	}
 	return buffer.Bytes()
@@ -223,7 +223,7 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 		if frame == nil {
 			break
 		}
-		p.frames = append(p.frames, frame)
+		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }

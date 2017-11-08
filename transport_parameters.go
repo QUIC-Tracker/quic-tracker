@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"github.com/bifurcation/mint"

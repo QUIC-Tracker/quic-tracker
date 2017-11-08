@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 /*This file originates from https://github.com/ekr/minq and is subject to the
 following license and copyright

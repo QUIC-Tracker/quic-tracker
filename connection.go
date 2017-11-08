@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"github.com/bifurcation/mint"
@@ -22,14 +22,14 @@ type Connection struct {
 	protected        *CryptoState
 	cipherSuite		 *mint.CipherSuiteParams
 
-	streams			 map[uint32]*Stream
-	connectionId  	 uint64
-	packetNumber  	 uint64
+	Streams              map[uint32]*Stream
+	connectionId         uint64
+	packetNumber         uint64
 	expectedPacketNumber uint64
-	version       	 uint32
-	omitConnectionId bool
-	ackQueue		 []uint64  // Stores the packet numbers to be acked
-	receivedPackets  uint64  // TODO: Implement proper ACK mechanism
+	Version              uint32
+	omitConnectionId     bool
+	ackQueue             []uint64  // Stores the packet numbers to be acked
+	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
 }
 func (c *Connection) nextPacketNumber() uint64 {
 	c.packetNumber++
@@ -43,7 +43,7 @@ func (c *Connection) sendAEADSealedPacket(packet Packet) {
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.udpConnection.Write(finalPacket)
 }
-func (c *Connection) sendProtectedPacket(packet Packet) {
+func (c *Connection) SendProtectedPacket(packet Packet) {
 	header := packet.encodeHeader()
 	protectedPayload := c.protected.write.Seal(nil, encodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
@@ -51,10 +51,10 @@ func (c *Connection) sendProtectedPacket(packet Packet) {
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.udpConnection.Write(finalPacket)
 }
-func (c *Connection) sendClientInitialPacket() {
+func (c *Connection) SendClientInitialPacket() {
 	c.tls.Handshake()
 	handshakeResult := c.tlsBuffer.getOutput()
-	handshakeFrame := NewStreamFrame(0, c.streams[0], handshakeResult, false)
+	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
@@ -65,7 +65,7 @@ func (c *Connection) sendClientInitialPacket() {
 
 	c.sendAEADSealedPacket(clientInitialPacket)
 }
-func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
+func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
 	c.connectionId = packet.header.ConnectionId()  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
@@ -87,7 +87,7 @@ func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { //
 		c.cipherSuite = &state.CipherSuite
 		c.protected = NewProtectedCryptoState(c)
 
-		outputFrame := NewStreamFrame(0, c.streams[0], tlsOutput, false)
+		outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
 
 		clearTextPacket = NewClientCleartextPacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
 		defer c.sendAEADSealedPacket(clearTextPacket)
@@ -100,7 +100,7 @@ func (c *Connection) processServerHello(packet *ServerCleartextPacket) bool { //
 		panic(alert)
 	}
 }
-func (c *Connection) readNextPacket() Packet {
+func (c *Connection) ReadNextPacket() Packet {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.udpConnection.ReadFromUDP(rec)
 	if err != nil {
@@ -146,7 +146,7 @@ func (c *Connection) readNextPacket() Packet {
 		if number == fullPacketNumber  {
 			fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
 			spew.Dump(packet)
-			return c.readNextPacket()
+			return c.ReadNextPacket()
 			// TODO: Should it be acked again ?
 		}
 	}
@@ -156,7 +156,7 @@ func (c *Connection) readNextPacket() Packet {
 
 	return packet
 }
-func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on the packet numbers received
+func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on the packet numbers received
 	packetNumbers := reverse(c.ackQueue)
 	frame := new(AckFrame)
 	frame.ackBlocks = make([]AckBlock, 0, 255)
@@ -178,10 +178,10 @@ func (c *Connection) getAckFrame() *AckFrame {  // Returns an ack frame based on
 	frame.numAckBlocks = uint8(len(frame.ackBlocks)-1)
 	return frame
 }
-func (c *Connection) sendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
+func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
 	protectedPacket := NewProtectedPacket(c)
-	protectedPacket.frames = append(protectedPacket.frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
-	c.sendProtectedPacket(protectedPacket)
+	protectedPacket.Frames = append(protectedPacket.Frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
+	c.SendProtectedPacket(protectedPacket)
 }
 
 func NewConnection(address string, serverName string) *Connection {
@@ -212,11 +212,11 @@ func NewConnection(address string, serverName string) *Connection {
 	rand.Read(cId)
 	c.connectionId = uint64(binary.BigEndian.Uint64(cId))
 	c.packetNumber = c.connectionId & 0x7fffffff
-	c.version = QuicVersion
+	c.Version = QuicVersion
 	c.omitConnectionId = false
 
-	c.streams = make(map[uint32]*Stream)
-	c.streams[0] = &Stream{}
+	c.Streams = make(map[uint32]*Stream)
+	c.Streams[0] = &Stream{}
 
 	return c
 }
@@ -225,50 +225,4 @@ func assert(value bool) {
 	if !value {
 		panic("")
 	}
-}
-
-func main() {
-	//conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
-	//conn := NewConnection("kotdt.com:4433", "kotdt.com")
-	//conn := NewConnection("localhost:4433", "localhost")
-	//conn := NewConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
-	conn := NewConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
-	conn.sendClientInitialPacket()
-	var packet Packet
-
-	ongoingHandhake := true
-	for ongoingHandhake {
-		packet = conn.readNextPacket()
-		if packet, ok := packet.(*ServerCleartextPacket); ok {
-			ongoingHandhake = conn.processServerHello(packet)
-		} else {
-			spew.Dump(packet)
-			panic(packet)
-		}
-	}
-
-	conn.streams[1] = &Stream{}
-	streamFrame := NewStreamFrame(1, conn.streams[1], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
-	ackFrame := conn.getAckFrame()
-
-	protectedPacket := NewProtectedPacket(conn)
-	protectedPacket.frames = append(protectedPacket.frames, streamFrame, ackFrame)
-	conn.sendProtectedPacket(protectedPacket)
-
-	for {
-		packet = conn.readNextPacket()
-		conn.sendAck(uint64(packet.Header().PacketNumber()))
-
-		spew.Dump("---> Received packet")
-		//spew.Dump(packet)
-
-		if packet.shouldBeAcknowledged() {
-			protectedPacket = NewProtectedPacket(conn)
-			protectedPacket.frames = append(protectedPacket.frames, conn.getAckFrame())
-			spew.Dump("<--- Send ack packet")
-			//spew.Dump(protectedPacket)
-			conn.sendProtectedPacket(protectedPacket)
-		}
-	}
-
 }

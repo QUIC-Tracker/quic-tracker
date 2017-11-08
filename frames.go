@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"bytes"
@@ -497,7 +497,7 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame.streamData = make([]byte, frame.dataLength, frame.dataLength)
 	buffer.Read(frame.streamData)
 
-	stream, ok := conn.streams[frame.streamId]
+	stream, ok := conn.Streams[frame.streamId]
 	if !ok {
 		panic(frame)
 	}

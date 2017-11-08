@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 type Stream struct {
 	readOffset uint64

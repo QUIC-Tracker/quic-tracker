@@ -1,4 +1,4 @@
-package main
+package masterthesis
 
 import (
 	"encoding/binary"

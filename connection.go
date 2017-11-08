@@ -109,32 +109,35 @@ func (c *Connection) readNextPacket() Packet {
 	rec = rec[:i]
 
 	var headerLen uint8
+	var header Header
 	if rec[0] & 0x80 == 0x80 {  // Is there a long header ?
 		headerLen = LongHeaderSize
+		header = ReadLongHeader(bytes.NewReader(rec[:headerLen]))
 	} else {
-		panic("TODO readNextPacket w/ short header")
+		buf := bytes.NewReader(rec[:LongHeaderSize])
+		header = ReadShortHeader(buf, c)  // TODO: Find a better upper bound
+		headerLen = uint8(int(buf.Size()) - buf.Len())
 	}
 
-	c.receivedPackets++
+	c.receivedPackets++  // TODO: Find appropriate place to increment it
 	var packet Packet
-	header := ReadLongHeader(bytes.NewReader(rec[:headerLen]))
-	switch header.packetType {
+	switch header.PacketType() {
 	case ServerCleartext:
-		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
+		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadServerCleartextPacket(buffer, c)
 	case OneRTTProtectedKP0:
-		payload, err := c.protected.read.Open(nil, encodeArgs(header.packetNumber), rec[headerLen:], rec[:headerLen])
+		payload, err := c.protected.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			panic(err)
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadProtectedPacket(buffer, c)
 	default:
-		panic(header.packetType)
+		panic(header.PacketType())
 	}
 
 	fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
@@ -227,7 +230,9 @@ func assert(value bool) {
 func main() {
 	//conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
 	//conn := NewConnection("kotdt.com:4433", "kotdt.com")
-	conn := NewConnection("localhost:4433", "localhost")
+	//conn := NewConnection("localhost:4433", "localhost")
+	//conn := NewConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
+	conn := NewConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
 	conn.sendClientInitialPacket()
 	var packet Packet
 
@@ -255,13 +260,13 @@ func main() {
 		conn.sendAck(uint64(packet.Header().PacketNumber()))
 
 		spew.Dump("---> Received packet")
-		spew.Dump(packet)
+		//spew.Dump(packet)
 
 		if packet.shouldBeAcknowledged() {
 			protectedPacket = NewProtectedPacket(conn)
 			protectedPacket.frames = append(protectedPacket.frames, conn.getAckFrame())
 			spew.Dump("<--- Send ack packet")
-			spew.Dump(protectedPacket)
+			//spew.Dump(protectedPacket)
 			conn.sendProtectedPacket(protectedPacket)
 		}
 	}

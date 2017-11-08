@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Acknowledger interface {
@@ -215,9 +216,10 @@ func (p *ProtectedPacket) encodePayload() []byte {
 }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = ReadHeader(buffer)
+	p.header = ReadHeader(buffer, conn)
 	for {
 		frame := NewFrame(buffer, conn)
+		spew.Dump(frame)
 		if frame == nil {
 			break
 		}

@@ -46,7 +46,7 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
 		return Frame(NewNewConnectionIdFrame(buffer))
 	case frameType == StopSendingType:
 		return Frame(NewStopSendingFrame(buffer))
-	case (frameType & AckType) == AckType:
+	case (frameType & 0xE0) == AckType:
 		return Frame(ReadAckFrame(buffer))
 	case (frameType & StreamType) == StreamType:
 		return Frame(ReadStreamFrame(buffer, conn))

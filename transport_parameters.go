@@ -107,7 +107,7 @@ func (h TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.Ex
 		return nil
 	}
 
-	if hs != mint.HandshakeTypeEncryptedExtensions {
+	if hs != mint.HandshakeTypeEncryptedExtensions {  // TODO: Verify this non equality check, or even that client can receive TPs.
 		var eep EncryptedExtensionsTransportParameters
 		_, err := syntax.Unmarshal(body.body, &eep)
 		if err != nil {

@@ -7,17 +7,18 @@ import (
 
 type Header interface {
 	PacketNumber() uint32
+	PacketType() LongPacketType  // TODO: Make it cleaner
 	ConnectionId() uint64
 	encode() []byte
 }
-func ReadHeader(buffer *bytes.Reader) Header {
+func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 	var h Header
 	typeByte, _ := buffer.ReadByte()
 	buffer.UnreadByte()
 	if typeByte & 0x80 == 0x80 {
 		h = ReadLongHeader(buffer)
 	} else {
-		h = ReadShortHeader(buffer)
+		h = ReadShortHeader(buffer, conn)
 	}
 	return h
 }
@@ -40,6 +41,9 @@ func (h LongHeader) encode() []byte {
 }
 func (h LongHeader) PacketNumber() uint32 {
 	return h.packetNumber
+}
+func (h LongHeader) PacketType() LongPacketType {
+	return h.packetType
 }
 func (h LongHeader) ConnectionId() uint64 {
 	return h.connectionId
@@ -104,27 +108,34 @@ func (h ShortHeader) encode() []byte {
 func (h ShortHeader) PacketNumber() uint32 {
 	return h.packetNumber
 }
+func (h ShortHeader) PacketType() LongPacketType {
+	if h.keyPhase == KeyPhaseZero {
+		return OneRTTProtectedKP0
+	} else {
+		return OneRTTProtectedKP1
+	}
+}
 func (h ShortHeader) ConnectionId() uint64 {
 	return h.connectionId
 }
-func ReadShortHeader(buffer *bytes.Reader) *ShortHeader {
+func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()
 	h.connectionIdFlag = (typeByte & 0x40) == 0x40
 	h.keyPhase = (typeByte & 0x20) == 0x20
 	h.packetType = ShortHeaderPacketType(typeByte & 0x1F)
 	if h.connectionIdFlag {
-		binary.Read(buffer, binary.BigEndian, h.connectionId)
+		binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	}
 	switch h.packetType {
 	case OneBytePacketNumber:
 		var number uint8
 		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = uint32(number)
+		h.packetNumber = (uint32(conn.expectedPacketNumber) & 0xffffff00) | uint32(number)
 	case TwoBytesPacketNumber:
 		var number uint16
 		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = uint32(number)
+		h.packetNumber = (uint32(conn.expectedPacketNumber) & 0xffff0000) | uint32(number)
 	case FourBytesPacketNumber:
 		binary.Read(buffer, binary.BigEndian, &h.packetNumber)
 	}

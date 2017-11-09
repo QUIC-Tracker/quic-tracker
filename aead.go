@@ -52,7 +52,7 @@ func (a *aeadFNV) Seal(dst []byte, nonce []byte, plaintext []byte, aad []byte) [
 	h := fnv.New64a()
 	h.Write(aad)
 	h.Write(plaintext)
-	res := encodeArgs(plaintext, h.Sum64())
+	res := EncodeArgs(plaintext, h.Sum64())
 	dst = append(dst, res...)
 	return dst
 }
@@ -67,7 +67,7 @@ func (a *aeadFNV) Open(dst []byte, nonce []byte, ciphertext []byte, aad []byte) 
 	h.Write(aad)
 	h.Write(pt)
 
-	at2 := encodeArgs(h.Sum64())
+	at2 := EncodeArgs(h.Sum64())
 
 	if !bytes.Equal(at, at2) {
 		return nil, fmt.Errorf("Invalid authentication tag")

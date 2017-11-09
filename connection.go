@@ -40,7 +40,7 @@ func (c *Connection) nextPacketNumber() uint64 {
 }
 func (c *Connection) sendAEADSealedPacket(packet Packet) {
 	header := packet.encodeHeader()
-	protectedPayload := c.cleartext.write.Seal(nil, encodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
+	protectedPayload := c.cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -48,7 +48,7 @@ func (c *Connection) sendAEADSealedPacket(packet Packet) {
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
 	header := packet.encodeHeader()
-	protectedPayload := c.protected.write.Seal(nil, encodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
+	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -61,7 +61,7 @@ func (c *Connection) SendClientInitialPacket() {
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.cleartext.write.Overhead())
+	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
 	}
@@ -103,11 +103,11 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) bool { //
 		panic(alert)
 	}
 }
-func (c *Connection) ReadNextPacket() (Packet, error) {
+func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.udpConnection.ReadFromUDP(rec)
 	if err != nil {
-		return nil, err
+		return nil, err, nil
 	}
 	rec = rec[:i]
 
@@ -126,16 +126,16 @@ func (c *Connection) ReadNextPacket() (Packet, error) {
 	var packet Packet
 	switch header.PacketType() {
 	case ServerCleartext:
-		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+		payload, err := c.cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
-			return nil, err
+			return nil, err, rec
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadServerCleartextPacket(buffer, c)
 	case OneRTTProtectedKP0:
-		payload, err := c.protected.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+		payload, err := c.protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
-			return nil, err
+			return nil, err, rec
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadProtectedPacket(buffer, c)
@@ -159,7 +159,7 @@ func (c *Connection) ReadNextPacket() (Packet, error) {
 	c.ackQueue = append(c.ackQueue, fullPacketNumber)
 	c.expectedPacketNumber = fullPacketNumber + 1
 
-	return packet, nil
+	return packet, nil, rec
 }
 func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on the packet numbers received
 	packetNumbers := reverse(c.ackQueue)

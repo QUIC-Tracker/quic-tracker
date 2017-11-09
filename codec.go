@@ -218,7 +218,7 @@ func uintDecode(buf *bytes.Reader, v reflect.Value, encodingSize uintptr) (uintp
 	return size, nil
 }
 
-func encodeArgs(args ...interface{}) []byte {
+func EncodeArgs(args ...interface{}) []byte {
 	var buf bytes.Buffer
 	var res error
 

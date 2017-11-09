@@ -15,7 +15,7 @@ func main() {
 
 	ongoingHandhake := true
 	for ongoingHandhake {
-		packet, err := conn.ReadNextPacket()
+		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
 			panic(err)
 		}
@@ -36,7 +36,7 @@ func main() {
 	conn.SendProtectedPacket(protectedPacket)
 
 	for {
-		packet, err := conn.ReadNextPacket()
+		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
 			panic(err)
 		}

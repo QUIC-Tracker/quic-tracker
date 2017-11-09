@@ -11,19 +11,19 @@ const (  // See https://tools.ietf.org/html/draft-ietf-quic-tls-05#section-5.2.2
 )
 
 type CryptoState struct {
-	read  cipher.AEAD
-	write cipher.AEAD
+	Read  cipher.AEAD
+	Write cipher.AEAD
 }
 func NewCleartextCryptoState() *CryptoState {
 	s := new(CryptoState)
-	s.read = &aeadFNV{}
-	s.write = &aeadFNV{}
+	s.Read = &aeadFNV{}
+	s.Write = &aeadFNV{}
 	return s
 }
 func NewProtectedCryptoState(conn *Connection) *CryptoState {
 	s := new(CryptoState)
-	s.read = newProtectedAead(serverPpSecret0Label, conn.tls, conn.cipherSuite)
-	s.write = newProtectedAead(clientPpSecret0Label, conn.tls, conn.cipherSuite)
+	s.Read = newProtectedAead(serverPpSecret0Label, conn.tls, conn.cipherSuite)
+	s.Write = newProtectedAead(clientPpSecret0Label, conn.tls, conn.cipherSuite)
 	return s
 }
 

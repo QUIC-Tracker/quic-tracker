@@ -74,7 +74,7 @@ def parse_alt_svc(header_value):
                     versions.add(int(version))
                 except ValueError:
                     pass
-        elif v.startswith('hq'):
+        elif v.startswith('hq-'):
             version = re.match(r'(hq-[0-9](?:-?.*)*)=\"(.*)\"', v).group(1)
             versions.add(version)
     return advertise_gquic, advertise_ietf_quic, versions

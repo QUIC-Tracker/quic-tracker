@@ -45,7 +45,7 @@ def results(d):
     r = Result.selectBy(date=d).getOne(None)
     if r is None:
         r = sqlhub.doInTransaction(load_result, d)
-    return render_template('result.html', records_length=len(r.records), date=datetime.strptime(str(d), '%Y%m%d').date(),
+    return render_template('result.html', records_length=Record.selectBy(result=r).count(), date=datetime.strptime(str(d), '%Y%m%d').date(),
                            stats=compute_stats(r), ajax_url=url_for('results_data', d=d))
 
 

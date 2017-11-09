@@ -44,6 +44,9 @@ class Record(SQLObject):
     advertise_ietf_quic = BoolCol(default=False)
     supported_versions = MultipleJoin('SupportedVersion')
 
+    class sqlmeta:
+        lazyUpdate = True
+
 
 class SupportedVersion(SQLObject):
     record = ForeignKey('Record', notNone=True)
@@ -98,12 +101,14 @@ def load_result(date):
     insert = Insert('record', valueList=records_values, template=('result_id', 'url', 'ipv4', 'header_v4', 'ipv6', 'header_v6'))
     conn.query(conn.sqlrepr(insert))
 
-    for r in result.records:
+    for r in Record.selectBy(result=result):
         alt_svc_value = (r.header_v4 if r.ipv4 else r.header_v6) or ''
         advertise_gquic, advertise_ietf_quic, versions = parse_alt_svc(alt_svc_value)
 
-        r.advertise_gquic = advertise_gquic
-        r.advertise_ietf_quic = advertise_ietf_quic
+        if advertise_gquic or advertise_ietf_quic:
+            r.advertise_gquic = advertise_gquic
+            r.advertise_ietf_quic = advertise_ietf_quic
+            r.syncUpdate()
         for v in versions:
             SupportedVersion(record=r, version=str(v))
 

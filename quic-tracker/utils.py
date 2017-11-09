@@ -10,4 +10,4 @@ def join_root(*paths):
 
 
 def find_latest_result_file():
-    return sorted(os.listdir(join_root('data')), reverse=True)[0]
+    return filter(lambda s: s.replace('.json', '').isdigit(), sorted(os.listdir(join_root('data')), reverse=True)).__next__()

@@ -2,7 +2,6 @@ package scenario
 
 import (
 	m "masterthesis"
-	"strings"
 	"encoding/binary"
 	"bytes"
 )
@@ -16,11 +15,10 @@ const (
 
 const ForceVersionNegotiation = 0x1a2a3a4a
 
-func RunVersionNegotiationScenario(host string, trace *m.Trace) string {
+func RunVersionNegotiationScenario(conn *m.Connection, trace *m.Trace) {
 	trace.Scenario = "version_negotation"
 	trace.ScenarioVersion = 1
 
-	conn := m.NewConnection(host, strings.Split(host, ":")[0])
 	conn.Version = ForceVersionNegotiation
 	conn.SendClientInitialPacket()
 	packet, err, buf := conn.ReadNextPacket()
@@ -55,8 +53,4 @@ func RunVersionNegotiationScenario(host string, trace *m.Trace) string {
 			}
 		}
 	}
-
-
-
-	return strings.Split(conn.ConnectedIp().String(), ":")[0]
 }

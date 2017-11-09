@@ -22,6 +22,9 @@ type Connection struct {
 	protected        *CryptoState
 	cipherSuite		 *mint.CipherSuiteParams
 
+	ReceivedPacketHandler func([]byte)
+	SentPacketHandler     func([]byte)
+
 	Streams              map[uint32]*Stream
 	connectionId         uint64
 	packetNumber         uint64
@@ -39,6 +42,9 @@ func (c *Connection) nextPacketNumber() uint64 {
 	return c.packetNumber
 }
 func (c *Connection) sendAEADSealedPacket(packet Packet) {
+	if c.SentPacketHandler != nil {
+		c.SentPacketHandler(packet.encode(packet.encodePayload()))
+	}
 	header := packet.encodeHeader()
 	protectedPayload := c.cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
@@ -47,6 +53,9 @@ func (c *Connection) sendAEADSealedPacket(packet Packet) {
 	c.udpConnection.Write(finalPacket)
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
+	if c.SentPacketHandler != nil {
+		c.SentPacketHandler(packet.encode(packet.encodePayload()))
+	}
 	header := packet.encodeHeader()
 	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
@@ -110,6 +119,10 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 		return nil, err, nil
 	}
 	rec = rec[:i]
+
+	if c.ReceivedPacketHandler != nil {
+		c.ReceivedPacketHandler(rec)
+	}
 
 	var headerLen uint8
 	var header Header

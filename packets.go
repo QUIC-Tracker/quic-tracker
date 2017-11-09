@@ -14,7 +14,7 @@ type Acknowledger interface {
 type PacketEncoder interface {
 	encodeHeader() []byte
 	encodePayload() []byte
-	encode() []byte
+	encode([]byte) []byte
 }
 
 type Packet interface {
@@ -34,10 +34,10 @@ func (p abstractPacket) Header() Header {
 func (p abstractPacket) encodeHeader() []byte {
 	return p.header.encode()
 }
-func (p abstractPacket) encode() []byte {
+func (p abstractPacket) encode(payload []byte) []byte {
 	buffer := new(bytes.Buffer)
 	buffer.Write(p.encodeHeader())
-	buffer.Write(p.encodePayload())
+	buffer.Write(payload)
 	return buffer.Bytes()
 }
 

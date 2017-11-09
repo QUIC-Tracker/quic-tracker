@@ -44,9 +44,18 @@ func main() {
 			Results: make(map[string]interface{}),
 		}
 
+		conn := m.NewConnection(host, strings.Split(host, ":")[0])
+		conn.ReceivedPacketHandler = func(data []byte) {
+			trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().Unix(), Data: data})
+		}
+		conn.SentPacketHandler = func(data []byte) {
+			trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().Unix(), Data: data})
+		}
+
 		start := time.Now()
-		trace.Ip = scenario.RunVersionNegotiationScenario(host, &trace)  // TODO: Find a better way of passing ip
+		scenario.RunVersionNegotiationScenario(conn, &trace)
 		trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
+		trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
 
 		out, _ := json.Marshal(trace)
 		println(string(out))

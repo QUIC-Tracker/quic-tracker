@@ -492,7 +492,7 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	if frame.dataLengthPresent {
 		binary.Read(buffer, binary.BigEndian, &frame.dataLength)
 	} else {
-		panic(frame)
+		frame.dataLength = uint16(buffer.Len())
 	}
 	frame.streamData = make([]byte, frame.dataLength, frame.dataLength)
 	buffer.Read(frame.streamData)

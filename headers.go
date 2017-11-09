@@ -27,7 +27,7 @@ type LongHeader struct {
 	packetType   LongPacketType
 	connectionId uint64
 	packetNumber uint32
-	version      uint32
+	Version      uint32
 }
 func (h LongHeader) encode() []byte {
 	buffer := new(bytes.Buffer)
@@ -36,7 +36,7 @@ func (h LongHeader) encode() []byte {
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.connectionId)
 	binary.Write(buffer, binary.BigEndian, h.packetNumber)
-	binary.Write(buffer, binary.BigEndian, h.version)
+	binary.Write(buffer, binary.BigEndian, h.Version)
 	return buffer.Bytes()
 }
 func (h LongHeader) PacketNumber() uint32 {
@@ -54,7 +54,7 @@ func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h.packetType = LongPacketType(typeByte - 0x80)
 	binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	binary.Read(buffer, binary.BigEndian, &h.packetNumber)
-	binary.Read(buffer, binary.BigEndian, &h.version)
+	binary.Read(buffer, binary.BigEndian, &h.Version)
 	return h
 }
 func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
@@ -62,7 +62,7 @@ func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
 	h.packetType = packetType
 	h.connectionId = conn.connectionId
 	h.packetNumber = uint32(conn.nextPacketNumber())
-	h.version = conn.Version
+	h.Version = conn.Version
 	return h
 }
 

@@ -43,13 +43,13 @@ func (p abstractPacket) encode() []byte {
 
 type VersionNegotationPacket struct {
 	abstractPacket
-	supportedVersions []SupportedVersion
+	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
 func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
-	for _, version := range p.supportedVersions {
+	for _, version := range p.SupportedVersions {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
 	return buffer.Bytes()
@@ -65,14 +65,14 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 		} else if err != nil {
 			panic(err)
 		}
-		p.supportedVersions = append(p.supportedVersions, SupportedVersion(version))
+		p.SupportedVersions = append(p.SupportedVersions, SupportedVersion(version))
 	}
 	return p
 }
 func NewVersionNegotationPacket(versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
 	p.header = NewLongHeader(VersionNegotiation, conn)
-	p.supportedVersions = versions
+	p.SupportedVersions = versions
 	return p
 }
 

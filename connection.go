@@ -31,6 +31,9 @@ type Connection struct {
 	ackQueue             []uint64  // Stores the packet numbers to be acked
 	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
 }
+func (c *Connection) ConnectedIp() net.Addr {
+	return c.udpConnection.RemoteAddr()
+}
 func (c *Connection) nextPacketNumber() uint64 {
 	c.packetNumber++
 	return c.packetNumber
@@ -100,11 +103,11 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) bool { //
 		panic(alert)
 	}
 }
-func (c *Connection) ReadNextPacket() Packet {
+func (c *Connection) ReadNextPacket() (Packet, error) {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.udpConnection.ReadFromUDP(rec)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	rec = rec[:i]
 
@@ -125,17 +128,19 @@ func (c *Connection) ReadNextPacket() Packet {
 	case ServerCleartext:
 		payload, err := c.cleartext.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadServerCleartextPacket(buffer, c)
 	case OneRTTProtectedKP0:
 		payload, err := c.protected.read.Open(nil, encodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadProtectedPacket(buffer, c)
+	case VersionNegotiation:
+		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))  // Version Negotation packets are not protected w/ AEAD, see https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
 	default:
 		panic(header.PacketType())
 	}
@@ -154,7 +159,7 @@ func (c *Connection) ReadNextPacket() Packet {
 	c.ackQueue = append(c.ackQueue, fullPacketNumber)
 	c.expectedPacketNumber = fullPacketNumber + 1
 
-	return packet
+	return packet, nil
 }
 func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on the packet numbers received
 	packetNumbers := reverse(c.ackQueue)
@@ -193,7 +198,7 @@ func NewConnection(address string, serverName string) *Connection {
 	if err != nil {
 		panic(err)
 	}
-	udpConn.SetDeadline(time.Time{})
+	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
 	c := new(Connection)
 	c.udpConnection = udpConn

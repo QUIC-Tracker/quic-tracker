@@ -1,4 +1,4 @@
-package http
+package main
 
 import (
 	"github.com/davecgh/go-spew/spew"
@@ -12,11 +12,13 @@ func main() {
 	//conn := NewConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
 	conn := m.NewConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
 	conn.SendClientInitialPacket()
-	var packet m.Packet
 
 	ongoingHandhake := true
 	for ongoingHandhake {
-		packet = conn.ReadNextPacket()
+		packet, err := conn.ReadNextPacket()
+		if err != nil {
+			panic(err)
+		}
 		if packet, ok := packet.(*m.ServerCleartextPacket); ok {
 			ongoingHandhake = conn.ProcessServerHello(packet)
 		} else {
@@ -34,7 +36,10 @@ func main() {
 	conn.SendProtectedPacket(protectedPacket)
 
 	for {
-		packet = conn.ReadNextPacket()
+		packet, err := conn.ReadNextPacket()
+		if err != nil {
+			panic(err)
+		}
 		conn.SendAck(uint64(packet.Header().PacketNumber()))
 
 		spew.Dump("---> Received packet")

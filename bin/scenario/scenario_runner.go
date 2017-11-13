@@ -57,9 +57,9 @@ func main() {
 		trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 		trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
 
-		out, _ := json.Marshal(trace)
-		println(string(out))
-
 		results = append(results, trace)
 	}
+
+	out, _ := json.Marshal(results)
+	println(string(out))
 }

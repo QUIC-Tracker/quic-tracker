@@ -64,7 +64,7 @@ class SQLObjectThreadConnection(object):
 
 
 def parse_alt_svc(header_value):
-    regex = r"([^\";,\s]*=\"?[^\";]*\"?)"
+    regex = r"([^\";,\s]*=([^\",;]*)|(\"[^\";]*\"))"
     advertise_gquic = False
     advertise_ietf_quic = False
     versions = set()

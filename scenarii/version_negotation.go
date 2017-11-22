@@ -1,4 +1,4 @@
-package scenario
+package scenarii
 
 import (
 	m "masterthesis"
@@ -15,10 +15,13 @@ const (
 
 const ForceVersionNegotiation = 0x1a2a3a4a
 
-func RunVersionNegotiationScenario(conn *m.Connection, trace *m.Trace) {
-	trace.Scenario = "version_negotation"
-	trace.ScenarioVersion = 1
-
+type VersionNegotationScenario struct {
+	AbstractScenario
+}
+func NewVersionNegotationScenario() *VersionNegotationScenario {
+	return &VersionNegotationScenario{AbstractScenario{"version_negotation", 1}}
+}
+func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.Version = ForceVersionNegotiation
 	conn.SendClientInitialPacket()
 	packet, err, buf := conn.ReadNextPacket()

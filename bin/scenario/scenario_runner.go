@@ -4,7 +4,7 @@ import (
 	"os"
 	"bufio"
 	m "masterthesis"
-	"masterthesis/scenario"
+	s "masterthesis/scenarii"
 	"time"
 	"os/exec"
 	"encoding/json"
@@ -35,29 +35,37 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 	results := make([]m.Trace, 0, 0)
-	for scanner.Scan() {
-		host := scanner.Text()
-		trace := m.Trace{
-			Commit:    commit,
-			Host:      host,
-			StartedAt: time.Now().Unix(),
-			Results: make(map[string]interface{}),
-		}
 
-		conn := m.NewConnection(host, strings.Split(host, ":")[0])
-		conn.ReceivedPacketHandler = func(data []byte) {
-			trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().Unix(), Data: data})
-		}
-		conn.SentPacketHandler = func(data []byte) {
-			trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().Unix(), Data: data})
-		}
+	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario()}
 
-		start := time.Now()
-		scenario.RunVersionNegotiationScenario(conn, &trace)
-		trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
-		trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
+	for _, scenario := range scenarii {
+		for scanner.Scan() {
+			host := scanner.Text()
 
-		results = append(results, trace)
+			trace := m.Trace{
+				Scenario: scenario.Name(),
+				ScenarioVersion: scenario.Version(),
+				Commit:    commit,
+				Host:      host,
+				StartedAt: time.Now().Unix(),
+				Results:   make(map[string]interface{}),
+			}
+
+			conn := m.NewConnection(host, strings.Split(host, ":")[0])
+			conn.ReceivedPacketHandler = func(data []byte) {
+				trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().Unix(), Data: data})
+			}
+			conn.SentPacketHandler = func(data []byte) {
+				trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().Unix(), Data: data})
+			}
+
+			start := time.Now()
+			scenario.Run(conn, &trace)
+			trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
+			trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
+
+			results = append(results, trace)
+		}
 	}
 
 	out, _ := json.Marshal(results)

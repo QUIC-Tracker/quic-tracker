@@ -3,9 +3,8 @@ package scenarii
 import (
 	m "masterthesis"
 	"fmt"
-	"github.com/bifurcation/mint"
-	"crypto"
 	"strings"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type HandshakeScenario struct {
@@ -18,16 +17,29 @@ func NewHandshakeScenario() *HandshakeScenario {
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.SendClientInitialPacket()
 
-	ongoingHandhake := true
-	for ongoingHandhake {
+	ongoingHandshake := true
+	defer func() {
+		if r := recover(); r != nil {
+			if err, ok := r.(error); ok {
+				println(err.Error())
+			}
+		}
+		ongoingHandshake = false
+	}()
+
+	for ongoingHandshake {
+		println(trace.Host, "Reading packet")
 		packet, err, _ := conn.ReadNextPacket()
+		fmt.Printf("Received %T\n", packet)
 		if err != nil {
-			println(err)
+			println(err.Error())
 			return
 		}
 		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
-			ongoingHandhake = conn.ProcessServerHello(scp)
-			println(trace.Host, "ok!")
+			ongoingHandshake, err = conn.ProcessServerHello(scp)
+			if err == nil && !ongoingHandshake {
+				println(trace.Host, "ok!")
+			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32
 			for _, v := range vn.SupportedVersions {
@@ -35,23 +47,25 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 					version = uint32(v)
 				}
 			}
-			fmt.Printf("%s: switching to version %#x\n", trace.Host, version)
-			if version == 0xff000007 {
-				conn := m.NewConnection(trace.Host, strings.Split(trace.Host, ":")[0])
-				conn.Version = version
-				params := mint.CipherSuiteParams{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
-					Suite:  mint.TLS_AES_128_GCM_SHA256,
-					Cipher: nil,
-					Hash:   crypto.SHA256,
-					KeyLen: 16,
-					IvLen:  12,
-				}
-				conn.Cleartext = m.NewCleartextSaltedCryptoState(conn, &params)
-				s.Run(conn, trace)
-			} else {
-				conn.Version = version
-				s.Run(conn, trace)
+			if version == 0 {
+				return
 			}
+			fmt.Printf("%s: switching to version %#x\n", trace.Host, version)
+			oldVersion := m.QuicVersion
+			oldALPN := m.QuicALPNToken
+			newConn := m.NewConnection(strings.Split(trace.Host, ":")[0], version, conn.ConnectionId, conn.UdpConnection)
+			newConn.PacketNumber = conn.PacketNumber
+			newConn.ReceivedPacketHandler = conn.ReceivedPacketHandler
+			newConn.SentPacketHandler = conn.SentPacketHandler
+			m.QuicVersion = version
+			m.QuicALPNToken = fmt.Sprintf("hq-%02d", version & 0xff)
+			s.Run(newConn, trace)
+			m.QuicVersion = oldVersion
+			m.QuicALPNToken = oldALPN
+			return
+		} else {
+			spew.Dump(packet)
+			return
 		}
 	}
 }

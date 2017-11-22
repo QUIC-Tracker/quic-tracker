@@ -33,12 +33,11 @@ func main() {
 
 	commit := GitCommit()
 
-	scanner := bufio.NewScanner(file)
+	scenarii := [...]s.Scenario{s.NewHandshakeScenario()}
 	results := make([]m.Trace, 0, 0)
 
-	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario()}
-
 	for _, scenario := range scenarii {
+		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			host := scanner.Text()
 

@@ -18,7 +18,7 @@ type Connection struct {
 	tls     	  	 *mint.Conn
 	tlsTPHandler	 *TLSTransportParameterHandler
 
-	cleartext        *CryptoState
+	Cleartext        *CryptoState
 	protected        *CryptoState
 	cipherSuite		 *mint.CipherSuiteParams
 
@@ -46,7 +46,7 @@ func (c *Connection) sendAEADSealedPacket(packet Packet) {
 		c.SentPacketHandler(packet.encode(packet.encodePayload()))
 	}
 	header := packet.encodeHeader()
-	protectedPayload := c.cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
+	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -70,7 +70,7 @@ func (c *Connection) SendClientInitialPacket() {
 
 	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
 	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.cleartext.Write.Overhead())
+	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
 	}
@@ -139,7 +139,7 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	var packet Packet
 	switch header.PacketType() {
 	case ServerCleartext:
-		payload, err := c.cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+		payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 		if err != nil {
 			return nil, err, rec
 		}
@@ -225,7 +225,7 @@ func NewConnection(address string, serverName string) *Connection {
 	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
 	c.tlsTPHandler = NewTLSTransportParameterHandler()
 	c.tls.SetExtensionHandler(c.tlsTPHandler)
-	c.cleartext = NewCleartextCryptoState()
+	c.Cleartext = NewCleartextCryptoState()
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
 	c.connectionId = uint64(binary.BigEndian.Uint64(cId))

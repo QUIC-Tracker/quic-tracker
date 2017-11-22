@@ -6,11 +6,14 @@ import (
 )
 
 func main() {
-	//conn := NewConnection("quant.eggert.org:4433", "quant.eggert.org")
+	//conn := m.NewConnection("quant.eggert.org:4433", "quant.eggert.org")
 	//conn := NewConnection("kotdt.com:4433", "kotdt.com")
 	//conn := NewConnection("localhost:4433", "localhost")
 	//conn := NewConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
 	conn := m.NewConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
+	//conn := m.NewConnection("quic.ogre.com:4433", "quic.ogre.com")
+	//conn := m.NewConnection("kazuhooku.com:4433", "kazuhooku.com")
+	//conn := m.NewConnection("fb.mvfst.net:4433", "fb.mvfst.net")
 	conn.SendClientInitialPacket()
 
 	ongoingHandhake := true
@@ -19,8 +22,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if packet, ok := packet.(*m.ServerCleartextPacket); ok {
-			ongoingHandhake = conn.ProcessServerHello(packet)
+		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
+			ongoingHandhake = conn.ProcessServerHello(scp)
 		} else {
 			spew.Dump(packet)
 			panic(packet)

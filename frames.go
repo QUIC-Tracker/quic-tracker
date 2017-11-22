@@ -296,7 +296,9 @@ func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	if frame.numBlocksPresent {
 		binary.Write(buffer, binary.BigEndian, frame.numAckBlocks)
 	}
-	binary.Write(buffer, binary.BigEndian, frame.numTimestamps)
+	if QuicVersion < 0xff000007 {
+		binary.Write(buffer, binary.BigEndian, frame.numTimestamps)
+	}
 	switch frame.largestAcknowledgedLength {
 	case 0:
 		binary.Write(buffer, binary.BigEndian, uint8(frame.largestAcknowledged))
@@ -323,12 +325,14 @@ func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 			binary.Write(buffer, binary.BigEndian, uint64(block.ack))
 		}
 	}
-	for index, timestamp := range frame.timestamps {
-		binary.Write(buffer, binary.BigEndian, timestamp.deltaLargestAcknowledged)
-		if index > 0 {
-			binary.Write(buffer, binary.BigEndian, uint16(timestamp.timeSince))
-		} else {
-			binary.Write(buffer, binary.BigEndian, timestamp.timeSince)
+	if QuicVersion < 0xff000007 {
+		for index, timestamp := range frame.timestamps {
+			binary.Write(buffer, binary.BigEndian, timestamp.deltaLargestAcknowledged)
+			if index > 0 {
+				binary.Write(buffer, binary.BigEndian, uint16(timestamp.timeSince))
+			} else {
+				binary.Write(buffer, binary.BigEndian, timestamp.timeSince)
+			}
 		}
 	}
 }
@@ -341,7 +345,9 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	if frame.numBlocksPresent {
 		binary.Read(buffer, binary.BigEndian, &frame.numAckBlocks)
 	}
-	binary.Read(buffer, binary.BigEndian, &frame.numTimestamps)
+	if QuicVersion < 0xff00007 {
+		binary.Read(buffer, binary.BigEndian, &frame.numTimestamps)
+	}
 	switch frame.largestAcknowledgedLength {
 	case 0:
 		var la uint8
@@ -382,7 +388,7 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 		}
 		frame.ackBlocks = append(frame.ackBlocks, ack)
 	}
-	for i:= 0; i < int(frame.numTimestamps); i++ {
+	for i:= 0; i < int(frame.numTimestamps) && QuicVersion < 0xff000007; i++ {
 		timestamp := Timestamp{}
 		binary.Read(buffer, binary.BigEndian, &timestamp.deltaLargestAcknowledged)
 		if i > 0 {

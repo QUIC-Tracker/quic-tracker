@@ -6,14 +6,14 @@ import (
 )
 
 func main() {
-	//conn := m.NewConnection("quant.eggert.org:4433", "quant.eggert.org")
-	//conn := NewConnection("kotdt.com:4433", "kotdt.com")
-	//conn := NewConnection("localhost:4433", "localhost")
-	//conn := NewConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
-	conn := m.NewConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
-	//conn := m.NewConnection("quic.ogre.com:4433", "quic.ogre.com")
-	//conn := m.NewConnection("kazuhooku.com:4433", "kazuhooku.com")
-	//conn := m.NewConnection("fb.mvfst.net:4433", "fb.mvfst.net")
+	//conn := m.NewDefaultConnection("quant.eggert.org:4433", "quant.eggert.org")
+	//conn := NewDefaultConnection("kotdt.com:4433", "kotdt.com")
+	//conn := NewDefaultConnection("localhost:4433", "localhost")
+	//conn := NewDefaultConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
+	conn := m.NewDefaultConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
+	//conn := m.NewDefaultConnection("quic.ogre.com:4433", "quic.ogre.com")
+	//conn := m.NewDefaultConnection("kazuhooku.com:4433", "kazuhooku.com")
+	//conn := m.NewDefaultConnection("fb.mvfst.net:4433", "fb.mvfst.net")
 	conn.SendClientInitialPacket()
 
 	ongoingHandhake := true
@@ -23,7 +23,10 @@ func main() {
 			panic(err)
 		}
 		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
-			ongoingHandhake = conn.ProcessServerHello(scp)
+			ongoingHandhake, err = conn.ProcessServerHello(scp)
+			if err != nil {
+				panic(err)
+			}
 		} else {
 			spew.Dump(packet)
 			panic(packet)

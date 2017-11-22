@@ -60,7 +60,7 @@ func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
 	h := new(LongHeader)
 	h.packetType = packetType
-	h.connectionId = conn.connectionId
+	h.connectionId = conn.ConnectionId
 	h.packetNumber = uint32(conn.nextPacketNumber())
 	h.Version = conn.Version
 	return h
@@ -146,7 +146,7 @@ func NewShortHeader(packetType ShortHeaderPacketType, keyPhase KeyPhaseBit, conn
 	h.connectionIdFlag = !conn.omitConnectionId
 	h.keyPhase = keyPhase
 	h.packetType = packetType
-	h.connectionId = conn.connectionId
+	h.connectionId = conn.ConnectionId
 	h.packetNumber = uint32(conn.nextPacketNumber())
 	return h
 }

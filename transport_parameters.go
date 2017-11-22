@@ -71,11 +71,13 @@ func (t TPExtensionBody) Unmarshal(data []byte) (int, error) {
 }
 
 type TLSTransportParameterHandler struct {
+	NegotiatedVersion uint32
+	InitialVersion    uint32
 	QuicTransportParameters
 }
 
-func NewTLSTransportParameterHandler() *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{QuicTransportParameters{8 * 1024, 8 * 1024, 16, 10}}
+func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
+	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{8 * 1024, 8 * 1024, 16, 10}}
 }
 
 func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
@@ -83,7 +85,7 @@ func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exten
 		panic(hs)
 	}
 
-	body, err := syntax.Marshal(ClientHelloTransportParameters{QuicVersion, QuicVersion, TransportParameterList{
+	body, err := syntax.Marshal(ClientHelloTransportParameters{h.NegotiatedVersion, h.InitialVersion, TransportParameterList{
 		{InitialMaxStreamData, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamData)},
 		{InitialMaxData, Uint32ToBEBytes(h.QuicTransportParameters.MaxData)},
 		{InitialMaxStreamId, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamId)},

@@ -50,7 +50,7 @@ func main() {
 				Results:   make(map[string]interface{}),
 			}
 
-			conn := m.NewConnection(host, strings.Split(host, ":")[0])
+			conn := m.NewDefaultConnection(host, strings.Split(host, ":")[0])
 			conn.ReceivedPacketHandler = func(data []byte) {
 				trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().Unix(), Data: data})
 			}

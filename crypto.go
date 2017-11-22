@@ -29,8 +29,8 @@ func NewCleartextCryptoState() *CryptoState {
 }
 func NewCleartextSaltedCryptoState(conn *Connection, cipherSuite *mint.CipherSuiteParams) *CryptoState {
 	s := new(CryptoState)
-	s.Read = newProtectedAead(saltSecret(EncodeArgs(conn.connectionId), serverCtSecretLabel, cipherSuite), cipherSuite)
-	s.Write = newProtectedAead(saltSecret(EncodeArgs(conn.connectionId), clientCtSecretLabel, cipherSuite), cipherSuite)
+	s.Read = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), serverCtSecretLabel, cipherSuite), cipherSuite)
+	s.Write = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), clientCtSecretLabel, cipherSuite), cipherSuite)
 	return s
 }
 func NewProtectedCryptoState(conn *Connection) *CryptoState {

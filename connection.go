@@ -10,13 +10,14 @@ import (
 	"time"
 	"os"
 	"fmt"
+	"crypto"
 )
 
 type Connection struct {
-	udpConnection 	 *net.UDPConn
-	tlsBuffer	  	 *connBuffer
-	tls     	  	 *mint.Conn
-	tlsTPHandler	 *TLSTransportParameterHandler
+	UdpConnection *net.UDPConn
+	tlsBuffer     *connBuffer
+	tls           *mint.Conn
+	tlsTPHandler  *TLSTransportParameterHandler
 
 	Cleartext        *CryptoState
 	protected        *CryptoState
@@ -26,8 +27,8 @@ type Connection struct {
 	SentPacketHandler     func([]byte)
 
 	Streams              map[uint32]*Stream
-	connectionId         uint64
-	packetNumber         uint64
+	ConnectionId         uint64
+	PacketNumber         uint64
 	expectedPacketNumber uint64
 	Version              uint32
 	omitConnectionId     bool
@@ -35,11 +36,11 @@ type Connection struct {
 	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
 }
 func (c *Connection) ConnectedIp() net.Addr {
-	return c.udpConnection.RemoteAddr()
+	return c.UdpConnection.RemoteAddr()
 }
 func (c *Connection) nextPacketNumber() uint64 {
-	c.packetNumber++
-	return c.packetNumber
+	c.PacketNumber++
+	return c.PacketNumber
 }
 func (c *Connection) sendAEADSealedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
@@ -50,7 +51,7 @@ func (c *Connection) sendAEADSealedPacket(packet Packet) {
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
-	c.udpConnection.Write(finalPacket)
+	c.UdpConnection.Write(finalPacket)
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
@@ -61,7 +62,7 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
-	c.udpConnection.Write(finalPacket)
+	c.UdpConnection.Write(finalPacket)
 }
 func (c *Connection) SendClientInitialPacket() {
 	c.tls.Handshake()
@@ -77,8 +78,8 @@ func (c *Connection) SendClientInitialPacket() {
 
 	c.sendAEADSealedPacket(clientInitialPacket)
 }
-func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) bool { // Returns whether or not the TLS Handshake should continue
-	c.connectionId = packet.header.ConnectionId()  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
+	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
 	for _, frame := range packet.streamFrames {
@@ -103,18 +104,18 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) bool { //
 
 		clearTextPacket = NewClientCleartextPacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
 		defer c.sendAEADSealedPacket(clearTextPacket)
-		return false
+		return false, nil
 	case mint.AlertWouldBlock:
 		clearTextPacket = NewClientCleartextPacket(nil, []AckFrame{*ackFrame}, nil, c)
 		defer c.sendAEADSealedPacket(clearTextPacket)
-		return true
+		return true, nil
 	default:
-		panic(alert)
+		return false, alert
 	}
 }
 func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
-	i, _, err := c.udpConnection.ReadFromUDP(rec)
+	i, _, err := c.UdpConnection.ReadFromUDP(rec)
 	if err != nil {
 		return nil, err, nil
 	}
@@ -202,7 +203,10 @@ func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that 
 	c.SendProtectedPacket(protectedPacket)
 }
 
-func NewConnection(address string, serverName string) *Connection {
+func NewDefaultConnection(address string, serverName string) *Connection {
+	cId := make([]byte, 8, 8)
+	rand.Read(cId)
+
 	udpAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		panic(err)
@@ -213,8 +217,12 @@ func NewConnection(address string, serverName string) *Connection {
 	}
 	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
+	return NewConnection(serverName, QuicVersion, uint64(binary.BigEndian.Uint64(cId)), udpConn)
+}
+
+func NewConnection(serverName string, version uint32, connectionId uint64, udpConn *net.UDPConn) *Connection {
 	c := new(Connection)
-	c.udpConnection = udpConn
+	c.UdpConnection = udpConn
 	c.tlsBuffer = newConnBuffer()
 	tlsConfig := mint.Config{
 		ServerName: serverName,
@@ -223,18 +231,29 @@ func NewConnection(address string, serverName string) *Connection {
 	}
 	tlsConfig.Init(true)
 	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
-	c.tlsTPHandler = NewTLSTransportParameterHandler()
+	c.tlsTPHandler = NewTLSTransportParameterHandler(version, QuicVersion)  // TODO: Find a better way around this
 	c.tls.SetExtensionHandler(c.tlsTPHandler)
 	c.Cleartext = NewCleartextCryptoState()
-	cId := make([]byte, 8, 8)
-	rand.Read(cId)
-	c.connectionId = uint64(binary.BigEndian.Uint64(cId))
-	c.packetNumber = c.connectionId & 0x7fffffff
-	c.Version = QuicVersion
+	c.ConnectionId = connectionId
+	c.PacketNumber = c.ConnectionId & 0x7fffffff
+	c.Version = version
 	c.omitConnectionId = false
 
 	c.Streams = make(map[uint32]*Stream)
 	c.Streams[0] = &Stream{}
+
+	if c.Version >= 0xff000007 {
+		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
+			Suite:  mint.TLS_AES_128_GCM_SHA256,
+			Cipher: nil,
+			Hash:   crypto.SHA256,
+			KeyLen: 16,
+			IvLen:  12,
+		}
+		c.Cleartext = NewCleartextSaltedCryptoState(c, &params)
+	} else {
+		c.Cleartext = NewCleartextCryptoState()
+	}
 
 	return c
 }

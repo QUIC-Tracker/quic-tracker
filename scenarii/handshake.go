@@ -3,7 +3,6 @@ package scenarii
 import (
 	m "masterthesis"
 	"fmt"
-	"strings"
 )
 
 const (

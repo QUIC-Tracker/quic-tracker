@@ -6,9 +6,9 @@ import (
 )
 
 func main() {
-	//conn := m.NewDefaultConnection("quant.eggert.org:4433", "quant.eggert.org")
+	conn := m.NewDefaultConnection("quant.eggert.org:4433", "quant.eggert.org")
 	//conn := m.NewDefaultConnection("kotdt.com:4433", "kotdt.com")
-	conn := m.NewDefaultConnection("localhost:4433", "localhost")
+	//conn := m.NewDefaultConnection("localhost:4433", "localhost")
 	//conn := m.NewDefaultConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
 	//conn := m.NewDefaultConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
 	//conn := m.NewDefaultConnection("quic.ogre.com:4433", "quic.ogre.com")

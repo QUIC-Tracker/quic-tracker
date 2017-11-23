@@ -4,7 +4,13 @@ import (
 	m "masterthesis"
 	"fmt"
 	"strings"
-	"github.com/davecgh/go-spew/spew"
+)
+
+const (
+	H_ReceivedUnexpectedPacketType = 1
+	H_TLSHandshakeFailed = 2
+	H_NoCompatibleVersionAvailable = 3
+	H_Timeout = 4
 )
 
 type HandshakeScenario struct {
@@ -28,18 +34,20 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 	}()
 
 	for ongoingHandshake {
-		println(trace.Host, "Reading packet")
 		packet, err, _ := conn.ReadNextPacket()
-		fmt.Printf("Received %T\n", packet)
 		if err != nil {
-			println(err.Error())
+			trace.ErrorCode = H_Timeout
 			return
 		}
 		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
 			ongoingHandshake, err = conn.ProcessServerHello(scp)
 			if err == nil && !ongoingHandshake {
-				println(trace.Host, "ok!")
+				trace.Results["negotiated_version"] = conn.Version
 				conn.CloseConnection(false, 42, "")
+			} else if err != nil {
+				trace.ErrorCode = H_TLSHandshakeFailed
+				trace.Results["tls_error"] = err.Error()
+				conn.CloseStream(0)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32
@@ -49,9 +57,10 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 				}
 			}
 			if version == 0 {
+				trace.ErrorCode = H_NoCompatibleVersionAvailable
+				trace.Results["supported_versions"] = vn.SupportedVersions
 				return
 			}
-			fmt.Printf("%s: switching to version %#x\n", trace.Host, version)
 			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
 			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
 			conn.TransitionTo(strings.Split(trace.Host, ":")[0], version, m.QuicALPNToken)
@@ -59,7 +68,8 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return
 		} else {
-			spew.Dump(packet)
+			trace.ErrorCode = H_ReceivedUnexpectedPacketType
+			trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
 			return
 		}
 	}

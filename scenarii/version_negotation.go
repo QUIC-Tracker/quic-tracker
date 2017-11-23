@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	NotAnsweringToVN = 1
-	DidNotEchoVersion = 2
-	LastTwoVersionsAreActuallySeal = 3
-	Timeout = 4
+	VN_NotAnsweringToVN               = 1
+	VN_DidNotEchoVersion              = 2
+	VN_LastTwoVersionsAreActuallySeal = 3
+	VN_Timeout                        = 4
 )
 
 const ForceVersionNegotiation = 0x1a2a3a4a
@@ -27,10 +27,10 @@ func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
 	packet, err, buf := conn.ReadNextPacket()
 
 	if err != nil {
-		trace.ErrorCode = Timeout
+		trace.ErrorCode = VN_Timeout
 	} else {
 		if packet.Header().PacketType() != m.VersionNegotiation {
-			trace.ErrorCode = NotAnsweringToVN
+			trace.ErrorCode = VN_NotAnsweringToVN
 			trace.Results["received_packet_type"] = packet.Header().PacketType()
 		} else {
 			packet, _ := packet.(*m.VersionNegotationPacket)
@@ -45,13 +45,13 @@ func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
 
 				_, err := m.NewCleartextCryptoState().Read.Open(nil, m.EncodeArgs(packet.Header().PacketNumber()), buf[m.LongHeaderSize:], buf[:m.LongHeaderSize])
 				if err == nil {
-					trace.ErrorCode = LastTwoVersionsAreActuallySeal
+					trace.ErrorCode = VN_LastTwoVersionsAreActuallySeal
 				}
 			}
 
 			echoed_version := packet.Header().(*m.LongHeader).Version
 			if echoed_version != conn.Version {
-				trace.ErrorCode = DidNotEchoVersion
+				trace.ErrorCode = VN_DidNotEchoVersion
 				trace.Results["echoed_version"] = echoed_version
 			}
 		}

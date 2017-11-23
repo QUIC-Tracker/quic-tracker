@@ -435,8 +435,8 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 func NewAckFrame(largestAcknowledged uint64, ackBlockLength uint64) *AckFrame {
 	frame := new(AckFrame)
 	frame.numBlocksPresent = false
-	frame.largestAcknowledgedLength = 0x02
-	frame.AckBlockLength = 0x02
+	frame.largestAcknowledgedLength = 0x03
+	frame.AckBlockLength = 0x03
 	frame.numTimestamps = 0
 	frame.largestAcknowledged = largestAcknowledged
 	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockLength})

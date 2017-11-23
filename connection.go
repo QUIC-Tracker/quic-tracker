@@ -45,6 +45,7 @@ func (c *Connection) nextPacketNumber() uint64 {
 	return c.PacketNumber
 }
 func (c *Connection) sendAEADSealedPacket(packet Packet) {
+	spew.Dump(packet)
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.encode(packet.encodePayload()))
 	}
@@ -125,7 +126,8 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	if version == 0 {
 		return errors.New("no appropriate version found")
 	}
-	c.TransitionTo(version, fmt.Sprintf("hq-%02d", version & 0xff))
+	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
+	c.TransitionTo(QuicVersion, QuicALPNToken)
 	return nil
 }
 func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
@@ -295,6 +297,7 @@ func NewConnection(serverName string, version uint32, ALPN string, connectionId 
 	c.ConnectionId = connectionId
 	c.PacketNumber = c.ConnectionId & 0x7fffffff
 	c.omitConnectionId = false
+	c.receivedPackets = 0
 
 	c.TransitionTo(version, ALPN)
 

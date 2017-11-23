@@ -7,10 +7,10 @@ import (
 
 func main() {
 	//conn := m.NewDefaultConnection("quant.eggert.org:4433", "quant.eggert.org")
-	//conn := NewDefaultConnection("kotdt.com:4433", "kotdt.com")
-	//conn := NewDefaultConnection("localhost:4433", "localhost")
-	//conn := NewDefaultConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
-	conn := m.NewDefaultConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
+	//conn := m.NewDefaultConnection("kotdt.com:4433", "kotdt.com")
+	conn := m.NewDefaultConnection("localhost:4433", "localhost")
+	//conn := m.NewDefaultConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
+	//conn := m.NewDefaultConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
 	//conn := m.NewDefaultConnection("quic.ogre.com:4433", "quic.ogre.com")
 	//conn := m.NewDefaultConnection("kazuhooku.com:4433", "kazuhooku.com")
 	//conn := m.NewDefaultConnection("fb.mvfst.net:4433", "fb.mvfst.net")
@@ -27,6 +27,9 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+			conn.ProcessVersionNegotation(vn)
+			conn.SendClientInitialPacket()
 		} else {
 			spew.Dump(packet)
 			panic(packet)

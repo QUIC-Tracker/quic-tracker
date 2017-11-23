@@ -63,7 +63,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 			}
 			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
 			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
-			conn.TransitionTo(strings.Split(trace.Host, ":")[0], version, m.QuicALPNToken)
+			conn.TransitionTo(version, m.QuicALPNToken)
 			s.Run(conn, trace)
 			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return

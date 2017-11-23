@@ -40,7 +40,7 @@ func NewProtectedCryptoState(conn *Connection) *CryptoState {
 		panic(err)
 	}
 	s.Read = newProtectedAead(readSecret, conn.cipherSuite)
-	writeSecret, err := conn.tls.ComputeExporter(serverPpSecret0Label, []byte{}, conn.cipherSuite.Hash.Size())
+	writeSecret, err := conn.tls.ComputeExporter(clientPpSecret0Label, []byte{}, conn.cipherSuite.Hash.Size())
 	if err != nil {
 		panic(err)
 	}

@@ -11,9 +11,11 @@ import (
 	"os"
 	"fmt"
 	"crypto"
+	"errors"
 )
 
 type Connection struct {
+	ServerName	  string
 	UdpConnection *net.UDPConn
 	tlsBuffer     *connBuffer
 	tls           *mint.Conn
@@ -113,6 +115,19 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, er
 		return false, alert
 	}
 }
+func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
+	var version uint32
+	for _, v := range vn.SupportedVersions {
+		if v >= 0xff000006 && v <= 0xff000007 {
+			version = uint32(v)
+		}
+	}
+	if version == 0 {
+		return errors.New("no appropriate version found")
+	}
+	c.TransitionTo(version, fmt.Sprintf("hq-%02d", version & 0xff))
+	return nil
+}
 func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.UdpConnection.ReadFromUDP(rec)
@@ -202,10 +217,10 @@ func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that 
 	protectedPacket.Frames = append(protectedPacket.Frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
 	c.SendProtectedPacket(protectedPacket)
 }
-func (c *Connection) TransitionTo(serverName string, version uint32, ALPN string) {
+func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.tlsBuffer = newConnBuffer()
 	tlsConfig := mint.Config{
-		ServerName: serverName,
+		ServerName: c.ServerName,
 		NonBlocking: true,
 		NextProtos: []string{ALPN},
 	}
@@ -275,12 +290,13 @@ func NewDefaultConnection(address string, serverName string) *Connection {
 
 func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn) *Connection {
 	c := new(Connection)
+	c.ServerName = serverName
 	c.UdpConnection = udpConn
 	c.ConnectionId = connectionId
 	c.PacketNumber = c.ConnectionId & 0x7fffffff
 	c.omitConnectionId = false
 
-	c.TransitionTo(serverName, version, ALPN)
+	c.TransitionTo(version, ALPN)
 
 	return c
 }

@@ -202,7 +202,60 @@ func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that 
 	protectedPacket.Frames = append(protectedPacket.Frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
 	c.SendProtectedPacket(protectedPacket)
 }
-
+func (c *Connection) TransitionTo(serverName string, version uint32, ALPN string) {
+	c.tlsBuffer = newConnBuffer()
+	tlsConfig := mint.Config{
+		ServerName: serverName,
+		NonBlocking: true,
+		NextProtos: []string{ALPN},
+	}
+	tlsConfig.Init(true)
+	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
+	var prevVersion uint32
+	if c.Version == 0 {
+		prevVersion = QuicVersion
+	} else {
+		prevVersion = c.Version
+	}
+	c.tlsTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
+	c.Version = version
+	c.tls.SetExtensionHandler(c.tlsTPHandler)
+	if c.Version >= 0xff000007 {
+		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
+			Suite:  mint.TLS_AES_128_GCM_SHA256,
+			Cipher: nil,
+			Hash:   crypto.SHA256,
+			KeyLen: 16,
+			IvLen:  12,
+		}
+		c.Cleartext = NewCleartextSaltedCryptoState(c, &params)
+	} else {
+		c.Cleartext = NewCleartextCryptoState()
+	}
+	c.Streams = make(map[uint32]*Stream)
+	c.Streams[0] = &Stream{}
+}
+func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
+	pkt := NewProtectedPacket(c)
+	if quicLayer {
+		pkt.Frames = append(pkt.Frames, ConnectionCloseFrame{errCode, uint16(len(reasonPhrase)), reasonPhrase})
+	} else {
+		pkt.Frames = append(pkt.Frames, ApplicationCloseFrame{errCode, uint16(len(reasonPhrase)), reasonPhrase})
+	}
+	c.SendProtectedPacket(pkt)
+}
+func (c *Connection) CloseStream(streamId uint32) {
+	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
+	if c.protected == nil {
+		pkt := NewClientCleartextPacket(nil, nil, nil, c)
+		pkt.streamFrames = append(pkt.streamFrames, frame)
+		c.sendAEADSealedPacket(pkt)
+	} else {
+		pkt := NewProtectedPacket(c)
+		pkt.Frames = append(pkt.Frames, frame)
+		c.SendProtectedPacket(pkt)
+	}
+}
 func NewDefaultConnection(address string, serverName string) *Connection {
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
@@ -217,43 +270,17 @@ func NewDefaultConnection(address string, serverName string) *Connection {
 	}
 	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
-	return NewConnection(serverName, QuicVersion, uint64(binary.BigEndian.Uint64(cId)), udpConn)
+	return NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
 }
 
-func NewConnection(serverName string, version uint32, connectionId uint64, udpConn *net.UDPConn) *Connection {
+func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn) *Connection {
 	c := new(Connection)
 	c.UdpConnection = udpConn
-	c.tlsBuffer = newConnBuffer()
-	tlsConfig := mint.Config{
-		ServerName: serverName,
-		NonBlocking: true,
-		NextProtos: []string{QuicALPNToken},
-	}
-	tlsConfig.Init(true)
-	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
-	c.tlsTPHandler = NewTLSTransportParameterHandler(version, QuicVersion)  // TODO: Find a better way around this
-	c.tls.SetExtensionHandler(c.tlsTPHandler)
-	c.Cleartext = NewCleartextCryptoState()
 	c.ConnectionId = connectionId
 	c.PacketNumber = c.ConnectionId & 0x7fffffff
-	c.Version = version
 	c.omitConnectionId = false
 
-	c.Streams = make(map[uint32]*Stream)
-	c.Streams[0] = &Stream{}
-
-	if c.Version >= 0xff000007 {
-		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
-			Suite:  mint.TLS_AES_128_GCM_SHA256,
-			Cipher: nil,
-			Hash:   crypto.SHA256,
-			KeyLen: 16,
-			IvLen:  12,
-		}
-		c.Cleartext = NewCleartextSaltedCryptoState(c, &params)
-	} else {
-		c.Cleartext = NewCleartextCryptoState()
-	}
+	c.TransitionTo(serverName, version, ALPN)
 
 	return c
 }

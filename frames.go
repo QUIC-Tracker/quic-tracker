@@ -28,6 +28,8 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
 		return Frame(NewResetStream(buffer))
 	case frameType == ConnectionCloseType:
 		return Frame(NewConnectionCloseFrame(buffer))
+	case frameType == ApplicationCloseType:
+		return Frame(NewApplicationCloseFrame(buffer))
 	case frameType == MaxDataType:
 		return Frame(NewMaxDataFrame(buffer))
 	case frameType == MaxStreamDataType:
@@ -60,6 +62,7 @@ type FrameType uint8
 const PaddingFrameType FrameType = 0x00
 const ResetStreamType FrameType = 0x01
 const ConnectionCloseType FrameType = 0x02
+const ApplicationCloseType FrameType = 0x03
 const MaxDataType FrameType = 0x04
 const MaxStreamDataType FrameType = 0x05
 const MaxStreamIdType FrameType = 0x06
@@ -105,7 +108,7 @@ func NewResetStream(buffer *bytes.Reader) *ResetStream {
 }
 
 type ConnectionCloseFrame struct {
-	errorCode          uint32
+	errorCode          uint16
 	reasonPhraseLength uint16
 	reasonPhrase       string
 }
@@ -120,6 +123,33 @@ func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
+	buffer.ReadByte()  // Discard frame type
+	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
+	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)
+	if frame.reasonPhraseLength > 0 {
+		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
+		binary.Read(buffer, binary.BigEndian, &reasonBytes)
+		frame.reasonPhrase = string(reasonBytes)
+	}
+	return frame
+}
+
+type ApplicationCloseFrame struct {
+	errorCode          uint16
+	reasonPhraseLength uint16
+	reasonPhrase       string
+}
+func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
+func (frame ApplicationCloseFrame) writeTo(buffer *bytes.Buffer) {
+	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	binary.Write(buffer, binary.BigEndian, frame.errorCode)
+	binary.Write(buffer, binary.BigEndian, frame.reasonPhraseLength)
+	if frame.reasonPhraseLength > 0 {
+		buffer.Write([]byte(frame.reasonPhrase))
+	}
+}
+func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
+	frame := new(ApplicationCloseFrame)
 	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)

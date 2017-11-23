@@ -39,6 +39,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 			ongoingHandshake, err = conn.ProcessServerHello(scp)
 			if err == nil && !ongoingHandshake {
 				println(trace.Host, "ok!")
+				conn.CloseConnection(false, 42, "")
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32
@@ -51,17 +52,11 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 				return
 			}
 			fmt.Printf("%s: switching to version %#x\n", trace.Host, version)
-			oldVersion := m.QuicVersion
-			oldALPN := m.QuicALPNToken
-			newConn := m.NewConnection(strings.Split(trace.Host, ":")[0], version, conn.ConnectionId, conn.UdpConnection)
-			newConn.PacketNumber = conn.PacketNumber
-			newConn.ReceivedPacketHandler = conn.ReceivedPacketHandler
-			newConn.SentPacketHandler = conn.SentPacketHandler
-			m.QuicVersion = version
-			m.QuicALPNToken = fmt.Sprintf("hq-%02d", version & 0xff)
-			s.Run(newConn, trace)
-			m.QuicVersion = oldVersion
-			m.QuicALPNToken = oldALPN
+			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
+			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
+			conn.TransitionTo(strings.Split(trace.Host, ":")[0], version, m.QuicALPNToken)
+			s.Run(conn, trace)
+			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return
 		} else {
 			spew.Dump(packet)

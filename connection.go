@@ -45,7 +45,6 @@ func (c *Connection) nextPacketNumber() uint64 {
 	return c.PacketNumber
 }
 func (c *Connection) sendAEADSealedPacket(packet Packet) {
-	spew.Dump(packet)
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.encode(packet.encodePayload()))
 	}

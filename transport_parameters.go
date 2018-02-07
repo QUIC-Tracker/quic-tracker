@@ -108,10 +108,10 @@ func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exten
 func (h TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.ExtensionList) error {
 	var list *TransportParameterList
 	var body TPExtensionBody
-	ok := el.Find(body)
+	ok, err := el.Find(body)
 
 	if !ok {
-		return nil
+		return err
 	}
 
 	if hs != mint.HandshakeTypeEncryptedExtensions {  // TODO: Verify this non equality check, or even that client can receive TPs.

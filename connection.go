@@ -97,7 +97,7 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 	case mint.AlertNoAlert:
 		tlsOutput := c.tlsBuffer.getOutput()
 
-		state := c.tls.State()
+		state := c.tls.ConnectionState()
 		// TODO: Check negotiated ALPN ?
 		c.cipherSuite = &state.CipherSuite
 		c.protected = NewProtectedCryptoState(c)
@@ -229,7 +229,6 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 		NextProtos: []string{ALPN},
 	}
 	tlsConfig.Init(true)
-	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
 	var prevVersion uint32
 	if c.Version == 0 {
 		prevVersion = QuicVersion
@@ -238,7 +237,8 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	}
 	c.tlsTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	c.tls.SetExtensionHandler(c.tlsTPHandler)
+	tlsConfig.ExtensionHandler = c.tlsTPHandler
+	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
 	if c.Version >= 0xff000007 {
 		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
 			Suite:  mint.TLS_AES_128_GCM_SHA256,
@@ -257,9 +257,9 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
 	pkt := NewProtectedPacket(c)
 	if quicLayer {
-		pkt.Frames = append(pkt.Frames, ConnectionCloseFrame{errCode, uint16(len(reasonPhrase)), reasonPhrase})
+		pkt.Frames = append(pkt.Frames, ConnectionCloseFrame{errCode, uint64(len(reasonPhrase)), reasonPhrase})
 	} else {
-		pkt.Frames = append(pkt.Frames, ApplicationCloseFrame{errCode, uint16(len(reasonPhrase)), reasonPhrase})
+		pkt.Frames = append(pkt.Frames, ApplicationCloseFrame{errCode, uint64(len(reasonPhrase)), reasonPhrase})
 	}
 	c.SendProtectedPacket(pkt)
 }

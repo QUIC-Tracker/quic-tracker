@@ -373,6 +373,7 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 
 	firstBlock := AckBlock{}
 	firstBlock.block, _ = ReadVarInt(buffer)
+	frame.ackBlocks = append(frame.ackBlocks, firstBlock)
 
 	var i uint64
 	for i = 0; i < frame.ackBlockCount; i++ {
@@ -437,11 +438,26 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	}
 	if frame.lenBit {
 		frame.length, _ = ReadVarInt(buffer)
+	} else {
+		frame.length = uint64(buffer.Len())
 	}
+	frame.streamData = make([]byte, frame.length, frame.length)
+	buffer.Read(frame.streamData)
+
+	stream, ok := conn.Streams[frame.streamId]
+	if !ok {
+		spew.Dump(frame)
+		panic(frame)
+	}
+	if frame.offset == stream.readOffset {
+		stream.readOffset += uint64(frame.length)
+	}
+
 	return frame
 }
-func NewStreamFrame(streamId uint32, stream *Stream, data []byte, finBit bool) *StreamFrame {
+func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *StreamFrame {
 	frame := new(StreamFrame)
+	frame.streamId = streamId
 	frame.finBit = finBit
 	frame.lenBit = true
 	frame.offset = stream.writeOffset

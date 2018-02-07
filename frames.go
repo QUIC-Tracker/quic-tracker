@@ -42,13 +42,13 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
 		return Frame(NewBlockedFrame(buffer))
 	case frameType == StreamBlockedType:
 		return Frame(NewStreamBlockedFrame(buffer))
-	case frameType == StreamIdNeededType:
+	case frameType == StreamIdBlockedType:
 		return Frame(NewStreamIdNeededFrame(buffer))
 	case frameType == NewConnectionIdType:
 		return Frame(NewNewConnectionIdFrame(buffer))
 	case frameType == StopSendingType:
 		return Frame(NewStopSendingFrame(buffer))
-	case (frameType & 0xE0) == AckType:
+	case frameType == AckType:
 		return Frame(ReadAckFrame(buffer))
 	case (frameType & StreamType) == StreamType:
 		return Frame(ReadStreamFrame(buffer, conn))
@@ -69,11 +69,12 @@ const MaxStreamIdType FrameType = 0x06
 const PingType FrameType = 0x07
 const BlockedType FrameType = 0x08
 const StreamBlockedType FrameType = 0x09
-const StreamIdNeededType FrameType = 0x0a
+const StreamIdBlockedType FrameType = 0x0a
 const NewConnectionIdType FrameType = 0x0b
 const StopSendingType FrameType = 0x0c
-const AckType FrameType = 0xa0
-const StreamType FrameType = 0xc0
+const PongType FrameType = 0x0d
+const AckType FrameType = 0x0e
+const StreamType FrameType = 0x10
 
 type PaddingFrame byte
 
@@ -87,36 +88,36 @@ func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 }
 
 type ResetStream struct {
-	streamId    uint32
-	errorCode   uint32
+	streamId    uint64
+	errorCode   uint16
 	finalOffset uint64
 }
 func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
 func (frame ResetStream) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.streamId)
+	WriteVarInt(buffer, frame.streamId)
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	binary.Write(buffer, binary.BigEndian, frame.finalOffset)
+	WriteVarInt(buffer, frame.finalOffset)
 }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.streamId)
+	frame.streamId, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	binary.Read(buffer, binary.BigEndian, &frame.finalOffset)
+	frame.finalOffset, _ = ReadVarInt(buffer)
 	return frame
 }
 
 type ConnectionCloseFrame struct {
 	errorCode          uint16
-	reasonPhraseLength uint16
+	reasonPhraseLength uint64
 	reasonPhrase       string
 }
 func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
 func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	binary.Write(buffer, binary.BigEndian, frame.reasonPhraseLength)
+	WriteVarInt(buffer, frame.reasonPhraseLength)
 	if frame.reasonPhraseLength > 0 {
 		buffer.Write([]byte(frame.reasonPhrase))
 	}
@@ -125,7 +126,7 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)
+	frame.reasonPhraseLength, _ = ReadVarInt(buffer)
 	if frame.reasonPhraseLength > 0 {
 		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
@@ -136,7 +137,7 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 
 type ApplicationCloseFrame struct {
 	errorCode          uint16
-	reasonPhraseLength uint16
+	reasonPhraseLength uint64
 	reasonPhrase       string
 }
 func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
@@ -152,7 +153,7 @@ func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 	frame := new(ApplicationCloseFrame)
 	buffer.ReadByte()  // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	binary.Read(buffer, binary.BigEndian, &frame.reasonPhraseLength)
+	frame.reasonPhraseLength, _ = ReadVarInt(buffer)
 	if frame.reasonPhraseLength > 0 {
 		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
@@ -168,391 +169,285 @@ type MaxDataFrame struct {
 func (frame MaxDataFrame) FrameType() FrameType { return MaxDataType }
 func (frame MaxDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.maximumData)
+	WriteVarInt(buffer, frame.maximumData)
 }
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	buffer.ReadByte()  // Discard frame type
+	frame.maximumData, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.maximumData)
 	return frame
 }
 
 type MaxStreamDataFrame struct {
-	streamId uint32
+	streamId uint64
 	maximumStreamData uint64
 }
 func (frame MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
 func (frame MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.streamId)
-	binary.Write(buffer, binary.BigEndian, frame.maximumStreamData)
+	WriteVarInt(buffer, frame.streamId)
+	WriteVarInt(buffer, frame.maximumStreamData)
 }
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.streamId)
-	binary.Read(buffer, binary.BigEndian, &frame.maximumStreamData)
+	frame.streamId, _ = ReadVarInt(buffer)
+	frame.maximumStreamData, _ = ReadVarInt(buffer)
 	return frame
 }
 
 type MaxStreamIdFrame struct {
-	maximumStreamId uint32
+	maximumStreamId uint64
 }
 func (frame MaxStreamIdFrame) FrameType() FrameType { return MaxStreamIdType }
 func (frame MaxStreamIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.maximumStreamId)
+	WriteVarInt(buffer, frame.maximumStreamId)
 }
 func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamIdFrame {
 	frame := new(MaxStreamIdFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.maximumStreamId)
+	frame.maximumStreamId, _ = ReadVarInt(buffer)
 	return frame
 }
 
 
-type PingFrame byte
+type PingFrame struct {
+	length uint8
+	data []byte
+}
 func (frame PingFrame) FrameType() FrameType { return PingType }
 func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	buffer.WriteByte(frame.length)
+	if frame.length > 0 {
+		buffer.Write(frame.data)
+	}
 }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
+	frame := new(PingFrame)
 	buffer.ReadByte()  // Discard frame type
-	return new(PingFrame)
+	frame.length, _ = buffer.ReadByte()
+	if frame.length > 0 {
+		frame.data = make([]byte, frame.length, frame.length)
+		buffer.Read(frame.data)
+	}
+	return frame
 }
 
-type BlockedFrame byte
+type BlockedFrame struct {
+	offset uint64
+}
 func (frame BlockedFrame) FrameType() FrameType { return BlockedType }
 func (frame BlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	WriteVarInt(buffer, frame.offset)
 }
 func NewBlockedFrame(buffer *bytes.Reader) *BlockedFrame {
+	frame := new(BlockedFrame)
 	buffer.ReadByte()  // Discard frame type
-	return new(BlockedFrame)
+	frame.offset, _ = ReadVarInt(buffer)
+	return frame
 }
 
 type StreamBlockedFrame struct {
-	streamId uint32
+	streamId uint64
+	offset   uint64
 }
 func (frame StreamBlockedFrame) FrameType() FrameType { return StreamBlockedType }
 func (frame StreamBlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.streamId)
+	WriteVarInt(buffer, frame.streamId)
+	WriteVarInt(buffer, frame.offset)
 }
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamBlockedFrame {
 	frame := new(StreamBlockedFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.streamId)
+	frame.streamId, _ = ReadVarInt(buffer)
+	frame.offset, _ = ReadVarInt(buffer)
 	return frame
 }
 
-type StreamIdNeededFrame byte
-func (frame StreamIdNeededFrame) FrameType() FrameType { return StreamIdNeededType }
-func (frame StreamIdNeededFrame) writeTo(buffer *bytes.Buffer) {
-	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+type StreamIdBlockedFrame struct {
+	streamId uint64
 }
-func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdNeededFrame {
+func (frame StreamIdBlockedFrame) FrameType() FrameType { return StreamIdBlockedType }
+func (frame StreamIdBlockedFrame) writeTo(buffer *bytes.Buffer) {
+	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	WriteVarInt(buffer, frame.streamId)
+}
+func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdBlockedFrame {
+	frame := new(StreamIdBlockedFrame)
 	buffer.ReadByte()  // Discard frame type
-	return new(StreamIdNeededFrame)
+	frame.streamId, _ = ReadVarInt(buffer)
+	return frame
 }
 
 type NewConnectionIdFrame struct {
-	sequence            uint16
-	connectionId        uint32
-	statelessResetToken [8]byte
+	sequence            uint64
+	connectionId        uint64
+	statelessResetToken [16]byte
 }
 func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
 func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.sequence)
-	binary.Write(buffer, binary.BigEndian, frame.connectionId)
+	WriteVarInt(buffer, frame.sequence)
+	WriteVarInt(buffer, frame.connectionId)
 	binary.Write(buffer, binary.BigEndian, frame.statelessResetToken)
 }
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.sequence)
-	binary.Read(buffer, binary.BigEndian, &frame.connectionId)
+	frame.sequence, _ = ReadVarInt(buffer)
+	frame.connectionId, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.statelessResetToken)
 	return frame
 }
 
 type StopSendingFrame struct {
-	streamId  uint32
-	errorCode uint32
+	streamId  uint64
+	errorCode uint16
 }
 func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
 func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.streamId)
+	WriteVarInt(buffer, frame.streamId)
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
 }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.streamId)
+	frame.streamId, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
 	return frame
 }
 
+type PongFrame struct {
+	PingFrame
+}
+
+func (frame PongFrame) FrameType() FrameType { return PongType }
+
+func NewPongFrame(buffer *bytes.Reader) *PongFrame {
+	frame := new(PongFrame)
+	buffer.ReadByte()  // Discard frame type
+	frame.length, _ = buffer.ReadByte()
+	if frame.length > 0 {
+		frame.data = make([]byte, frame.length, frame.length)
+		buffer.Read(frame.data)
+	}
+	return frame
+}
+
 type AckFrame struct {
-	numBlocksPresent          bool
-	largestAcknowledgedLength byte
-	AckBlockLength            byte
-	numAckBlocks              uint8
-	numTimestamps             uint8
 	largestAcknowledged       uint64
-	ackDelay                  uint16
+	ackDelay                  uint64
+	ackBlockCount              uint64
 	ackBlocks                 []AckBlock
-	timestamps                []Timestamp
 }
 type AckBlock struct {
-	gap uint8
-	ack uint64
-}
-type Timestamp struct {
-	deltaLargestAcknowledged uint8
-	timeSince                uint32
+	gap uint64
+	block uint64
 }
 func (frame AckFrame) FrameType() FrameType { return AckType }
 func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
-	typeByte := byte(frame.FrameType())
-	if frame.numBlocksPresent {
-		typeByte |= 0x10
-	}
-	typeByte |= frame.largestAcknowledgedLength << 2
-	typeByte |= frame.AckBlockLength
-	binary.Write(buffer, binary.BigEndian, typeByte)
-	if frame.numBlocksPresent {
-		binary.Write(buffer, binary.BigEndian, frame.numAckBlocks)
-	}
-	if QuicVersion < 0xff000007 {
-		binary.Write(buffer, binary.BigEndian, frame.numTimestamps)
-	}
-	switch frame.largestAcknowledgedLength {
-	case 0:
-		binary.Write(buffer, binary.BigEndian, uint8(frame.largestAcknowledged))
-	case 1:
-		binary.Write(buffer, binary.BigEndian, uint16(frame.largestAcknowledged))
-	case 2:
-		binary.Write(buffer, binary.BigEndian, uint32(frame.largestAcknowledged))
-	case 3:
-		binary.Write(buffer, binary.BigEndian, uint64(frame.largestAcknowledged))
-	}
-	binary.Write(buffer, binary.BigEndian, frame.ackDelay)
-	for index, block := range frame.ackBlocks {
-		if index > 0 {
-			binary.Write(buffer, binary.BigEndian, block.gap)
+	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	WriteVarInt(buffer, frame.largestAcknowledged)
+	WriteVarInt(buffer, frame.ackDelay)
+	WriteVarInt(buffer, frame.ackBlockCount)
+	for i, ack := range frame.ackBlocks {
+		if i > 0 {
+			WriteVarInt(buffer, ack.gap)
 		}
-		switch frame.AckBlockLength {
-		case 0:
-			binary.Write(buffer, binary.BigEndian, uint8(block.ack))
-		case 1:
-			binary.Write(buffer, binary.BigEndian, uint16(block.ack))
-		case 2:
-			binary.Write(buffer, binary.BigEndian, uint32(block.ack))
-		case 3:
-			binary.Write(buffer, binary.BigEndian, uint64(block.ack))
-		}
-	}
-	if QuicVersion < 0xff000007 {
-		for index, timestamp := range frame.timestamps {
-			binary.Write(buffer, binary.BigEndian, timestamp.deltaLargestAcknowledged)
-			if index > 0 {
-				binary.Write(buffer, binary.BigEndian, uint16(timestamp.timeSince))
-			} else {
-				binary.Write(buffer, binary.BigEndian, timestamp.timeSince)
-			}
-		}
+		WriteVarInt(buffer, ack.block)
 	}
 }
 func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	frame := new(AckFrame)
-	typeByte, _ := buffer.ReadByte()
-	frame.numBlocksPresent = typeByte & 0x10 == 0x10
-	frame.largestAcknowledgedLength = (typeByte & 0xC) >> 2
-	frame.AckBlockLength = typeByte & 0x3
-	if frame.numBlocksPresent {
-		binary.Read(buffer, binary.BigEndian, &frame.numAckBlocks)
-	}
-	if QuicVersion < 0xff00007 {
-		binary.Read(buffer, binary.BigEndian, &frame.numTimestamps)
-	}
-	switch frame.largestAcknowledgedLength {
-	case 0:
-		var la uint8
-		binary.Read(buffer, binary.BigEndian, &la)
-		frame.largestAcknowledged = uint64(la)
-	case 1:
-		var la uint16
-		binary.Read(buffer, binary.BigEndian, &la)
-		frame.largestAcknowledged = uint64(la)
-	case 2:
-		var la uint32
-		binary.Read(buffer, binary.BigEndian, &la)
-		frame.largestAcknowledged = uint64(la)
-	case 3:
-		binary.Read(buffer, binary.BigEndian, &frame.largestAcknowledged)
-	}
-	binary.Read(buffer, binary.BigEndian, &frame.ackDelay)
-	for i := 0; i < int(frame.numAckBlocks) + 1; i++ {  // First ACK Block Length is always present, see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-8.13.1
+	buffer.ReadByte()  // Discard frame byte
+
+	frame.largestAcknowledged, _ = ReadVarInt(buffer)
+	frame.ackDelay, _ = ReadVarInt(buffer)
+	frame.ackBlockCount, _ = ReadVarInt(buffer)
+
+	firstBlock := AckBlock{}
+	firstBlock.block, _ = ReadVarInt(buffer)
+
+	var i uint64
+	for i = 0; i < frame.ackBlockCount; i++ {
 		ack := AckBlock{}
-		if i > 0 {
-			ack.gap, _ = buffer.ReadByte()
-		}
-		switch frame.AckBlockLength {
-		case 0:
-			var value uint8
-			binary.Read(buffer, binary.BigEndian, &value)
-			ack.ack = uint64(value)
-		case 1:
-			var value uint16
-			binary.Read(buffer, binary.BigEndian, &value)
-			ack.ack = uint64(value)
-		case 2:
-			var value uint32
-			binary.Read(buffer, binary.BigEndian, &value)
-			ack.ack = uint64(value)
-		case 3:
-			binary.Read(buffer, binary.BigEndian, &ack.ack)
-		}
+		ack.gap, _ = ReadVarInt(buffer)
+		ack.block, _ = ReadVarInt(buffer)
 		frame.ackBlocks = append(frame.ackBlocks, ack)
-	}
-	for i:= 0; i < int(frame.numTimestamps) && QuicVersion < 0xff000007; i++ {
-		timestamp := Timestamp{}
-		binary.Read(buffer, binary.BigEndian, &timestamp.deltaLargestAcknowledged)
-		if i > 0 {
-			var timeSince uint16
-			binary.Read(buffer, binary.BigEndian, &timeSince)
-			timestamp.timeSince = uint32(timeSince)
-		} else {
-			binary.Read(buffer, binary.BigEndian, &timestamp.timeSince)
-		}
-		frame.timestamps = append(frame.timestamps, timestamp)
 	}
 	return frame
 }
-func NewAckFrame(largestAcknowledged uint64, ackBlockLength uint64) *AckFrame {
+func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 	frame := new(AckFrame)
-	frame.numBlocksPresent = false
-	frame.largestAcknowledgedLength = 0x03
-	frame.AckBlockLength = 0x03
-	frame.numTimestamps = 0
 	frame.largestAcknowledged = largestAcknowledged
-	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockLength})
+	frame.ackBlockCount = 0
+	frame.ackDelay = 0
+	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockCount})
 	return frame
 }
 
 type StreamFrame struct {
 	finBit bool
-	streamIdLength uint8
-	offsetLength uint8
-	dataLengthPresent bool
-	streamId uint32
-	offset uint64
-	dataLength uint16
+	lenBit bool
+	offBit bool
+
+	streamId uint64
+	offset   uint64
+	length   uint64
 	streamData []byte
 }
 func (frame StreamFrame) FrameType() FrameType { return StreamType }
 func (frame StreamFrame) writeTo(buffer *bytes.Buffer) {
 	typeByte := byte(frame.FrameType())
 	if frame.finBit {
-		typeByte |= 0x20
+		typeByte |= 0x01
 	}
-	typeByte |= frame.streamIdLength << 3
-	typeByte |= frame.offsetLength << 1
-	if frame.dataLengthPresent {
-		typeByte |= 1
+	if frame.lenBit {
+		typeByte |= 0x02
+	}
+	if frame.offBit {
+		typeByte |= 0x04
 	}
 	binary.Write(buffer, binary.BigEndian, typeByte)
-	switch frame.streamIdLength {
-	case 0:
-		binary.Write(buffer, binary.BigEndian, uint8(frame.streamId))
-	case 1:
-		binary.Write(buffer, binary.BigEndian, uint16(frame.streamId))
-	case 2:
-		//binary.Write(buffer, binary.BigEndian, [3]byte(frame.streamId))
-		panic("TODO")
-	case 3:
-		binary.Write(buffer, binary.BigEndian, uint32(frame.streamId))
+	WriteVarInt(buffer, frame.streamId)
+	if frame.offBit {
+		WriteVarInt(buffer, frame.offset)
 	}
-	switch frame.offsetLength {
-	case 1:
-		binary.Write(buffer, binary.BigEndian, uint16(frame.offset))
-	case 2:
-		binary.Write(buffer, binary.BigEndian, uint32(frame.offset))
-	case 3:
-		binary.Write(buffer, binary.BigEndian, frame.offset)
+	if frame.lenBit {
+		WriteVarInt(buffer, frame.length)
 	}
-	if frame.dataLengthPresent {
-		binary.Write(buffer, binary.BigEndian, frame.dataLength)
-	}
-	binary.Write(buffer, binary.BigEndian, frame.streamData)
+	buffer.Write(frame.streamData)
 }
 func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame := new(StreamFrame)
 	typeByte, _ := buffer.ReadByte()
-	frame.finBit = (typeByte & 0x20) == 0x20
-	frame.streamIdLength = (typeByte & 0x18) >> 3
-	frame.offsetLength = (typeByte & 0x6) >> 1
-	frame.dataLengthPresent = (typeByte & 0x1) == 1
-	switch frame.streamIdLength {
-	case 0:
-		var id uint8
-		binary.Read(buffer, binary.BigEndian, &id)
-		frame.streamId = uint32(id)
-	case 1:
-		var id uint16
-		binary.Read(buffer, binary.BigEndian, &id)
-		frame.streamId = uint32(id)
-	case 2:
-		var id [3]byte
-		binary.Read(buffer, binary.BigEndian, &id)
-		frame.streamId = uint32((id[0] << 16) + (id[1] << 8) + id[2])
-	case 3:
-		binary.Read(buffer, binary.BigEndian, &frame.streamId)
-	}
-	switch frame.offsetLength {
-	case 1:
-		var offset uint16
-		binary.Read(buffer, binary.BigEndian, &offset)
-		frame.offset = uint64(offset)
-	case 2:
-		var offset uint32
-		binary.Read(buffer, binary.BigEndian, &offset)
-		frame.offset = uint64(offset)
-	case 3:
-		binary.Read(buffer, binary.BigEndian, &frame.offset)
-	}
+	frame.finBit = (typeByte & 0x01) == 0x01
+	frame.lenBit = (typeByte & 0x02) == 0x02
+	frame.offBit = (typeByte & 0x04) == 0x04
 
-	if frame.dataLengthPresent {
-		binary.Read(buffer, binary.BigEndian, &frame.dataLength)
-	} else {
-		frame.dataLength = uint16(buffer.Len())
+	frame.streamId, _ = ReadVarInt(buffer)
+	if frame.offBit {
+		frame.offset, _ = ReadVarInt(buffer)
 	}
-	frame.streamData = make([]byte, frame.dataLength, frame.dataLength)
-	buffer.Read(frame.streamData)
-
-	stream, ok := conn.Streams[frame.streamId]
-	if !ok {
-		panic(frame)
+	if frame.lenBit {
+		frame.length, _ = ReadVarInt(buffer)
 	}
-	if frame.offset == stream.readOffset {
-		stream.readOffset += uint64(frame.dataLength)
-	}
-
 	return frame
 }
 func NewStreamFrame(streamId uint32, stream *Stream, data []byte, finBit bool) *StreamFrame {
 	frame := new(StreamFrame)
 	frame.finBit = finBit
-	frame.streamIdLength = 3  // TODO: Make a cleverer use of these
-	frame.offsetLength = 3
-	frame.dataLengthPresent = true
-	frame.streamId = streamId
+	frame.lenBit = true
 	frame.offset = stream.writeOffset
-	frame.dataLength = uint16(len(data))
+	frame.offBit = frame.offset > 0
+	frame.length = uint64(len(data))
 	frame.streamData = data
-	stream.writeOffset += uint64(frame.dataLength)
+	stream.writeOffset += uint64(frame.length)
 	return frame
 }

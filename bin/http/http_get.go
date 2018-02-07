@@ -36,8 +36,8 @@ func main() {
 		}
 	}
 
-	conn.Streams[1] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(1, conn.Streams[1], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
+	conn.Streams[4] = &m.Stream{}
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)
@@ -49,7 +49,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		conn.SendAck(uint64(packet.Header().PacketNumber()))
 
 		spew.Dump("---> Received packet")
 		//spew.Dump(packet)

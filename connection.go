@@ -204,16 +204,17 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 	ackBlock := AckBlock{}
 	for _, number := range packetNumbers[1:] {
 		if previous - number == 1 {
-			ackBlock.ack++
+			ackBlock.block++
 		} else {
 			frame.ackBlocks = append(frame.ackBlocks, ackBlock)
-			ackBlock = AckBlock{uint8(previous - number - 1), 0}  // TODO: Handle gaps larger than 255 packets
+			ackBlock = AckBlock{previous - number - 1, 0}
 		}
 		previous = number
 	}
 	frame.ackBlocks = append(frame.ackBlocks, ackBlock)
-	frame.numBlocksPresent = len(frame.ackBlocks) > 1
-	frame.numAckBlocks = uint8(len(frame.ackBlocks)-1)
+	if len(frame.ackBlocks) > 0 {
+		frame.ackBlockCount = uint64(len(frame.ackBlocks) - 1)
+	}
 	return frame
 }
 func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only

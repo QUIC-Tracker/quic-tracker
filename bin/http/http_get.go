@@ -14,7 +14,7 @@ func main() {
 	//conn := m.NewDefaultConnection("quic.ogre.com:4433", "quic.ogre.com")
 	//conn := m.NewDefaultConnection("kazuhooku.com:4433", "kazuhooku.com")
 	//conn := m.NewDefaultConnection("fb.mvfst.net:4433", "fb.mvfst.net")
-	conn.SendClientInitialPacket()
+	conn.SendInitialPacket()
 
 	ongoingHandhake := true
 	for ongoingHandhake {
@@ -22,14 +22,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
+		if scp, ok := packet.(*m.HandshakePacket); ok {
 			ongoingHandhake, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				panic(err)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			conn.ProcessVersionNegotation(vn)
-			conn.SendClientInitialPacket()
+			conn.SendInitialPacket()
 		} else {
 			spew.Dump(packet)
 			panic(packet)

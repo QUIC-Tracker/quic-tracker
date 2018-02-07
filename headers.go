@@ -7,7 +7,7 @@ import (
 
 type Header interface {
 	PacketNumber() uint32
-	PacketType() uint8
+	PacketType() PacketType
 	ConnectionId() uint64
 	encode() []byte
 }
@@ -24,7 +24,7 @@ func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 }
 
 type LongHeader struct {
-	packetType   LongPacketType
+	packetType   PacketType
 	connectionId uint64
 	Version      uint32
 	packetNumber uint32
@@ -42,8 +42,8 @@ func (h LongHeader) encode() []byte {
 func (h LongHeader) PacketNumber() uint32 {
 	return h.packetNumber
 }
-func (h LongHeader) PacketType() uint8 {
-	return uint8(h.packetType)
+func (h LongHeader) PacketType() PacketType {
+	return h.packetType
 }
 func (h LongHeader) ConnectionId() uint64 {
 	return h.connectionId
@@ -51,13 +51,13 @@ func (h LongHeader) ConnectionId() uint64 {
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h := new(LongHeader)
 	typeByte, _ := buffer.ReadByte()
-	h.packetType = LongPacketType(typeByte - 0x80)
+	h.packetType = PacketType(typeByte - 0x80)
 	binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	binary.Read(buffer, binary.BigEndian, &h.Version)
 	binary.Read(buffer, binary.BigEndian, &h.packetNumber)
 	return h
 }
-func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
+func NewLongHeader(packetType PacketType, conn *Connection) *LongHeader {
 	h := new(LongHeader)
 	h.packetType = packetType
 	h.connectionId = conn.ConnectionId
@@ -66,19 +66,23 @@ func NewLongHeader(packetType LongPacketType, conn *Connection) *LongHeader {
 	return h
 }
 
-type LongPacketType uint8
+type PacketType uint8
 
 const (
-	Initial          LongPacketType = 0x7f
-	Retry            LongPacketType = 0x7e
-	Handshake        LongPacketType = 0x7d
-	ZeroRTTProtected LongPacketType = 0x7c
+	Initial          PacketType = 0x7f
+	Retry            PacketType = 0x7e
+	Handshake        PacketType = 0x7d
+	ZeroRTTProtected PacketType = 0x7c
+
+	OneBytePacketNumber   PacketType = 0x1f
+	TwoBytesPacketNumber  PacketType = 0x1e
+	FourBytesPacketNumber PacketType = 0x1d
 )
 
 type ShortHeader struct {
 	omitConnectionIdFlag bool
 	keyPhase             KeyPhaseBit
-	packetType           ShortHeaderPacketType
+	packetType           PacketType
 	connectionId         uint64
 	packetNumber         uint32
 }
@@ -109,8 +113,8 @@ func (h ShortHeader) encode() []byte {
 func (h ShortHeader) PacketNumber() uint32 {
 	return h.packetNumber
 }
-func (h ShortHeader) PacketType() uint8 {
-	return uint8(h.packetType)
+func (h ShortHeader) PacketType() PacketType {
+	return h.packetType
 }
 func (h ShortHeader) ConnectionId() uint64 {
 	return h.connectionId
@@ -120,7 +124,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	typeByte, _ := buffer.ReadByte()
 	h.omitConnectionIdFlag = (typeByte & 0x40) == 0x40
 	h.keyPhase = (typeByte & 0x20) == 0x20
-	h.packetType = ShortHeaderPacketType(typeByte & 0x1F)
+	h.packetType = PacketType(typeByte & 0x1F)
 	if !h.omitConnectionIdFlag {
 		binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	}
@@ -138,7 +142,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	}
 	return h
 }
-func NewShortHeader(packetType ShortHeaderPacketType, keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
+func NewShortHeader(packetType PacketType, keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	h.omitConnectionIdFlag = !conn.omitConnectionId
 	h.keyPhase = keyPhase
@@ -151,8 +155,3 @@ func NewShortHeader(packetType ShortHeaderPacketType, keyPhase KeyPhaseBit, conn
 type KeyPhaseBit bool
 const KeyPhaseZero KeyPhaseBit = false
 const KeyPhaseOne KeyPhaseBit = true
-
-type ShortHeaderPacketType uint8
-const OneBytePacketNumber ShortHeaderPacketType = 0x1f
-const TwoBytesPacketNumber ShortHeaderPacketType = 0x1e
-const FourBytesPacketNumber ShortHeaderPacketType = 0x1d

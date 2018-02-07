@@ -6,7 +6,7 @@ import (
 
 var QuicVersion uint32 = 0xff000005       // See https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-4
 var QuicALPNToken = "hq-05"        // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
-const MinimumClientInitialLength = 1252 // TODO IPv6 is 1232 and should be supported as well
+const MinimumInitialLength = 1252 // TODO IPv6 is 1232 and should be supported as well
 const LongHeaderSize = 17
 const MaxUDPPayloadSize = 65507
 

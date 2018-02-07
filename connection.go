@@ -66,21 +66,21 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.UdpConnection.Write(finalPacket)
 }
-func (c *Connection) SendClientInitialPacket() {
+func (c *Connection) SendInitialPacket() {
 	c.tls.Handshake()
 	handshakeResult := c.tlsBuffer.getOutput()
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
-	clientInitialPacket := NewClientInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumClientInitialLength), c)
-	clientInitialPacket.streamFrames = append(clientInitialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumClientInitialLength - (LongHeaderSize + len(clientInitialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
+	initialPacket := NewInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumInitialLength), c)
+	initialPacket.streamFrames = append(initialPacket.streamFrames, *handshakeFrame)
+	paddingLength := MinimumInitialLength - (LongHeaderSize + len(initialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
-		clientInitialPacket.padding = append(clientInitialPacket.padding, *new(PaddingFrame))
+		initialPacket.padding = append(initialPacket.padding, *new(PaddingFrame))
 	}
 
-	c.sendAEADSealedPacket(clientInitialPacket)
+	c.sendAEADSealedPacket(initialPacket)
 }
-func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
+func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
@@ -88,7 +88,7 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, er
 		serverData = append(serverData, frame.streamData...)
 	}
 
-	var clearTextPacket *ClientCleartextPacket
+	var clearTextPacket *HandshakePacket
 	ackFrame := NewAckFrame(uint64(packet.header.PacketNumber()), c.receivedPackets - 1)
 
 	c.tlsBuffer.input(serverData)
@@ -104,11 +104,11 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, er
 
 		outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
 
-		clearTextPacket = NewClientCleartextPacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
+		clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
 		defer c.sendAEADSealedPacket(clearTextPacket)
 		return false, nil
 	case mint.AlertWouldBlock:
-		clearTextPacket = NewClientCleartextPacket(nil, []AckFrame{*ackFrame}, nil, c)
+		clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
 		defer c.sendAEADSealedPacket(clearTextPacket)
 		return true, nil
 	default:
@@ -153,43 +153,44 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	}
 
 	c.receivedPackets++  // TODO: Find appropriate place to increment it
+
 	var packet Packet
-	switch header.PacketType() {
-	case ServerCleartext:
-		payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
-		if err != nil {
-			return nil, err, rec
-		}
-		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-		packet = ReadServerCleartextPacket(buffer, c)
-	case OneRTTProtectedKP0:
-		payload, err := c.protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
-		if err != nil {
-			return nil, err, rec
-		}
-		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-		packet = ReadProtectedPacket(buffer, c)
-	default:
-		if lHeader, ok := header.(LongHeader); ok && lHeader.Version == 0x00000000 {
-			packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
-		} else {
+	if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
+		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+	} else {
+		switch header.PacketType() {
+		case Handshake:
+			payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+			if err != nil {
+				return nil, err, rec
+			}
+			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+			packet = ReadHandshakePacket(buffer, c)
+		case ZeroRTTProtected, OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:  // Packets with a short header always include a 1-RTT protected payload.
+			payload, err := c.protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+			if err != nil {
+				return nil, err, rec
+			}
+			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+			packet = ReadProtectedPacket(buffer, c)
+		default:
+			spew.Dump(header)
 			panic(header.PacketType())
 		}
-	}
 
-	fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+		fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 
-	for _, number := range c.ackQueue {
-		if number == fullPacketNumber  {
-			fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
-			spew.Dump(packet)
-			return c.ReadNextPacket()
-			// TODO: Should it be acked again ?
+		for _, number := range c.ackQueue {
+			if number == fullPacketNumber  {
+				fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
+				spew.Dump(packet)
+				return c.ReadNextPacket()
+				// TODO: Should it be acked again ?
+			}
 		}
+		c.ackQueue = append(c.ackQueue, fullPacketNumber)
+		c.expectedPacketNumber = fullPacketNumber + 1
 	}
-
-	c.ackQueue = append(c.ackQueue, fullPacketNumber)
-	c.expectedPacketNumber = fullPacketNumber + 1
 
 	return packet, nil, rec
 }
@@ -265,7 +266,7 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 func (c *Connection) CloseStream(streamId uint32) {
 	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
 	if c.protected == nil {
-		pkt := NewClientCleartextPacket(nil, nil, nil, c)
+		pkt := NewHandshakePacket(nil, nil, nil, c)
 		pkt.streamFrames = append(pkt.streamFrames, frame)
 		c.sendAEADSealedPacket(pkt)
 	} else {

@@ -23,7 +23,7 @@ func NewVersionNegotationScenario() *VersionNegotationScenario {
 }
 func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.Version = ForceVersionNegotiation
-	conn.SendClientInitialPacket()
+	conn.SendInitialPacket()
 	packet, err, buf := conn.ReadNextPacket()
 
 	if err != nil {

@@ -20,7 +20,7 @@ func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 1}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
-	conn.SendClientInitialPacket()
+	conn.SendInitialPacket()
 
 	ongoingHandshake := true
 	defer func() {
@@ -38,8 +38,8 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 			trace.ErrorCode = H_Timeout
 			return
 		}
-		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
-			ongoingHandshake, err = conn.ProcessServerHello(scp)
+		if handshake, ok := packet.(*m.HandshakePacket); ok {
+			ongoingHandshake, err = conn.ProcessServerHello(handshake)
 			if err == nil && !ongoingHandshake {
 				trace.Results["negotiated_version"] = conn.Version
 				conn.CloseConnection(false, 42, "")

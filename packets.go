@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Acknowledger interface {
@@ -168,9 +167,9 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 		}
 		buffer.UnreadByte()
 		switch {
-		case 0xa0 <= typeByte && typeByte <= 0xbf:
+		case typeByte == 0x0e:
 			p.ackFrames = append(p.ackFrames, *ReadAckFrame(buffer))
-		case 0xc0 <= typeByte && typeByte <= 0xff:
+		case 0x10 <= typeByte && typeByte <= 0x17:
 			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
 		default:
 			p.padding = append(p.padding, *NewPaddingFrame(buffer))
@@ -211,7 +210,6 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 	p.header = ReadHeader(buffer, conn)
 	for {
 		frame := NewFrame(buffer, conn)
-		spew.Dump(frame)
 		if frame == nil {
 			break
 		}

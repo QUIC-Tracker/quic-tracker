@@ -11,19 +11,24 @@ import (
 const QuicTPExtensionType = mint.ExtensionType(26) // See https://tools.ietf.org/html/draft-ietf-quic-tls-06#section-10.2
 
 type TransportParametersType uint16
-const InitialMaxStreamData 	TransportParametersType = 0x00
-const InitialMaxData 		TransportParametersType = 0x01
-const InitialMaxStreamId	TransportParametersType = 0x02
-const IdleTimeout			TransportParametersType = 0x03
-const OmitConnectionId		TransportParametersType = 0x04  // TODO: Support the following parameters
-const MaxPacketSize			TransportParametersType = 0x05
-const StatelessResetToken	TransportParametersType = 0x06
+const (
+	InitialMaxStreamData   TransportParametersType = 0x00
+	InitialMaxData         TransportParametersType = 0x01
+	InitialMaxStreamIdBidi TransportParametersType = 0x02
+	IdleTimeout            TransportParametersType = 0x03
+	OmitConnectionId       TransportParametersType = 0x04 // TODO: Support the following parameters
+	MaxPacketSize          TransportParametersType = 0x05
+	StatelessResetToken    TransportParametersType = 0x06
+	AckDelayExponent       TransportParametersType = 0x07
+	InitialMaxStreamIdUni  TransportParametersType = 0x08
+)
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
-	MaxStreamData uint32
-	MaxData 	  uint32
-	MaxStreamId   uint32
-	IdleTimeout   uint16
+	MaxStreamData   uint32
+	MaxData         uint32
+	MaxStreamIdBidi uint32
+	MaxStreamIdUni  uint32
+	IdleTimeout     uint16
 }
 
 type TransportParameter struct {
@@ -43,12 +48,12 @@ func (list *TransportParameterList) getParameter(id TransportParametersType) []b
 }
 
 type ClientHelloTransportParameters struct {
-	negotiatedVersion uint32
 	initialVersion    uint32
 	Parameters        TransportParameterList `tls:"head=2"`
 }
 
 type EncryptedExtensionsTransportParameters struct {
+	negotiatedVersion uint32
 	SupportedVersions []SupportedVersion `tls:"head=1"`
 	Parameters        TransportParameterList  `tls:"head=2"`
 }
@@ -77,7 +82,7 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{8 * 1024, 8 * 1024, 16, 10}}
+	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{8 * 1024, 8 * 1024, 16, 16,10}}
 }
 
 func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
@@ -85,10 +90,10 @@ func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exten
 		panic(hs)
 	}
 
-	body, err := syntax.Marshal(ClientHelloTransportParameters{h.NegotiatedVersion, h.InitialVersion, TransportParameterList{
+	body, err := syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion, TransportParameterList{
 		{InitialMaxStreamData, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamData)},
 		{InitialMaxData, Uint32ToBEBytes(h.QuicTransportParameters.MaxData)},
-		{InitialMaxStreamId, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamId)},
+		{InitialMaxStreamIdBidi, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamIdBidi)},
 		{IdleTimeout, Uint16ToBEBytes(h.QuicTransportParameters.IdleTimeout)},
 	}})
 
@@ -118,7 +123,8 @@ func (h TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.Ex
 		list = &eep.Parameters
 		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamData)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamData)
 		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxData)), binary.BigEndian, &h.QuicTransportParameters.MaxData)
-		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamId)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamId)
+		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamIdBidi)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamIdBidi)
+		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamIdUni)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamIdUni)
 		binary.Read(bytes.NewBuffer(list.getParameter(IdleTimeout)), binary.BigEndian, &h.QuicTransportParameters.IdleTimeout)
 		spew.Dump(h)
 	}

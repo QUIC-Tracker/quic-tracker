@@ -44,7 +44,7 @@ func (c *Connection) nextPacketNumber() uint64 {
 	c.PacketNumber++
 	return c.PacketNumber
 }
-func (c *Connection) sendAEADSealedPacket(packet Packet) {
+func (c *Connection) sendHandshakeProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.encode(packet.encodePayload()))
 	}
@@ -78,7 +78,7 @@ func (c *Connection) SendInitialPacket() {
 		initialPacket.padding = append(initialPacket.padding, *new(PaddingFrame))
 	}
 
-	c.sendAEADSealedPacket(initialPacket)
+	c.sendHandshakeProtectedPacket(initialPacket)
 }
 func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
@@ -105,11 +105,11 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 		outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
 
 		clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendAEADSealedPacket(clearTextPacket)
+		defer c.sendHandshakeProtectedPacket(clearTextPacket)
 		return false, nil
 	case mint.AlertWouldBlock:
 		clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendAEADSealedPacket(clearTextPacket)
+		defer c.sendHandshakeProtectedPacket(clearTextPacket)
 		return true, nil
 	default:
 		return false, alert
@@ -268,7 +268,7 @@ func (c *Connection) CloseStream(streamId uint32) {
 	if c.protected == nil {
 		pkt := NewHandshakePacket(nil, nil, nil, c)
 		pkt.streamFrames = append(pkt.streamFrames, frame)
-		c.sendAEADSealedPacket(pkt)
+		c.sendHandshakeProtectedPacket(pkt)
 	} else {
 		pkt := NewProtectedPacket(c)
 		pkt.Frames = append(pkt.Frames, frame)

@@ -8,9 +8,9 @@ import (
 
 const (
 	// See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.2.1
-	quicVersionSalt = "afc824ec5fc77eca1e9d36f37fb2d46518c36639"
-	clientCtSecretLabel = "QUIC client cleartext Secret"
-	serverCtSecretLabel = "QUIC server cleartext Secret"
+	quicVersionSalt    = "afc824ec5fc77eca1e9d36f37fb2d46518c36639"
+	clientHSecretLabel = "QUIC client handshake secret"
+	serverHSecretLabel = "QUIC server handshake secret"
 
 	// See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.2.3
 	clientPpSecret0Label = "EXPORTER-QUIC client 1-RTT Secret"
@@ -29,8 +29,8 @@ func NewCleartextCryptoState() *CryptoState {
 }
 func NewCleartextSaltedCryptoState(conn *Connection, cipherSuite *mint.CipherSuiteParams) *CryptoState {
 	s := new(CryptoState)
-	s.Read = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), serverCtSecretLabel, cipherSuite), cipherSuite)
-	s.Write = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), clientCtSecretLabel, cipherSuite), cipherSuite)
+	s.Read = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), serverHSecretLabel, cipherSuite), cipherSuite)
+	s.Write = newProtectedAead(saltSecret(EncodeArgs(conn.ConnectionId), clientHSecretLabel, cipherSuite), cipherSuite)
 	return s
 }
 func NewProtectedCryptoState(conn *Connection) *CryptoState {

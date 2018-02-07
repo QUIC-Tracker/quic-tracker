@@ -118,7 +118,7 @@ func (c *Connection) ProcessServerHello(packet *ServerCleartextPacket) (bool, er
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
 	var version uint32
 	for _, v := range vn.SupportedVersions {
-		if v >= 0xff000006 && v <= 0xff000007 {
+		if v >= 0xff000008 && v <= 0xff000009 {
 			version = uint32(v)
 		}
 	}
@@ -169,10 +169,12 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 		}
 		buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 		packet = ReadProtectedPacket(buffer, c)
-	case VersionNegotiation:
-		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))  // Version Negotation packets are not protected w/ AEAD, see https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
 	default:
-		panic(header.PacketType())
+		if lHeader, ok := header.(LongHeader); ok && lHeader.Version == 0x00000000 {
+			packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+		} else {
+			panic(header.PacketType())
+		}
 	}
 
 	fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())

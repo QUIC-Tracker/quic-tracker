@@ -43,12 +43,18 @@ func (p abstractPacket) encode(payload []byte) []byte {
 
 type VersionNegotationPacket struct {
 	abstractPacket
+	UnusedField uint8
+	ConnectionId uint64
+	Version SupportedVersion
 	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
 func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
+	buffer.WriteByte(p.UnusedField & 0x80)
+	binary.Write(buffer, binary.BigEndian, p.ConnectionId)
+	binary.Write(buffer, binary.BigEndian, p.Version)
 	for _, version := range p.SupportedVersions {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
@@ -56,7 +62,13 @@ func (p VersionNegotationPacket) encodePayload() []byte {
 }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
-	p.header = ReadLongHeader(buffer)
+	b, err := buffer.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	p.UnusedField = b & 0x7f
+	binary.Read(buffer, binary.BigEndian, &p.ConnectionId)
+	binary.Read(buffer, binary.BigEndian, &p.Version)
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
@@ -69,9 +81,10 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	}
 	return p
 }
-func NewVersionNegotationPacket(versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
+func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
-	p.header = NewLongHeader(VersionNegotiation, conn)
+	p.UnusedField = unusedField
+	p.Version = version
 	p.SupportedVersions = versions
 	return p
 }

@@ -82,7 +82,7 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{8 * 1024, 8 * 1024, 17, 19,10}}
+	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{16 * 1024, 32 * 1024, 17, 19,10}}
 }
 
 func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {

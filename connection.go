@@ -28,7 +28,7 @@ type Connection struct {
 	ReceivedPacketHandler func([]byte)
 	SentPacketHandler     func([]byte)
 
-	Streams              map[uint32]*Stream
+	Streams              map[uint64]*Stream
 	ConnectionId         uint64
 	PacketNumber         uint64
 	expectedPacketNumber uint64
@@ -89,30 +89,36 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 	}
 
 	var clearTextPacket *HandshakePacket
-	ackFrame := NewAckFrame(uint64(packet.header.PacketNumber()), c.receivedPackets - 1)
+	ackFrame := c.GetAckFrame()
 
 	c.tlsBuffer.input(serverData)
-	alert := c.tls.Handshake()
-	switch alert {
-	case mint.AlertNoAlert:
-		tlsOutput := c.tlsBuffer.getOutput()
 
-		state := c.tls.ConnectionState()
-		// TODO: Check negotiated ALPN ?
-		c.cipherSuite = &state.CipherSuite
-		c.protected = NewProtectedCryptoState(c)
+	for {
+		alert := c.tls.Handshake()
+		switch alert {
+		case mint.AlertNoAlert:
+			tlsOutput := c.tlsBuffer.getOutput()
 
-		outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
+			spew.Dump(c.tls.GetHsState())
+			state := c.tls.ConnectionState()
+			if state.HandshakeState == mint.StateClientConnected {
+				// TODO: Check negotiated ALPN ?
+				c.cipherSuite = &state.CipherSuite
+				c.protected = NewProtectedCryptoState(c)
 
-		clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendHandshakeProtectedPacket(clearTextPacket)
-		return false, nil
-	case mint.AlertWouldBlock:
-		clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
-		defer c.sendHandshakeProtectedPacket(clearTextPacket)
-		return true, nil
-	default:
-		return false, alert
+				outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
+
+				clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
+				defer c.sendHandshakeProtectedPacket(clearTextPacket)
+				return false, nil
+			}
+		case mint.AlertWouldBlock:
+			clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
+			defer c.sendHandshakeProtectedPacket(clearTextPacket)
+			return true, nil
+		default:
+			return false, alert
+		}
 	}
 }
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
@@ -252,7 +258,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	} else {
 		c.Cleartext = NewCleartextCryptoState()
 	}
-	c.Streams = make(map[uint32]*Stream)
+	c.Streams = make(map[uint64]*Stream)
 	c.Streams[0] = &Stream{}
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
@@ -264,7 +270,7 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 	}
 	c.SendProtectedPacket(pkt)
 }
-func (c *Connection) CloseStream(streamId uint32) {
+func (c *Connection) CloseStream(streamId uint64) {
 	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
 	if c.protected == nil {
 		pkt := NewHandshakePacket(nil, nil, nil, c)

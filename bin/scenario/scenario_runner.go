@@ -33,7 +33,7 @@ func main() {
 
 	commit := GitCommit()
 
-	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario(), s.NewHandshakeScenario()}
+	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario(), s.NewHandshakeScenario(), s.NewHandshakev6Scenario()}
 	results := make([]m.Trace, 0, 0)
 
 	for _, scenario := range scenarii {
@@ -51,18 +51,23 @@ func main() {
 				Results:   make(map[string]interface{}),
 			}
 
-			conn := m.NewDefaultConnection(host, strings.Split(host, ":")[0], false)
-			conn.ReceivedPacketHandler = func(data []byte) {
-				trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
-			}
-			conn.SentPacketHandler = func(data []byte) {
-				trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
-			}
+			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
+			if err == nil {
+				conn.ReceivedPacketHandler = func(data []byte) {
+					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
+				}
+				conn.SentPacketHandler = func(data []byte) {
+					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
+				}
 
-			start := time.Now()
-			scenario.Run(conn, &trace)
-			trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
-			trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
+				start := time.Now()
+				scenario.Run(conn, &trace)
+				trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
+				trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
+			} else {
+				trace.ErrorCode = 255
+				trace.Results["udp_error"] = err
+			}
 
 			results = append(results, trace)
 			println(" ", trace.ErrorCode)

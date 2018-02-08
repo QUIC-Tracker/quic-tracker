@@ -17,7 +17,7 @@ type HandshakeScenario struct {
 }
 
 func NewHandshakeScenario() *HandshakeScenario {
-	return &HandshakeScenario{AbstractScenario{"handshake", 2}}
+	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.SendInitialPacket()

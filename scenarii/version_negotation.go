@@ -17,7 +17,7 @@ type VersionNegotationScenario struct {
 	AbstractScenario
 }
 func NewVersionNegotationScenario() *VersionNegotationScenario {
-	return &VersionNegotationScenario{AbstractScenario{"version_negotation", 2}}
+	return &VersionNegotationScenario{AbstractScenario{"version_negotation", 2, false}}
 }
 func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.Version = ForceVersionNegotiation

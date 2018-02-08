@@ -17,7 +17,7 @@ type HandshakeScenario struct {
 }
 
 func NewHandshakeScenario() *HandshakeScenario {
-	return &HandshakeScenario{AbstractScenario{"handshake", 1}}
+	return &HandshakeScenario{AbstractScenario{"handshake", 2}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.SendInitialPacket()
@@ -51,7 +51,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32
 			for _, v := range vn.SupportedVersions {
-				if v >= 0xff000006 && v <= 0xff000007 {
+				if v >= m.MinimumVersion && v <= m.MaximumVersion {
 					version = uint32(v)
 				}
 			}

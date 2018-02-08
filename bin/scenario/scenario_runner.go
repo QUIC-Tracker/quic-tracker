@@ -40,7 +40,7 @@ func main() {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			host := scanner.Text()
-			println(scenario.Name(), " ", host)
+			print(scenario.Name(), " ", host)
 
 			trace := m.Trace{
 				Scenario: scenario.Name(),
@@ -65,6 +65,7 @@ func main() {
 			trace.Ip = strings.Split(conn.ConnectedIp().String(), ":")[0]
 
 			results = append(results, trace)
+			println(" ", trace.ErrorCode)
 		}
 		file.Seek(0, 0)
 	}

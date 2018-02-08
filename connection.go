@@ -71,9 +71,16 @@ func (c *Connection) SendInitialPacket() {
 	handshakeResult := c.tlsBuffer.getOutput()
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
-	initialPacket := NewInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, MinimumInitialLength), c)
+	var initialLength int
+	if c.UdpConnection.RemoteAddr().Network() == "udp6" {
+		initialLength = MinimumInitialLengthv6
+	} else {
+		initialLength = MinimumInitialLength
+	}
+
+	initialPacket := NewInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, initialLength), c)
 	initialPacket.streamFrames = append(initialPacket.streamFrames, *handshakeFrame)
-	paddingLength := MinimumInitialLength - (LongHeaderSize + len(initialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
+	paddingLength := initialLength - (LongHeaderSize + len(initialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		initialPacket.padding = append(initialPacket.padding, *new(PaddingFrame))
 	}
@@ -281,15 +288,22 @@ func (c *Connection) CloseStream(streamId uint64) {
 		c.SendProtectedPacket(pkt)
 	}
 }
-func NewDefaultConnection(address string, serverName string) *Connection {
+func NewDefaultConnection(address string, serverName string, useIPv6 bool) *Connection {
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
 
-	udpAddr, err := net.ResolveUDPAddr("udp", address)
+	var network string
+	if useIPv6 {
+		network = "udp6"
+	} else {
+		network = "udp4"
+	}
+
+	udpAddr, err := net.ResolveUDPAddr(network, address)
 	if err != nil {
 		panic(err)
 	}
-	udpConn, err := net.DialUDP("udp4", nil, udpAddr)
+	udpConn, err := net.DialUDP(network, nil, udpAddr)
 	if err != nil {
 		panic(err)
 	}

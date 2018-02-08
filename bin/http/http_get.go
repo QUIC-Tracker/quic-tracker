@@ -10,7 +10,10 @@ func main() {
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	flag.Parse()
-	conn := m.NewDefaultConnection(*address, "test.privateoctopus.com", *useIPv6)
+	conn, err := m.NewDefaultConnection(*address, "test.privateoctopus.com", *useIPv6)
+	if err != nil {
+		panic(err)
+	}
 	conn.SendInitialPacket()
 
 	ongoingHandhake := true

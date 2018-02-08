@@ -36,6 +36,8 @@ type Connection struct {
 	omitConnectionId     bool
 	ackQueue             []uint64  // Stores the packet numbers to be acked
 	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
+
+	useIPv6	bool
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
@@ -72,7 +74,7 @@ func (c *Connection) SendInitialPacket() {
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
 	var initialLength int
-	if c.UdpConnection.RemoteAddr().Network() == "udp6" {
+	if c.useIPv6 {
 		initialLength = MinimumInitialLengthv6
 	} else {
 		initialLength = MinimumInitialLength
@@ -288,7 +290,7 @@ func (c *Connection) CloseStream(streamId uint64) {
 		c.SendProtectedPacket(pkt)
 	}
 }
-func NewDefaultConnection(address string, serverName string, useIPv6 bool) *Connection {
+func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
 
@@ -301,15 +303,17 @@ func NewDefaultConnection(address string, serverName string, useIPv6 bool) *Conn
 
 	udpAddr, err := net.ResolveUDPAddr(network, address)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	udpConn, err := net.DialUDP(network, nil, udpAddr)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
-	return NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
+	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
+	c.useIPv6 = useIPv6
+	return c, nil
 }
 
 func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn) *Connection {

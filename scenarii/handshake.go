@@ -17,10 +17,10 @@ type HandshakeScenario struct {
 }
 
 func NewHandshakeScenario() *HandshakeScenario {
-	return &HandshakeScenario{AbstractScenario{"handshake", 1}}
+	return &HandshakeScenario{AbstractScenario{"handshake", 2}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
-	conn.SendClientInitialPacket()
+	conn.SendInitialPacket()
 
 	ongoingHandshake := true
 	defer func() {
@@ -38,8 +38,8 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 			trace.ErrorCode = H_Timeout
 			return
 		}
-		if scp, ok := packet.(*m.ServerCleartextPacket); ok {
-			ongoingHandshake, err = conn.ProcessServerHello(scp)
+		if handshake, ok := packet.(*m.HandshakePacket); ok {
+			ongoingHandshake, err = conn.ProcessServerHello(handshake)
 			if err == nil && !ongoingHandshake {
 				trace.Results["negotiated_version"] = conn.Version
 				conn.CloseConnection(false, 42, "")
@@ -51,7 +51,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32
 			for _, v := range vn.SupportedVersions {
-				if v >= 0xff000006 && v <= 0xff000007 {
+				if v >= m.MinimumVersion && v <= m.MaximumVersion {
 					version = uint32(v)
 				}
 			}

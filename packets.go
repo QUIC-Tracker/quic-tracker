@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Acknowledger interface {
@@ -43,12 +42,18 @@ func (p abstractPacket) encode(payload []byte) []byte {
 
 type VersionNegotationPacket struct {
 	abstractPacket
+	UnusedField uint8
+	ConnectionId uint64
+	Version SupportedVersion
 	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
 func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
+	buffer.WriteByte(p.UnusedField & 0x80)
+	binary.Write(buffer, binary.BigEndian, p.ConnectionId)
+	binary.Write(buffer, binary.BigEndian, p.Version)
 	for _, version := range p.SupportedVersions {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
@@ -56,7 +61,13 @@ func (p VersionNegotationPacket) encodePayload() []byte {
 }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
-	p.header = ReadLongHeader(buffer)
+	b, err := buffer.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	p.UnusedField = b & 0x7f
+	binary.Read(buffer, binary.BigEndian, &p.ConnectionId)
+	binary.Read(buffer, binary.BigEndian, &p.Version)
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
@@ -69,20 +80,21 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	}
 	return p
 }
-func NewVersionNegotationPacket(versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
+func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
-	p.header = NewLongHeader(VersionNegotiation, conn)
+	p.UnusedField = unusedField
+	p.Version = version
 	p.SupportedVersions = versions
 	return p
 }
 
-type ClientInitialPacket struct {
+type InitialPacket struct {
 	abstractPacket
 	streamFrames []StreamFrame
 	padding      []PaddingFrame
 }
-func (p ClientInitialPacket) ShouldBeAcknowledged() bool { return true }
-func (p ClientInitialPacket) encodePayload() []byte {
+func (p InitialPacket) ShouldBeAcknowledged() bool { return true }
+func (p InitialPacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
@@ -92,8 +104,8 @@ func (p ClientInitialPacket) encodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func ReadClientInitialPacket(buffer *bytes.Reader, conn *Connection) *ClientInitialPacket {
-	p := new(ClientInitialPacket)
+func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
+	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)
 	for {
 		typeByte, err := buffer.ReadByte()
@@ -111,26 +123,26 @@ func ReadClientInitialPacket(buffer *bytes.Reader, conn *Connection) *ClientInit
 	}
 	return p
 }
-func NewClientInitialPacket(streamFrames []StreamFrame, padding []PaddingFrame, conn *Connection) *ClientInitialPacket {
-	p := new(ClientInitialPacket)
-	p.header = NewLongHeader(ClientInitial, conn)
+func NewInitialPacket(streamFrames []StreamFrame, padding []PaddingFrame, conn *Connection) *InitialPacket {
+	p := new(InitialPacket)
+	p.header = NewLongHeader(Initial, conn)
 	p.streamFrames = streamFrames
 	p.padding = padding
 	return p
 }
 
-type ServerStatelessRetryPacket struct {
-	// TODO: https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.4.2
+type RetryPacket struct {
+	// TODO: https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-5.4.2
 }
 
-type ServerCleartextPacket struct {
+type HandshakePacket struct {
 	abstractPacket
 	streamFrames []StreamFrame
 	ackFrames    []AckFrame
 	padding      []PaddingFrame
 }
-func (p ServerCleartextPacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
-func (p ServerCleartextPacket) encodePayload() []byte {
+func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
+func (p HandshakePacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.streamFrames {
 		frame.writeTo(buffer)
@@ -143,8 +155,8 @@ func (p ServerCleartextPacket) encodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func ReadServerCleartextPacket(buffer *bytes.Reader, conn *Connection) *ServerCleartextPacket {
-	p := new(ServerCleartextPacket)
+func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
+	p := new(HandshakePacket)
 	p.header = ReadLongHeader(buffer)
 	for {
 		typeByte, err := buffer.ReadByte()
@@ -155,9 +167,9 @@ func ReadServerCleartextPacket(buffer *bytes.Reader, conn *Connection) *ServerCl
 		}
 		buffer.UnreadByte()
 		switch {
-		case 0xa0 <= typeByte && typeByte <= 0xbf:
+		case typeByte == 0x0e:
 			p.ackFrames = append(p.ackFrames, *ReadAckFrame(buffer))
-		case 0xc0 <= typeByte && typeByte <= 0xff:
+		case 0x10 <= typeByte && typeByte <= 0x17:
 			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
 		default:
 			p.padding = append(p.padding, *NewPaddingFrame(buffer))
@@ -165,30 +177,9 @@ func ReadServerCleartextPacket(buffer *bytes.Reader, conn *Connection) *ServerCl
 	}
 	return p
 }
-
-type ClientCleartextPacket struct {
-	abstractPacket
-	streamFrames []StreamFrame
-	ackFrames    []AckFrame
-	padding      []PaddingFrame
-}
-func (p ClientCleartextPacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }
-func (p ClientCleartextPacket) encodePayload() []byte {
-	buffer := new(bytes.Buffer)
-	for _, frame := range p.streamFrames {
-		frame.writeTo(buffer)
-	}
-	for _, frame := range p.ackFrames {
-		frame.writeTo(buffer)
-	}
-	for _, frame := range p.padding {
-		frame.writeTo(buffer)
-	}
-	return buffer.Bytes()
-}
-func NewClientCleartextPacket(streamFrames []StreamFrame, ackFrames []AckFrame, padding []PaddingFrame, conn *Connection) *ClientCleartextPacket {
-	p := new(ClientCleartextPacket)
-	p.header = NewLongHeader(ClientCleartext, conn)
+func NewHandshakePacket(streamFrames []StreamFrame, ackFrames []AckFrame, padding []PaddingFrame, conn *Connection) *HandshakePacket {
+	p := new(HandshakePacket)
+	p.header = NewLongHeader(Handshake, conn)
 	p.streamFrames = streamFrames
 	p.ackFrames = ackFrames
 	p.padding = padding
@@ -219,7 +210,6 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 	p.header = ReadHeader(buffer, conn)
 	for {
 		frame := NewFrame(buffer, conn)
-		spew.Dump(frame)
 		if frame == nil {
 			break
 		}
@@ -229,6 +219,6 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 }
 func NewProtectedPacket(conn *Connection) *ProtectedPacket {  // TODO: Figure out the short header 1RTT variant
 	p := new(ProtectedPacket)
-	p.header = NewLongHeader(OneRTTProtectedKP0, conn)
+	p.header = NewLongHeader(ZeroRTTProtected, conn)
 	return p
 }

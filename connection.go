@@ -99,7 +99,6 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 		case mint.AlertNoAlert:
 			tlsOutput := c.tlsBuffer.getOutput()
 
-			spew.Dump(c.tls.GetHsState())
 			state := c.tls.ConnectionState()
 			if state.HandshakeState == mint.StateClientConnected {
 				// TODO: Check negotiated ALPN ?
@@ -124,7 +123,7 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
 	var version uint32
 	for _, v := range vn.SupportedVersions {
-		if v >= 0xff000008 && v <= 0xff000009 {
+		if v >= MinimumVersion && v <= MaximumVersion {
 			version = uint32(v)
 		}
 	}

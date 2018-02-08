@@ -3,17 +3,14 @@ package main
 import (
 	"github.com/davecgh/go-spew/spew"
 	m "masterthesis"
+	"flag"
 )
 
 func main() {
-	conn := m.NewDefaultConnection("quant.eggert.org:4433", "quant.eggert.org")
-	//conn := m.NewDefaultConnection("kotdt.com:4433", "kotdt.com")
-	//conn := m.NewDefaultConnection("localhost:4433", "localhost")
-	//conn := m.NewDefaultConnection("minq.dev.mozaws.net:4433", "minq.dev.mozaws.net")
-	//conn := m.NewDefaultConnection("mozquic.ducksong.com:4433", "mozquic.ducksong.com")
-	//conn := m.NewDefaultConnection("quic.ogre.com:4433", "quic.ogre.com")
-	//conn := m.NewDefaultConnection("kazuhooku.com:4433", "kazuhooku.com")
-	//conn := m.NewDefaultConnection("fb.mvfst.net:4433", "fb.mvfst.net")
+	address := flag.String("address", "", "The address to connect to")
+	useIPv6 := flag.Bool("6", false, "Use IPV6")
+	flag.Parse()
+	conn := m.NewDefaultConnection(*address, "test.privateoctopus.com", *useIPv6)
 	conn.SendInitialPacket()
 
 	ongoingHandhake := true
@@ -51,13 +48,13 @@ func main() {
 		}
 
 		spew.Dump("---> Received packet")
-		//spew.Dump(packet)
+		spew.Dump(packet)
 
 		if packet.ShouldBeAcknowledged() {
 			protectedPacket = m.NewProtectedPacket(conn)
 			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 			spew.Dump("<--- Send ack packet")
-			//spew.Dump(protectedPacket)
+			spew.Dump(protectedPacket)
 			conn.SendProtectedPacket(protectedPacket)
 		}
 	}

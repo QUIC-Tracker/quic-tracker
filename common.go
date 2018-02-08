@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 )
 
-var QuicVersion uint32 = 0xff000008 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-08"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff000009 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-09"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength = 1252 // TODO IPv6 is 1232 and should be supported as well

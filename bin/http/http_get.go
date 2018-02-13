@@ -4,13 +4,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	m "masterthesis"
 	"flag"
+	"strings"
 )
 
 func main() {
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	flag.Parse()
-	conn, err := m.NewDefaultConnection(*address, "test.privateoctopus.com", *useIPv6)
+	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], *useIPv6)
 	if err != nil {
 		panic(err)
 	}

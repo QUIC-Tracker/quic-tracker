@@ -3,24 +3,21 @@ package masterthesis
 import (
 	"github.com/bifurcation/mint"
 	"github.com/bifurcation/mint/syntax"
-	"encoding/binary"
-	"bytes"
-	"github.com/davecgh/go-spew/spew"
 )
 
-const QuicTPExtensionType = mint.ExtensionType(26) // See https://tools.ietf.org/html/draft-ietf-quic-tls-06#section-10.2
+const QuicTPExtensionType = mint.ExtensionType(26)  // https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-9.2
 
 type TransportParametersType uint16
 const (
-	InitialMaxStreamData   TransportParametersType = 0x00
-	InitialMaxData         TransportParametersType = 0x01
-	InitialMaxStreamIdBidi TransportParametersType = 0x02
-	IdleTimeout            TransportParametersType = 0x03
-	OmitConnectionId       TransportParametersType = 0x04 // TODO: Support the following parameters
-	MaxPacketSize          TransportParametersType = 0x05
-	StatelessResetToken    TransportParametersType = 0x06
-	AckDelayExponent       TransportParametersType = 0x07
-	InitialMaxStreamIdUni  TransportParametersType = 0x08
+	InitialMaxStreamData   TransportParametersType = 0x0000
+	InitialMaxData         TransportParametersType = 0x0001
+	InitialMaxStreamIdBidi TransportParametersType = 0x0002
+	IdleTimeout            TransportParametersType = 0x0003
+	OmitConnectionId       TransportParametersType = 0x0004 // TODO: Support the following parameters
+	MaxPacketSize          TransportParametersType = 0x0005
+	StatelessResetToken    TransportParametersType = 0x0006
+	AckDelayExponent       TransportParametersType = 0x0007
+	InitialMaxStreamIdUni  TransportParametersType = 0x0008
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
@@ -48,12 +45,12 @@ func (list *TransportParameterList) getParameter(id TransportParametersType) []b
 }
 
 type ClientHelloTransportParameters struct {
-	initialVersion    uint32
+	InitialVersion    uint32
 	Parameters        TransportParameterList `tls:"head=2"`
 }
 
 type EncryptedExtensionsTransportParameters struct {
-	negotiatedVersion uint32
+	NegotiatedVersion uint32
 	SupportedVersions []SupportedVersion `tls:"head=1"`
 	Parameters        TransportParameterList  `tls:"head=2"`
 }
@@ -70,7 +67,7 @@ func (t TPExtensionBody) Marshal() ([]byte, error) {
 	return t.body, nil
 }
 
-func (t TPExtensionBody) Unmarshal(data []byte) (int, error) {
+func (t *TPExtensionBody) Unmarshal(data []byte) (int, error) {
 	t.body = data
 	return len(t.body), nil
 }
@@ -79,13 +76,14 @@ type TLSTransportParameterHandler struct {
 	NegotiatedVersion uint32
 	InitialVersion    uint32
 	QuicTransportParameters
+	*EncryptedExtensionsTransportParameters
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{16 * 1024, 32 * 1024, 17, 19,10}}
+	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{16 * 1024, 32 * 1024, 17, 19,10}, nil}
 }
 
-func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
+func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
 	if hs != mint.HandshakeTypeClientHello {
 		panic(hs)
 	}
@@ -105,28 +103,23 @@ func (h TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exten
 	return nil
 }
 
-func (h TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.ExtensionList) error {
-	var list *TransportParameterList
+func (h *TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.ExtensionList) error {
 	var body TPExtensionBody
-	ok, err := el.Find(body)
+	ok, err := el.Find(&body)
 
 	if !ok {
 		return err
 	}
 
-	if hs != mint.HandshakeTypeEncryptedExtensions {  // TODO: Verify this non equality check, or even that client can receive TPs.
-		var eep EncryptedExtensionsTransportParameters
-		_, err := syntax.Unmarshal(body.body, &eep)
+	if hs == mint.HandshakeTypeEncryptedExtensions {
+		if h.EncryptedExtensionsTransportParameters == nil {
+			h.EncryptedExtensionsTransportParameters = &EncryptedExtensionsTransportParameters{}
+		}
+		_, err := syntax.Unmarshal(body.body, h.EncryptedExtensionsTransportParameters)
 		if err != nil {
 			panic(err)
 		}
-		list = &eep.Parameters
-		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamData)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamData)
-		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxData)), binary.BigEndian, &h.QuicTransportParameters.MaxData)
-		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamIdBidi)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamIdBidi)
-		binary.Read(bytes.NewBuffer(list.getParameter(InitialMaxStreamIdUni)), binary.BigEndian, &h.QuicTransportParameters.MaxStreamIdUni)
-		binary.Read(bytes.NewBuffer(list.getParameter(IdleTimeout)), binary.BigEndian, &h.QuicTransportParameters.IdleTimeout)
-		spew.Dump(h)
+		// TODO process the list and update parameters that could have changed
 	}
 
 	return nil

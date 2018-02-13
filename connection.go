@@ -15,11 +15,11 @@ import (
 )
 
 type Connection struct {
-	ServerName	  string
+	ServerName    string
 	UdpConnection *net.UDPConn
 	tlsBuffer     *connBuffer
 	tls           *mint.Conn
-	tlsTPHandler  *TLSTransportParameterHandler
+	TLSTPHandler  *TLSTransportParameterHandler
 
 	Cleartext        *CryptoState
 	protected        *CryptoState
@@ -250,9 +250,9 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	} else {
 		prevVersion = c.Version
 	}
-	c.tlsTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
+	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	tlsConfig.ExtensionHandler = c.tlsTPHandler
+	tlsConfig.ExtensionHandler = c.TLSTPHandler
 	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
 	if c.Version >= 0xff000007 {
 		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3

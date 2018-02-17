@@ -394,76 +394,76 @@ func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 }
 
 type StreamFrame struct {
-	finBit bool
-	lenBit bool
-	offBit bool
+	FinBit bool
+	LenBit bool
+	OffBit bool
 
-	streamId uint64
-	offset   uint64
-	length   uint64
-	streamData []byte
+	StreamId   uint64
+	Offset     uint64
+	Length     uint64
+	StreamData []byte
 }
 func (frame StreamFrame) FrameType() FrameType { return StreamType }
 func (frame StreamFrame) writeTo(buffer *bytes.Buffer) {
 	typeByte := byte(frame.FrameType())
-	if frame.finBit {
+	if frame.FinBit {
 		typeByte |= 0x01
 	}
-	if frame.lenBit {
+	if frame.LenBit {
 		typeByte |= 0x02
 	}
-	if frame.offBit {
+	if frame.OffBit {
 		typeByte |= 0x04
 	}
 	binary.Write(buffer, binary.BigEndian, typeByte)
-	WriteVarInt(buffer, frame.streamId)
-	if frame.offBit {
-		WriteVarInt(buffer, frame.offset)
+	WriteVarInt(buffer, frame.StreamId)
+	if frame.OffBit {
+		WriteVarInt(buffer, frame.Offset)
 	}
-	if frame.lenBit {
-		WriteVarInt(buffer, frame.length)
+	if frame.LenBit {
+		WriteVarInt(buffer, frame.Length)
 	}
-	buffer.Write(frame.streamData)
+	buffer.Write(frame.StreamData)
 }
 func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame := new(StreamFrame)
 	typeByte, _ := buffer.ReadByte()
-	frame.finBit = (typeByte & 0x01) == 0x01
-	frame.lenBit = (typeByte & 0x02) == 0x02
-	frame.offBit = (typeByte & 0x04) == 0x04
+	frame.FinBit = (typeByte & 0x01) == 0x01
+	frame.LenBit = (typeByte & 0x02) == 0x02
+	frame.OffBit = (typeByte & 0x04) == 0x04
 
-	frame.streamId, _ = ReadVarInt(buffer)
-	if frame.offBit {
-		frame.offset, _ = ReadVarInt(buffer)
+	frame.StreamId, _ = ReadVarInt(buffer)
+	if frame.OffBit {
+		frame.Offset, _ = ReadVarInt(buffer)
 	}
-	if frame.lenBit {
-		frame.length, _ = ReadVarInt(buffer)
+	if frame.LenBit {
+		frame.Length, _ = ReadVarInt(buffer)
 	} else {
-		frame.length = uint64(buffer.Len())
+		frame.Length = uint64(buffer.Len())
 	}
-	frame.streamData = make([]byte, frame.length, frame.length)
-	buffer.Read(frame.streamData)
+	frame.StreamData = make([]byte, frame.Length, frame.Length)
+	buffer.Read(frame.StreamData)
 
-	stream, ok := conn.Streams[frame.streamId]
+	stream, ok := conn.Streams[frame.StreamId]
 	if !ok {
 		spew.Dump(frame)
 		panic(frame)
 	}
-	if frame.offset == stream.readOffset {
-		stream.readOffset += uint64(frame.length)
+	if frame.Offset == stream.readOffset {
+		stream.readOffset += uint64(frame.Length)
 	}
 
 	return frame
 }
 func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *StreamFrame {
 	frame := new(StreamFrame)
-	frame.streamId = streamId
-	frame.finBit = finBit
-	frame.lenBit = true
-	frame.offset = stream.writeOffset
-	frame.offBit = frame.offset > 0
-	frame.length = uint64(len(data))
-	frame.streamData = data
-	stream.writeOffset += uint64(frame.length)
+	frame.StreamId = streamId
+	frame.FinBit = finBit
+	frame.LenBit = true
+	frame.Offset = stream.writeOffset
+	frame.OffBit = frame.Offset > 0
+	frame.Length = uint64(len(data))
+	frame.StreamData = data
+	stream.writeOffset += uint64(frame.Length)
 	return frame
 }

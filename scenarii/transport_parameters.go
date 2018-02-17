@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	H_NoTPReceived = 1
-	H_TPResentAfterVN = 2
+	TP_NoTPReceived    = 1
+	TP_TPResentAfterVN = 2
 )
 
 type TransportParameterScenario struct {
@@ -48,7 +48,7 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace) {
 			receivedVN = true
 
 			if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-				trace.ErrorCode = H_NoTPReceived
+				trace.ErrorCode = TP_NoTPReceived
 			} else {
 				trace.Results["transport_parameters"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters
 			}
@@ -63,12 +63,12 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace) {
 
 	if !receivedVN {
 		if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-			trace.ErrorCode = H_NoTPReceived
+			trace.ErrorCode = TP_NoTPReceived
 		} else {
 			trace.Results["transport_parameters"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters
 		}
 	} else if conn.TLSTPHandler.EncryptedExtensionsTransportParameters != nil {
-		trace.ErrorCode = H_TPResentAfterVN
+		trace.ErrorCode = TP_TPResentAfterVN
 		trace.Results["transport_parameters_after_VN"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters
 	}
 

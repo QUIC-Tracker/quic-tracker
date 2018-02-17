@@ -137,20 +137,20 @@ type RetryPacket struct {
 
 type HandshakePacket struct {
 	abstractPacket
-	streamFrames []StreamFrame
-	ackFrames    []AckFrame
-	padding      []PaddingFrame
+	StreamFrames []StreamFrame
+	AckFrames    []AckFrame
+	Padding      []PaddingFrame
 }
-func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.streamFrames) > 0 }  // TODO: A padding only packet should be flagged somewhere
+func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.StreamFrames) > 0 } // TODO: A padding only packet should be flagged somewhere
 func (p HandshakePacket) encodePayload() []byte {
 	buffer := new(bytes.Buffer)
-	for _, frame := range p.streamFrames {
+	for _, frame := range p.StreamFrames {
 		frame.writeTo(buffer)
 	}
-	for _, frame := range p.ackFrames {
+	for _, frame := range p.AckFrames {
 		frame.writeTo(buffer)
 	}
-	for _, frame := range p.padding {
+	for _, frame := range p.Padding {
 		frame.writeTo(buffer)
 	}
 	return buffer.Bytes()
@@ -168,11 +168,11 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 		buffer.UnreadByte()
 		switch {
 		case typeByte == 0x0e:
-			p.ackFrames = append(p.ackFrames, *ReadAckFrame(buffer))
+			p.AckFrames = append(p.AckFrames, *ReadAckFrame(buffer))
 		case 0x10 <= typeByte && typeByte <= 0x17:
-			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
+			p.StreamFrames = append(p.StreamFrames, *ReadStreamFrame(buffer, conn))
 		default:
-			p.padding = append(p.padding, *NewPaddingFrame(buffer))
+			p.Padding = append(p.Padding, *NewPaddingFrame(buffer))
 		}
 	}
 	return p
@@ -180,9 +180,9 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 func NewHandshakePacket(streamFrames []StreamFrame, ackFrames []AckFrame, padding []PaddingFrame, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = NewLongHeader(Handshake, conn)
-	p.streamFrames = streamFrames
-	p.ackFrames = ackFrames
-	p.padding = padding
+	p.StreamFrames = streamFrames
+	p.AckFrames = ackFrames
+	p.Padding = padding
 	return p
 }
 

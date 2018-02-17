@@ -93,8 +93,8 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
-	for _, frame := range packet.streamFrames {
-		serverData = append(serverData, frame.streamData...)
+	for _, frame := range packet.StreamFrames {
+		serverData = append(serverData, frame.StreamData...)
 	}
 
 	var clearTextPacket *HandshakePacket
@@ -282,7 +282,7 @@ func (c *Connection) CloseStream(streamId uint64) {
 	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
 	if c.protected == nil {
 		pkt := NewHandshakePacket(nil, nil, nil, c)
-		pkt.streamFrames = append(pkt.streamFrames, frame)
+		pkt.StreamFrames = append(pkt.StreamFrames, frame)
 		c.sendHandshakeProtectedPacket(pkt)
 	} else {
 		pkt := NewProtectedPacket(c)

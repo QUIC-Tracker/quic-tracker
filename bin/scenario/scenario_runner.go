@@ -33,7 +33,11 @@ func main() {
 
 	commit := GitCommit()
 
-	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario(), s.NewHandshakeScenario(), s.NewHandshakev6Scenario(), s.NewTransportParameterScenario()}
+	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario(),
+								s.NewHandshakeScenario(),
+								s.NewHandshakev6Scenario(),
+								s.NewTransportParameterScenario(),
+								s.NewHandshakeRetransmissionScenario()}
 	results := make([]m.Trace, 0, 0)
 
 	for _, scenario := range scenarii {

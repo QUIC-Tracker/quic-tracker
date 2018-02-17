@@ -242,6 +242,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 		ServerName: c.ServerName,
 		NonBlocking: true,
 		NextProtos: []string{ALPN},
+		InsecureSkipVerify: true,
 	}
 	tlsConfig.Init(true)
 	var prevVersion uint32

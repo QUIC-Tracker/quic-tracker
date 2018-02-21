@@ -29,8 +29,13 @@ func main() {
 				panic(err)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			conn.ProcessVersionNegotation(vn)
-			conn.SendInitialPacket()
+			if err := conn.ProcessVersionNegotation(vn); err == nil {
+				conn.SendInitialPacket()
+			} else {
+				println("No version in common with " + *address)
+				spew.Dump(vn)
+				return
+			}
 		} else {
 			spew.Dump(packet)
 			panic(packet)

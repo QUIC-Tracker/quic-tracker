@@ -1,6 +1,6 @@
 package masterthesis
 
 type Stream struct {
-	readOffset uint64
-	writeOffset uint64
+	ReadOffset  uint64
+	WriteOffset uint64
 }

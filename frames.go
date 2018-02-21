@@ -449,8 +449,8 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 		spew.Dump(frame)
 		panic(frame)
 	}
-	if frame.Offset == stream.readOffset {
-		stream.readOffset += uint64(frame.Length)
+	if frame.Offset == stream.ReadOffset {
+		stream.ReadOffset += uint64(frame.Length)
 	}
 
 	return frame
@@ -460,10 +460,10 @@ func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *
 	frame.StreamId = streamId
 	frame.FinBit = finBit
 	frame.LenBit = true
-	frame.Offset = stream.writeOffset
+	frame.Offset = stream.WriteOffset
 	frame.OffBit = frame.Offset > 0
 	frame.Length = uint64(len(data))
 	frame.StreamData = data
-	stream.writeOffset += uint64(frame.Length)
+	stream.WriteOffset += uint64(frame.Length)
 	return frame
 }

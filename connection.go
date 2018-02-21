@@ -37,7 +37,7 @@ type Connection struct {
 	ackQueue             []uint64  // Stores the packet numbers to be acked
 	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
 
-	useIPv6	bool
+	UseIPv6 bool
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
@@ -46,12 +46,12 @@ func (c *Connection) nextPacketNumber() uint64 {
 	c.PacketNumber++
 	return c.PacketNumber
 }
-func (c *Connection) sendHandshakeProtectedPacket(packet Packet) {
+func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.encode(packet.encodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
-	header := packet.encodeHeader()
-	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
+	header := packet.EncodeHeader()
+	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -59,10 +59,10 @@ func (c *Connection) sendHandshakeProtectedPacket(packet Packet) {
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.encode(packet.encodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
-	header := packet.encodeHeader()
-	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.encodePayload(), header)
+	header := packet.EncodeHeader()
+	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
@@ -74,20 +74,20 @@ func (c *Connection) SendInitialPacket() {
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
 	var initialLength int
-	if c.useIPv6 {
+	if c.UseIPv6 {
 		initialLength = MinimumInitialLengthv6
 	} else {
 		initialLength = MinimumInitialLength
 	}
 
 	initialPacket := NewInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, initialLength), c)
-	initialPacket.streamFrames = append(initialPacket.streamFrames, *handshakeFrame)
-	paddingLength := initialLength - (LongHeaderSize + len(initialPacket.encodePayload()) + c.Cleartext.Write.Overhead())
+	initialPacket.StreamFrames = append(initialPacket.StreamFrames, *handshakeFrame)
+	paddingLength := initialLength - (LongHeaderSize + len(initialPacket.EncodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
-		initialPacket.padding = append(initialPacket.padding, *new(PaddingFrame))
+		initialPacket.Padding = append(initialPacket.Padding, *new(PaddingFrame))
 	}
 
-	c.sendHandshakeProtectedPacket(initialPacket)
+	c.SendHandshakeProtectedPacket(initialPacket)
 }
 func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
@@ -117,12 +117,12 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 				outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
 
 				clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
-				defer c.sendHandshakeProtectedPacket(clearTextPacket)
+				defer c.SendHandshakeProtectedPacket(clearTextPacket)
 				return false, nil
 			}
 		case mint.AlertWouldBlock:
 			clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
-			defer c.sendHandshakeProtectedPacket(clearTextPacket)
+			defer c.SendHandshakeProtectedPacket(clearTextPacket)
 			return true, nil
 		default:
 			return false, alert
@@ -242,7 +242,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 		ServerName: c.ServerName,
 		NonBlocking: true,
 		NextProtos: []string{ALPN},
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true,  // See A First Look at QUIC in the Wild
 	}
 	tlsConfig.Init(true)
 	var prevVersion uint32
@@ -284,7 +284,7 @@ func (c *Connection) CloseStream(streamId uint64) {
 	if c.protected == nil {
 		pkt := NewHandshakePacket(nil, nil, nil, c)
 		pkt.StreamFrames = append(pkt.StreamFrames, frame)
-		c.sendHandshakeProtectedPacket(pkt)
+		c.SendHandshakeProtectedPacket(pkt)
 	} else {
 		pkt := NewProtectedPacket(c)
 		pkt.Frames = append(pkt.Frames, frame)
@@ -313,7 +313,7 @@ func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Con
 	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
 	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
-	c.useIPv6 = useIPv6
+	c.UseIPv6 = useIPv6
 	return c, nil
 }
 

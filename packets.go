@@ -11,9 +11,9 @@ type Acknowledger interface {
 }
 
 type PacketEncoder interface {
-	encodeHeader() []byte
-	encodePayload() []byte
-	encode([]byte) []byte
+	EncodeHeader() []byte
+	EncodePayload() []byte
+	Encode([]byte) []byte
 }
 
 type Packet interface {
@@ -30,12 +30,12 @@ type abstractPacket struct {
 func (p abstractPacket) Header() Header {
 	return p.header
 }
-func (p abstractPacket) encodeHeader() []byte {
+func (p abstractPacket) EncodeHeader() []byte {
 	return p.header.encode()
 }
-func (p abstractPacket) encode(payload []byte) []byte {
+func (p abstractPacket) Encode(payload []byte) []byte {
 	buffer := new(bytes.Buffer)
-	buffer.Write(p.encodeHeader())
+	buffer.Write(p.EncodeHeader())
 	buffer.Write(payload)
 	return buffer.Bytes()
 }
@@ -49,7 +49,7 @@ type VersionNegotationPacket struct {
 }
 type SupportedVersion uint32
 func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
-func (p VersionNegotationPacket) encodePayload() []byte {
+func (p VersionNegotationPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.WriteByte(p.UnusedField & 0x80)
 	binary.Write(buffer, binary.BigEndian, p.ConnectionId)
@@ -90,16 +90,16 @@ func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, ver
 
 type InitialPacket struct {
 	abstractPacket
-	streamFrames []StreamFrame
-	padding      []PaddingFrame
+	StreamFrames []StreamFrame
+	Padding      []PaddingFrame
 }
 func (p InitialPacket) ShouldBeAcknowledged() bool { return true }
-func (p InitialPacket) encodePayload() []byte {
+func (p InitialPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
-	for _, frame := range p.streamFrames {
+	for _, frame := range p.StreamFrames {
 		frame.writeTo(buffer)
 	}
-	for _, frame := range p.padding {
+	for _, frame := range p.Padding {
 		frame.writeTo(buffer)
 	}
 	return buffer.Bytes()
@@ -116,9 +116,9 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 		}
 		buffer.UnreadByte()
 		if FrameType(typeByte) != PaddingFrameType {
-			p.streamFrames = append(p.streamFrames, *ReadStreamFrame(buffer, conn))
+			p.StreamFrames = append(p.StreamFrames, *ReadStreamFrame(buffer, conn))
 		} else {
-			p.padding = append(p.padding, *NewPaddingFrame(buffer))
+			p.Padding = append(p.Padding, *NewPaddingFrame(buffer))
 		}
 	}
 	return p
@@ -126,8 +126,8 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 func NewInitialPacket(streamFrames []StreamFrame, padding []PaddingFrame, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = NewLongHeader(Initial, conn)
-	p.streamFrames = streamFrames
-	p.padding = padding
+	p.StreamFrames = streamFrames
+	p.Padding = padding
 	return p
 }
 
@@ -142,7 +142,7 @@ type HandshakePacket struct {
 	Padding      []PaddingFrame
 }
 func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.StreamFrames) > 0 } // TODO: A padding only packet should be flagged somewhere
-func (p HandshakePacket) encodePayload() []byte {
+func (p HandshakePacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.StreamFrames {
 		frame.writeTo(buffer)
@@ -198,7 +198,7 @@ func (p *ProtectedPacket) ShouldBeAcknowledged() bool {
 	}
 	return false
 }
-func (p *ProtectedPacket) encodePayload() []byte {
+func (p *ProtectedPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.Frames {
 		frame.writeTo(buffer)

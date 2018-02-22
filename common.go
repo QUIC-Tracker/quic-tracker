@@ -12,7 +12,7 @@ const (
 	MinimumInitialLengthv6 = 1232
 	LongHeaderSize         = 17
 	MaxUDPPayloadSize      = 65507
-	MinimumVersion         = 0xff000008
+	MinimumVersion         = 0xff000009
 	MaximumVersion         = 0xff000009
 )
 

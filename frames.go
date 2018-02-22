@@ -451,6 +451,7 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	}
 	if frame.Offset == stream.ReadOffset {
 		stream.ReadOffset += uint64(frame.Length)
+		stream.ReadData = append(stream.WriteData, frame.StreamData...)
 	}
 
 	return frame
@@ -465,5 +466,6 @@ func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *
 	frame.Length = uint64(len(data))
 	frame.StreamData = data
 	stream.WriteOffset += uint64(frame.Length)
+	stream.WriteData = append(stream.WriteData, data...)
 	return frame
 }

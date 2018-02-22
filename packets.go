@@ -217,8 +217,8 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 	}
 	return p
 }
-func NewProtectedPacket(conn *Connection) *ProtectedPacket {  // TODO: Figure out the short header 1RTT variant
+func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewLongHeader(ZeroRTTProtected, conn)
+	p.header = NewShortHeader(FourBytesPacketNumber, KeyPhaseZero, conn)
 	return p
 }

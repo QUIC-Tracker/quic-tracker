@@ -144,7 +144,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 }
 func NewShortHeader(packetType PacketType, keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
-	h.omitConnectionIdFlag = !conn.omitConnectionId
+	h.omitConnectionIdFlag = conn.omitConnectionId
 	h.keyPhase = keyPhase
 	h.packetType = packetType
 	h.connectionId = conn.ConnectionId

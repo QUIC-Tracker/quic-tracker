@@ -2,12 +2,15 @@ package scenarii
 
 import (
 	m "masterthesis"
+	"github.com/davecgh/go-spew/spew"
 )
 
 const (
-	FC_TLSHandshakeFailed      = 1
-	FC_HostSentMoreThanLimit   = 2
-	FC_HostDidNotResumeSending = 3
+	FC_TLSHandshakeFailed          = 1
+	FC_HostSentMoreThanLimit       = 2
+	FC_HostDidNotResumeSending     = 3
+	FC_NotEnoughDataAvailable      = 4
+	FC_RespectedLimitsButNoBlocked = 5
 )
 
 type FlowControlScenario struct {
@@ -17,6 +20,8 @@ func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{"flow_control", 1, false}}
 }
 func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
+	conn.TLSTPHandler.MaxStreamData = 80
+
 	if err := CompleteHandshake(conn); err != nil {
 		trace.ErrorCode = FC_TLSHandshakeFailed
 		trace.Results["error"] = err.Error()
@@ -24,17 +29,31 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 	}
 
 	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /\r\n"), false)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)
 	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
 	conn.SendProtectedPacket(protectedPacket)
 
+	var shouldResume bool
+
 	for {
 		packet, err, _ := conn.ReadNextPacket()
+		if shouldResume {
+			spew.Dump(packet)
+		}
 		if err != nil {
-			panic(err)
+			readOffset := conn.Streams[4].ReadOffset
+			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
+				trace.ErrorCode = FC_RespectedLimitsButNoBlocked
+			} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
+				trace.ErrorCode = FC_NotEnoughDataAvailable
+			} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
+				trace.ErrorCode = FC_HostDidNotResumeSending
+			}
+			trace.Results["error"] = err.Error()
+			return
 		}
 
 		if conn.Streams[4].ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
@@ -57,16 +76,16 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 					break
 				}
 			}
-			if isBlocked {
+			if isBlocked && !shouldResume {
 				maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
+				conn.TLSTPHandler.MaxData *= 2
 				maxStreamData := m.MaxStreamDataFrame{4,uint64(conn.TLSTPHandler.MaxStreamData * 2)}
+				conn.TLSTPHandler.MaxStreamData *= 2
 				protectedPacket := m.NewProtectedPacket(conn)
 				protectedPacket.Frames = append(protectedPacket.Frames, maxData, maxStreamData)
-				break
+				conn.SendProtectedPacket(protectedPacket)
+				shouldResume = true
 			}
-
-			// TODO: Check that the host resumes sending after setting higher limits
-
 		}
 	}
 

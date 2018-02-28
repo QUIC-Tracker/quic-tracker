@@ -35,7 +35,6 @@ type Connection struct {
 	Version              uint32
 	omitConnectionId     bool
 	ackQueue             []uint64  // Stores the packet numbers to be acked
-	receivedPackets      uint64  // TODO: Implement proper ACK mechanism
 
 	UseIPv6 bool
 }
@@ -144,16 +143,14 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	return nil
 }
 func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
+	saveCleartext := func (ct []byte) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct)}}
+
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.UdpConnection.ReadFromUDP(rec)
 	if err != nil {
 		return nil, err, nil
 	}
 	rec = rec[:i]
-
-	if c.ReceivedPacketHandler != nil {
-		c.ReceivedPacketHandler(rec)
-	}
 
 	var headerLen uint8
 	var header Header
@@ -166,8 +163,6 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 		headerLen = uint8(int(buf.Size()) - buf.Len())
 	}
 
-	c.receivedPackets++  // TODO: Find appropriate place to increment it
-
 	var packet Packet
 	if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
 		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
@@ -179,13 +174,19 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 				return nil, err, rec
 			}
 			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+			saveCleartext(append(rec[:headerLen], payload...))
 			packet = ReadHandshakePacket(buffer, c)
 		case ZeroRTTProtected, OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:  // Packets with a short header always include a 1-RTT protected payload.
+			if c.protected == nil {
+				//println("Crypto state is not ready to decrypt protected packets")
+				return c.ReadNextPacket()  // Packet may have been reordered, TODO: Implement a proper packet queue instead of triggering retransmissions
+			}
 			payload, err := c.protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 			if err != nil {
 				return nil, err, rec
 			}
 			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+			saveCleartext(append(rec[:headerLen], payload...))
 			packet = ReadProtectedPacket(buffer, c)
 		default:
 			spew.Dump(header)
@@ -230,11 +231,6 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 		frame.ackBlockCount = uint64(len(frame.ackBlocks) - 1)
 	}
 	return frame
-}
-func (c *Connection) SendAck(packetNumber uint64) { // Simplistic function that acks packets in sequence only
-	protectedPacket := NewProtectedPacket(c)
-	protectedPacket.Frames = append(protectedPacket.Frames, NewAckFrame(packetNumber, c.receivedPackets - 1))
-	c.SendProtectedPacket(protectedPacket)
 }
 func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.tlsBuffer = newConnBuffer()
@@ -324,7 +320,6 @@ func NewConnection(serverName string, version uint32, ALPN string, connectionId 
 	c.ConnectionId = connectionId
 	c.PacketNumber = c.ConnectionId & 0x7fffffff
 	c.omitConnectionId = false
-	c.receivedPackets = 0
 
 	c.TransitionTo(version, ALPN)
 

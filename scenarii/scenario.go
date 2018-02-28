@@ -43,7 +43,10 @@ func CompleteHandshake(conn *m.Connection) error {
 				return err
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			conn.ProcessVersionNegotation(vn)
+			err := conn.ProcessVersionNegotation(vn)
+			if err != nil {
+				return err
+			}
 			conn.SendInitialPacket()
 		} else {
 			defer spew.Dump(packet)

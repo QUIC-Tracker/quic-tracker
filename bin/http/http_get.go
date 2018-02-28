@@ -43,7 +43,7 @@ func main() {
 	}
 
 	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html HTTP/1.0\nHost: localhost\n\n"), false)
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)

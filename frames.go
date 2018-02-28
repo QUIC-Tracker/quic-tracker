@@ -175,7 +175,6 @@ func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	buffer.ReadByte()  // Discard frame type
 	frame.MaximumData, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.MaximumData)
 	return frame
 }
 
@@ -451,7 +450,7 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	}
 	if frame.Offset == stream.ReadOffset {
 		stream.ReadOffset += uint64(frame.Length)
-		stream.ReadData = append(stream.WriteData, frame.StreamData...)
+		stream.ReadData = append(stream.ReadData, frame.StreamData...)
 	}
 
 	return frame

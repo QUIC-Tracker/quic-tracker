@@ -190,7 +190,7 @@ type ProtectedPacket struct {
 	abstractPacket
 	Frames []Frame
 }
-func (p *ProtectedPacket) ShouldBeAcknowledged() bool {
+func (p ProtectedPacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		if _, ok :=  frame.(AckFrame); !ok {
 			return true
@@ -198,7 +198,7 @@ func (p *ProtectedPacket) ShouldBeAcknowledged() bool {
 	}
 	return false
 }
-func (p *ProtectedPacket) EncodePayload() []byte {
+func (p ProtectedPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.Frames {
 		frame.writeTo(buffer)

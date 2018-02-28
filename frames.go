@@ -164,36 +164,36 @@ func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 
 
 type MaxDataFrame struct {
-	maximumData uint64
+	MaximumData uint64
 }
 func (frame MaxDataFrame) FrameType() FrameType { return MaxDataType }
 func (frame MaxDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.maximumData)
+	WriteVarInt(buffer, frame.MaximumData)
 }
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.maximumData, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.maximumData)
+	frame.MaximumData, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.MaximumData)
 	return frame
 }
 
 type MaxStreamDataFrame struct {
-	streamId uint64
-	maximumStreamData uint64
+	StreamId          uint64
+	MaximumStreamData uint64
 }
 func (frame MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
 func (frame MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.streamId)
-	WriteVarInt(buffer, frame.maximumStreamData)
+	WriteVarInt(buffer, frame.StreamId)
+	WriteVarInt(buffer, frame.MaximumStreamData)
 }
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.streamId, _ = ReadVarInt(buffer)
-	frame.maximumStreamData, _ = ReadVarInt(buffer)
+	frame.StreamId, _ = ReadVarInt(buffer)
+	frame.MaximumStreamData, _ = ReadVarInt(buffer)
 	return frame
 }
 

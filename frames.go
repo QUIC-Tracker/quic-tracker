@@ -6,55 +6,55 @@ import (
 	"io"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"errors"
 )
 
 type Frame interface {
 	FrameType() FrameType
 	writeTo(buffer *bytes.Buffer)
 }
-func NewFrame(buffer *bytes.Reader, conn *Connection) Frame {
+func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 	typeByte, err := buffer.ReadByte()
 	if err == io.EOF {
-		return nil
+		return nil, nil
 	} else if err != nil {
-		panic(err)
+		return nil, err
 	}
 	buffer.UnreadByte()
 	frameType := FrameType(typeByte)
 	switch {
 	case frameType == PaddingFrameType:
-		return Frame(NewPaddingFrame(buffer))
+		return Frame(NewPaddingFrame(buffer)), nil
 	case frameType == ResetStreamType:
-		return Frame(NewResetStream(buffer))
+		return Frame(NewResetStream(buffer)), nil
 	case frameType == ConnectionCloseType:
-		return Frame(NewConnectionCloseFrame(buffer))
+		return Frame(NewConnectionCloseFrame(buffer)), nil
 	case frameType == ApplicationCloseType:
-		return Frame(NewApplicationCloseFrame(buffer))
+		return Frame(NewApplicationCloseFrame(buffer)), nil
 	case frameType == MaxDataType:
-		return Frame(NewMaxDataFrame(buffer))
+		return Frame(NewMaxDataFrame(buffer)), nil
 	case frameType == MaxStreamDataType:
-		return Frame(NewMaxStreamDataFrame(buffer))
+		return Frame(NewMaxStreamDataFrame(buffer)), nil
 	case frameType == MaxStreamIdType:
-		return Frame(NewMaxStreamIdFrame(buffer))
+		return Frame(NewMaxStreamIdFrame(buffer)), nil
 	case frameType == PingType:
-		return Frame(NewPingFrame(buffer))
+		return Frame(NewPingFrame(buffer)), nil
 	case frameType == BlockedType:
-		return Frame(NewBlockedFrame(buffer))
+		return Frame(NewBlockedFrame(buffer)), nil
 	case frameType == StreamBlockedType:
-		return Frame(NewStreamBlockedFrame(buffer))
+		return Frame(NewStreamBlockedFrame(buffer)), nil
 	case frameType == StreamIdBlockedType:
-		return Frame(NewStreamIdNeededFrame(buffer))
+		return Frame(NewStreamIdNeededFrame(buffer)), nil
 	case frameType == NewConnectionIdType:
-		return Frame(NewNewConnectionIdFrame(buffer))
+		return Frame(NewNewConnectionIdFrame(buffer)), nil
 	case frameType == StopSendingType:
-		return Frame(NewStopSendingFrame(buffer))
+		return Frame(NewStopSendingFrame(buffer)), nil
 	case frameType == AckType:
-		return Frame(ReadAckFrame(buffer))
-	case (frameType & StreamType) == StreamType:
-		return Frame(ReadStreamFrame(buffer, conn))
+		return Frame(ReadAckFrame(buffer)), nil
+	case (frameType & StreamType) == StreamType && frameType <= 0x17:
+		return Frame(ReadStreamFrame(buffer, conn)), nil
 	default:
-		spew.Dump(buffer)
-		panic(fmt.Sprintf("Unknown frame type %d", typeByte))
+		return nil, errors.New(fmt.Sprintf("Unknown frame type %d", typeByte))
 	}
 }
 type FrameType uint8
@@ -300,7 +300,7 @@ func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte()  // Discard frame type
 	frame.sequence, _ = ReadVarInt(buffer)
-	frame.connectionId, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.connectionId)
 	binary.Read(buffer, binary.BigEndian, &frame.statelessResetToken)
 	return frame
 }

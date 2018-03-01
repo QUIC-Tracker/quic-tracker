@@ -1,0 +1,263 @@
+top:
+  - Long Header
+  - Short Header
+  - Version Negotiation Packet
+Long Header:
+  - Header Form:
+      length: 1
+      values: 1
+  - Long Packet Type:
+      length: 7
+      values: [0x7f, 0x7e, 0x7d, 0x7c]
+  - Connection ID:
+      length: 64
+  - Version:
+      length: 32
+      values:
+        neq: 0
+  - Packet number:
+      length: 32
+  - Payload:
+      parse: Frame
+Short Header:
+  - Header Form:
+      length: 1
+      values: 0
+  - Omit Connection ID Flag:
+      length: 1
+      values: [0, 1]
+  - Key Phase Bit:
+      length: 1
+      values: [0, 1]
+  - Short Packet Type:
+      length: 5
+      values: [0x1d, 0x1e, 0x1f]
+      triggers:
+        - Packet Number:
+            length:
+              0x1d: 32
+              0x1e: 16
+              0x1f: 8
+  - Connection ID:
+      length: 64
+      conditions:
+        - Omit Connection ID Flag:
+            eq: 0
+  - Packet Number:
+      length: [8, 16, 32]
+  - Protected Payload:
+      parse: Frame
+Version Negotiation Packet:
+  - Header Form:
+      length: 1
+      values: 0
+  - Unused:
+      length: 7
+  - Connection ID:
+      length: 64
+  - Version:
+      length: 32
+      values: 0
+  - Supported Version:
+      length: 32
+      repeated:
+Stateless Reset Packet:
+  - Random Octets:
+      length: '*'
+  - Stateless Reset Token:
+      length: 128
+PADDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x00
+  - next: Frame
+RST_STREAM:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x01
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+  - Final Offset:
+      length: varint
+  - next: Frame
+CONNECTION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x02
+  - Error Code:
+      length: 16
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - next: Frame
+APPLICATION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x03
+  - Error Code:
+      length: 16
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - next: Frame
+MAX_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x04
+  - Maximum Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x05
+  - Stream ID:
+      length: varint
+  - Maximum Stream Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x06
+  - Maximum Stream ID:
+      length: varint
+  - next: Frame
+PING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x07
+  - Length:
+      length: 8
+      triggers:
+        - Data:
+            length: set
+  - Data
+  - next: Frame
+BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x08
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x09
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_ID_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0a
+  - Stream ID:
+      length: varint
+  - next: Frame
+NEW_CONNECTION_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0b
+  - Sequence:
+      length: varint
+  - Connection ID:
+      length: 64
+  - Stateless Reset Token:
+      length: 128
+  - next: Frame
+STOP_SENDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0c
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+  - next: Frame
+PONG:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0d
+  - Length:
+      length: 8
+      triggers:
+        - Data:
+            length: set
+  - Data
+  - next: Frame
+ACK:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0e
+  - Largest Acknowledged:
+      length: varint
+  - ACK Delay:
+      length: varint
+  - ACK Block Count:
+      length: varint
+      triggers:
+        - ACK Blocks:
+            length: set
+  - First ACK Block:
+      length: varint
+  - ACK Blocks:
+      parse: ACK Block
+  - next: Frame
+ACK Block:
+  - Gap:
+      length: varint
+  - ACK Block:
+      length: varint
+STREAM:
+  - type: Frame
+  - Frame Type:
+      length: 5
+      values: 0x02
+  - OFF bit:
+      length: 1
+  - LEN bit:
+      length: 1
+  - FIN bit:
+      length: 1
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+      conditions:
+        - OFF bit:
+            eq: 1
+  - Length:
+      length: varint
+      conditions:
+        - LEN bit:
+            eq: 1
+      triggers:
+        - Stream Data:
+            length: set
+  - Stream Data:
+      length: '*'
+  - next: Frame

@@ -5,31 +5,50 @@
 {% endblock %}
 {% macro print_struct(d) %}
     <ul>
-    {% for name, value in d %}
-        {% if not value|is_tuple %}
-            <li>{{ name }}: {{ value }}</li>
-        {% else %}
-            <li>{{ name }}: {{ value[0] }}
-                {{ print_struct(value[1]) }}
-            </li>
-        {% endif %}
-    {% endfor %}
+        {% for name, value in d %}
+            {% if not value|is_tuple %}
+                <li>{{ name }}: {{ value }}</li>
+            {% else %}
+                <li>{{ name }}: {{ value[0] }}
+                    {{ print_struct(value[1]) }}
+                </li>
+            {% endif %}
+        {% endfor %}
     </ul>
 {% endmacro %}
 {% block content %}
-    <div class="box">
-        <div class="box-body">
-            {{ print_struct(dissection) }}
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="box">
+                <div class="box-body">
+                    {% set size = 2 * 8 %}
+                    {% for i in range(0, packet|length, size) %}
+                        <code class="address">{{ '%04X'|format(i) }}&nbsp;&nbsp;</code>
+                        {% set line = packet[i:i+size] %}
+                        {% for j in range(size) %}
+                            <code>{{ line[j]|default('xx')|safe }}</code>
+                            {% if j == 7 %}
+                                <code>&nbsp;&nbsp;</code>
+                            {% endif %}
+                        {% endfor %}
+                        <code>&nbsp;&nbsp;</code>
+                        {% for j in range(size) %}
+                            <code>{{ line[j]|default('00')|decode }}</code>
+                        {% endfor %}
+                        <br>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="box">
+                <div class="box-body">
+                    {{ print_struct(dissection) }}
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
 {% block js %}
     {{ super() }}
-    <script>
-        $(window).ready(function() {
-            $.get('/dissector/example', null, function(data, status) {
-                console.log(data, status)
-            }, 'json');
-        })
-    </script>
 {% endblock %}

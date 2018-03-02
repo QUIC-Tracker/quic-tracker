@@ -25,3 +25,12 @@ class ByteArrayEncoder(JSONEncoder):
 
 def is_tuple(value):
     return isinstance(value, tuple)
+
+
+def split_every_n(string, n=2):
+    return [''.join(x) for x in zip(*[iter(string)]*n)]
+
+
+def decode(hex_byte):
+    c = chr(int('0x' + hex_byte, base=16))
+    return c if c.isprintable() else '.'

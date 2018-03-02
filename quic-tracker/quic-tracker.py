@@ -11,10 +11,13 @@ from sqlobject import OR
 from sqlobject import sqlhub
 
 from database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
-from utils import find_latest_result_file
+from dissector import get_example
+from utils import find_latest_result_file, ByteArrayEncoder, is_tuple
 
 app = Flask(__name__)
 setup_database()
+app.json_encoder = ByteArrayEncoder
+app.jinja_env.filters['is_tuple'] = is_tuple
 
 
 @app.before_request
@@ -105,6 +108,16 @@ def results_data(d):
                 'data': records_to_datatables_data(records)}
 
     return jsonify(response)
+
+
+@app.route('/dissector')
+def dissector():
+    return render_template('dissector.html', dissection=get_example())
+
+
+@app.route('/dissector/example')
+def dissector_example():
+    return jsonify(get_example())
 
 if __name__ == '__main__':
     app.run(debug=True)

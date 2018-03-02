@@ -11,6 +11,7 @@ packet3 = "/X2Vvy5oHiFm/wAACWvaRb4OwAAAAGBxbDgAAAA="
 packet4 = "/X2Vvy5oHiFm/wAACWvaRcAWAEJ/OhcDAwA19YpFSRK4K4S2F/jZOx8wh44ZV09z9uUCmvk+hONCu+INYWSjwwCRdyepuI/r3bhrD2yNAJ4OwAAAAGBxbDoAAAI="
 packet5 = "HX2Vvy5oHiFma9pFwRIEB0dFVCAvDQoOwAAAAGBxbDoAAAI="
 
+
 class ParseError(ValueError):
     pass
 
@@ -18,16 +19,12 @@ class ParseError(ValueError):
 def parse_packet(buffer, protocol):
     top_level = protocol.pop('top')
     for top_struct in top_level:
-        next_struct = top_struct
-        while next_struct and len(buffer) > 1:
-            try:
-                ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol)
-                print(ret, inc, next_struct)
-                buffer = buffer[inc:]
-                return
-            except ParseError as e:
-                #print('%s: %s' % (top_struct, e))
-                break
+        try:
+            ret, _, _ = parse_structure(buffer, protocol[top_struct], protocol)
+            return ret
+        except ParseError:
+            pass
+    return []
 
 
 def yield_structures(buffer, struct_name, protocol):
@@ -168,10 +165,16 @@ def verify_condition(structure, field, formula):
     return False
 
 
+def get_example():
+    with open('protocol.yaml') as f:
+        protocol = yaml.load(f)
+    return parse_packet(bytearray(b64decode(packet5)), protocol)
+
+
 if __name__ == "__main__":
     with open('protocol.yaml') as f:
         protocol = yaml.load(f)
     hexdump(b64decode(packet5))
     for _ in range(100000):
         pass
-    parse_packet(bytearray(b64decode(packet5)), protocol)
+    print(parse_packet(bytearray(b64decode(packet5)), protocol))

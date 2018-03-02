@@ -4,30 +4,31 @@
     <small></small>
 {% endblock %}
 {% macro print_struct(d) %}
-    <ul>
-        {% for name, value, s_idx, e_idx in d %}
-            {% if not value|is_tuple %}
-                <li>{{ name }}: {{ value }} {{ '[{}-{}]'.format(s_idx, e_idx) }}</li>
-            {% else %}
-                <li>{{ name }}: {{ value[0] }} {{ '[{}-{}]'.format(s_idx, e_idx) }}
-                    {{ print_struct(value[1]) }}
-                </li>
-            {% endif %}
-        {% endfor %}
-    </ul>
+    {% for name, value, s_idx, e_idx in d %}
+        <li data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
+        {% if not value|is_tuple %}
+            {{ name }}: {{ value }}
+        {% else %}
+            {{ name }}: {{ value[0] }}
+            <ul data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
+                {{ print_struct(value[1]) }}
+            </ul>
+        {% endif %}
+        </li>
+    {% endfor %}
 {% endmacro %}
 {% block content %}
     <div class="row">
         <div class="col-lg-6">
             <div class="box">
-                <div class="box-body">
+                <div class="box-body hex-view">
                     {% set size = 2 * 8 %}
                     {% for i in range(0, packet|length, size) %}
                         <code class="address">{{ '%04X'|format(i) }}&nbsp;&nbsp;</code>
 
                         {% set line = packet[i:i+size] %}
                         {% for j in range(size) %}
-                            <code>{{ line[j]|default('&nbsp;&nbsp;')|safe }}</code>
+                            <code class="byte">{{ line[j]|default('&nbsp;&nbsp;')|safe }}</code>
                             {% if j == 7 %}
                                 <code>&nbsp;&nbsp;</code>
                             {% endif %}
@@ -35,7 +36,7 @@
                         <code>&nbsp;&nbsp;</code>
 
                         {% for j in range(size) %}
-                            <code>{{ line[j]|default('00')|decode }}</code>
+                            <code class="char">{{ line[j]|default('00')|decode|replace(' ', '&nbsp;')|safe }}</code>
                         {% endfor %}
                         <br>
                     {% endfor %}
@@ -44,8 +45,8 @@
         </div>
         <div class="col-lg-6">
             <div class="box">
-                <div class="box-body">
-                    {{ print_struct(dissection) }}
+                <div class="box-body structure" style="word-wrap: break-word;">
+                    <ul>{{ print_struct(dissection) }}</ul>
                 </div>
             </div>
         </div>
@@ -53,4 +54,31 @@
 {% endblock %}
 {% block js %}
     {{ super() }}
+    <script>
+        $(window).ready(function() {
+            function handleOver(e) {
+                $('.structure li').attr('style', '');
+                $('.structure ul').attr('style', '');
+                $(e.target).css('background-color', '#566aff').css('color', 'white');
+
+                const start_idx = $(e.target).data('start-offset');
+                const end_idx = $(e.target).data('end-offset');
+
+                const bytes = $('.hex-view code.byte');
+                bytes.attr('style', '');
+                bytes.slice(start_idx, end_idx).css('background-color', '#566aff').css('color', 'white');
+
+                const chars = $('.hex-view code.char');
+                chars.attr('style', '');
+                chars.slice(start_idx, end_idx).css('background-color', '#566aff').css('color', 'white');
+            }
+            $('.structure li').mouseover(handleOver);
+            $('.structure ul').mouseover(handleOver);
+            $('.structure').mouseout(function() {
+                $('.structure li').attr('style', '');
+                $('.structure ul').attr('style', '');
+                $('.hex-view code').attr('style', '');
+            })
+        });
+    </script>
 {% endblock %}

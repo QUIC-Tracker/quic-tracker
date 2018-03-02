@@ -5,11 +5,11 @@
 {% endblock %}
 {% macro print_struct(d) %}
     <ul>
-        {% for name, value in d %}
+        {% for name, value, s_idx, e_idx in d %}
             {% if not value|is_tuple %}
-                <li>{{ name }}: {{ value }}</li>
+                <li>{{ name }}: {{ value }} {{ '[{}-{}]'.format(s_idx, e_idx) }}</li>
             {% else %}
-                <li>{{ name }}: {{ value[0] }}
+                <li>{{ name }}: {{ value[0] }} {{ '[{}-{}]'.format(s_idx, e_idx) }}
                     {{ print_struct(value[1]) }}
                 </li>
             {% endif %}
@@ -24,14 +24,16 @@
                     {% set size = 2 * 8 %}
                     {% for i in range(0, packet|length, size) %}
                         <code class="address">{{ '%04X'|format(i) }}&nbsp;&nbsp;</code>
+
                         {% set line = packet[i:i+size] %}
                         {% for j in range(size) %}
-                            <code>{{ line[j]|default('xx')|safe }}</code>
+                            <code>{{ line[j]|default('&nbsp;&nbsp;')|safe }}</code>
                             {% if j == 7 %}
                                 <code>&nbsp;&nbsp;</code>
                             {% endif %}
                         {% endfor %}
                         <code>&nbsp;&nbsp;</code>
+
                         {% for j in range(size) %}
                             <code>{{ line[j]|default('00')|decode }}</code>
                         {% endfor %}

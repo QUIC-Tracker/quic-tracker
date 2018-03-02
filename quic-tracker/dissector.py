@@ -20,25 +20,26 @@ def parse_packet(buffer, protocol):
     top_level = protocol.pop('top')
     for top_struct in top_level:
         try:
-            ret, _, _ = parse_structure(buffer, protocol[top_struct], protocol)
-            return ret
+            ret, inc, _ = parse_structure(buffer, protocol[top_struct], protocol, 0)
+            return [(top_struct, ('', ret, 0, inc), 0, inc)]
         except ParseError:
             pass
     return []
 
 
-def yield_structures(buffer, struct_name, protocol):
+def yield_structures(buffer, struct_name, protocol, start_idx):
     next_struct = struct_name
     while next_struct and buffer:
         if next_struct not in protocol:
-            ret, inc, next_struct = parse_structure_type(buffer, next_struct, protocol)
+            ret, inc, next_struct = parse_structure_type(buffer, next_struct, protocol, start_idx)
         else:
-            ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol)
+            ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx)
         yield ret, inc
         buffer = buffer[inc:]
+        start_idx += inc
 
 
-def parse_structure_type(buffer, type_name, protocol):
+def parse_structure_type(buffer, type_name, protocol, start_idx):
     def get_struct_type(structure_description):
         for field, args in (list(d.items())[0] for d in structure_description):
             if field == 'type':
@@ -48,7 +49,7 @@ def parse_structure_type(buffer, type_name, protocol):
 
     for struct_name, struct_description in structures:
         try:
-            struct, inc, next_struct = parse_structure(buffer, struct_description, protocol)
+            struct, inc, next_struct = parse_structure(buffer, struct_description, protocol, start_idx)
             return (struct_name, struct), inc, next_struct
         except ParseError as e:
             #print('%s: %s' % (struct_name, e))
@@ -57,7 +58,7 @@ def parse_structure_type(buffer, type_name, protocol):
     return (None, []), 0, None
 
 
-def parse_structure(buffer, structure_description, protocol):
+def parse_structure(buffer, structure_description, protocol, start_idx):
     structure = []
     struct_triggers = {}
     i = 0
@@ -83,8 +84,8 @@ def parse_structure(buffer, structure_description, protocol):
 
         if parse:
             for _ in range(length if length is not None else 1):
-                for ret, inc in yield_structures(buffer, parse, protocol):
-                    structure.append((field, ret))
+                for ret, inc in yield_structures(buffer, parse, protocol, start_idx + i):
+                    structure.append((field, ret, start_idx + i, start_idx + i + inc))
                     i += inc
             continue
         elif length:
@@ -105,14 +106,16 @@ def parse_structure(buffer, structure_description, protocol):
                     buffer[0] = (buffer[0] << length) & 0xff
                     if previous_len < 8:
                         length = previous_len + length
-            structure.append((field, val))
+
+            structure.append((field, val, start_idx + i, start_idx + i + (length//8 or 1)))
+
             if length >= 8:
                 buffer = buffer[length//8:]
                 i += length//8
 
         if values is not None:
             if type(values) is dict:
-                err = ParseError('Value %s for field %s does not fullfill conditions %s' % (str(val), str(field), str(values)))
+                err = ParseError('Value %s for field %s does not fulfill conditions %s' % (str(val), str(field), str(values)))
                 for op, v in values.items():
                     if op == 'eq' and val != v:
                         raise err
@@ -156,7 +159,7 @@ def read_varint(buffer):
 
 
 def verify_condition(structure, field, formula):
-    for f, v in structure:
+    for f, v, _, _ in structure:
         if f == field:
             if 'eq' in formula:
                 return v == formula['eq']

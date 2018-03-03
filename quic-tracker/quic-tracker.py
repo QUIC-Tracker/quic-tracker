@@ -1,6 +1,5 @@
 import os
 import re
-from base64 import b64decode
 from datetime import datetime
 
 from flask import Flask, jsonify
@@ -12,8 +11,8 @@ from sqlobject import OR
 from sqlobject import sqlhub
 
 from database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
-from dissector import get_example, packet5
-from utils import find_latest_result_file, ByteArrayEncoder, is_tuple, split_every_n, decode
+from traces import get_example_trace
+from utils import find_latest_result_file, ByteArrayEncoder, is_tuple, decode
 
 app = Flask(__name__)
 setup_database()
@@ -116,7 +115,7 @@ def results_data(d):
 
 @app.route('/dissector')
 def dissector():
-    return render_template('dissector.html', dissection=get_example(), packet=split_every_n(bytearray(b64decode(packet5)).hex()))
+    return render_template('dissector.html', trace=get_example_trace())
 
 if __name__ == '__main__':
     app.run(debug=True)

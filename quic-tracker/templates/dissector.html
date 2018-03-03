@@ -6,27 +6,29 @@
 {% macro print_struct(d) %}
     {% for name, value, s_idx, e_idx in d %}
         <li data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
-        {% if not value|is_tuple %}
-            {{ name }}: {{ value }}
-        {% else %}
-            {{ name }}: {{ value[0] }}
-            <ul data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
-                {{ print_struct(value[1]) }}
-            </ul>
-        {% endif %}
+            {% if not value|is_tuple %}
+                {{ name }}: {{ value }}
+            {% else %}
+                {{ name }}: {{ value[0] }}
+                <ul data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
+                    {{ print_struct(value[1]) }}
+                </ul>
+            {% endif %}
         </li>
     {% endfor %}
 {% endmacro %}
-{% block content %}
-    <div class="row">
+{% macro print_dissection(i, packet) %}
+    {% set data = packet.data %}
+    {% set dissection = packet.dissection %}
+    <div class="row packet packet-{{ i }}">
         <div class="col-lg-6">
             <div class="box">
                 <div class="box-body hex-view">
                     {% set size = 2 * 8 %}
-                    {% for i in range(0, packet|length, size) %}
+                    {% for i in range(0, data|length, size) %}
                         <code class="address">{{ '%04X'|format(i) }}&nbsp;&nbsp;</code>
 
-                        {% set line = packet[i:i+size] %}
+                        {% set line = data[i:i+size] %}
                         {% for j in range(size) %}
                             <code class="byte">{{ line[j]|default('&nbsp;&nbsp;')|safe }}</code>
                             {% if j == 7 %}
@@ -51,33 +53,70 @@
             </div>
         </div>
     </div>
+{% endmacro %}
+{% block content %}
+    <div class="box">
+        <div class="box-body">
+            <table class="table table-bordered stream">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Timestamp</th>
+                    <th>Direction</th>
+                    <th>Length</th>
+                    <th>Packet type</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for packet in trace.stream %}
+                    <tr data-packet-number="{{ loop.index }}">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ packet.timestamp }}</td>
+                        <td>{{ packet.direction }}</td>
+                        <td>{{ packet.length }} bytes</td>
+                        <td>{{ packet.type }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% for packet in trace.stream %}
+        {{ print_dissection(loop.index, packet) }}
+    {% endfor %}
 {% endblock %}
 {% block js %}
     {{ super() }}
     <script>
-        $(window).ready(function() {
+        $(window).ready(function () {
             function handleOver(e) {
-                $('.structure li').attr('style', '');
-                $('.structure ul').attr('style', '');
+                console.log($('.shown .structure li'));
+                console.log($('.structure li'));
+                $('.shown .structure li').attr('style', '');
+                $('.shown .structure ul').attr('style', '');
                 $(e.target).css('background-color', '#566aff').css('color', 'white');
 
                 const start_idx = $(e.target).data('start-offset');
                 const end_idx = $(e.target).data('end-offset');
 
-                const bytes = $('.hex-view code.byte');
+                const bytes = $('.shown .hex-view code.byte');
                 bytes.attr('style', '');
                 bytes.slice(start_idx, end_idx).css('background-color', '#566aff').css('color', 'white');
 
-                const chars = $('.hex-view code.char');
+                const chars = $('.shown .hex-view code.char');
                 chars.attr('style', '');
                 chars.slice(start_idx, end_idx).css('background-color', '#566aff').css('color', 'white');
             }
-            $('.structure li').mouseover(handleOver);
-            $('.structure ul').mouseover(handleOver);
-            $('.structure').mouseout(function() {
-                $('.structure li').attr('style', '');
-                $('.structure ul').attr('style', '');
-                $('.hex-view code').attr('style', '');
+
+            $('.structure li').click(handleOver);
+            $('.structure ul').click(handleOver);
+
+            $('.packet').hide();
+            $('.packet-1').addClass('shown').show();
+            $('table.stream tr').click(function (e) {
+                const packet_number = $(this).data('packet-number');
+                $('.packet').removeClass('shown').hide();
+                $('.packet-' + packet_number).addClass('shown').show();
             })
         });
     </script>

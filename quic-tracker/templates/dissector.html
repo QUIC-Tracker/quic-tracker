@@ -90,8 +90,6 @@
     <script>
         $(window).ready(function () {
             function handleOver(e) {
-                console.log($('.shown .structure li'));
-                console.log($('.structure li'));
                 $('.shown .structure li').attr('style', '');
                 $('.shown .structure ul').attr('style', '');
                 $(e.target).css('background-color', '#566aff').css('color', 'white');
@@ -113,7 +111,9 @@
 
             $('.packet').hide();
             $('.packet-1').addClass('shown').show();
-            $('table.stream tr').click(function (e) {
+            $('table.stream tr').click(function () {
+                $('table.stream tr').attr('style', '');
+                $(this).css('background-color', '#566aff').css('color', 'white');
                 const packet_number = $(this).data('packet-number');
                 $('.packet').removeClass('shown').hide();
                 $('.packet-' + packet_number).addClass('shown').show();

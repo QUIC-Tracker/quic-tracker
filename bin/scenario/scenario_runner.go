@@ -33,11 +33,11 @@ func main() {
 
 	commit := GitCommit()
 
-	scenarii := [...]s.Scenario{s.NewVersionNegotationScenario(),
+	scenarii := [...]s.Scenario{s.NewFlowControlScenario(),/*s.NewVersionNegotationScenario(),
 								s.NewHandshakeScenario(),
 								s.NewHandshakev6Scenario(),
 								s.NewTransportParameterScenario(),
-								s.NewHandshakeRetransmissionScenario()}
+								s.NewHandshakeRetransmissionScenario()*/}
 	results := make([]m.Trace, 0, 0)
 
 	for _, scenario := range scenarii {
@@ -58,10 +58,10 @@ func main() {
 			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
 			if err == nil {
 				conn.ReceivedPacketHandler = func(data []byte) {
-					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
+					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
 				}
 				conn.SentPacketHandler = func(data []byte) {
-					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().UnixNano() / 10e6, Data: data})
+					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToServer, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
 				}
 
 				start := time.Now()

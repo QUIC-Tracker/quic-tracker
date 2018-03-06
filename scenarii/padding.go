@@ -2,12 +2,11 @@ package scenarii
 
 import (
 	m "masterthesis"
-	"github.com/davecgh/go-spew/spew"
-	"strings"
 )
 
 const (
 	P_VNDidNotComplete = 1
+	P_ReceivedSmth	   = 2
 )
 
 type PaddingScenario struct {
@@ -39,7 +38,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace) {
 	sendEmptyInitialPacket()
 	packet, err, _ := conn.ReadNextPacket()
 
-	if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+	if vn, ok := packet.(*m.VersionNegotationPacket); packet != nil && ok {
 		if err := conn.ProcessVersionNegotation(vn); err != nil {
 			trace.ErrorCode = P_VNDidNotComplete
 			trace.Results["error"] = err.Error()
@@ -48,11 +47,15 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace) {
 		sendEmptyInitialPacket()
 	}
 
-	packet, err, _ = conn.ReadNextPacket()
+	for {
+		if err != nil {
+			trace.Results["error"] = err.Error()
+			break
+		} else if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {
+			trace.ErrorCode = P_ReceivedSmth
+			break
+		}
 
-	if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
-		trace.Results["error"] = err.Error()
-	} else if packet != nil {
-		spew.Dump(packet)
+		packet, err, _ = conn.ReadNextPacket()
 	}
 }

@@ -166,6 +166,7 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	var packet Packet
 	if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
 		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+		saveCleartext(rec)
 	} else {
 		switch header.PacketType() {
 		case Handshake:
@@ -188,6 +189,14 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
 			saveCleartext(append(rec[:headerLen], payload...))
 			packet = ReadProtectedPacket(buffer, c)
+		case Initial:
+			payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+			if err != nil {
+				return nil, err, rec
+			}
+			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
+			saveCleartext(append(rec[:headerLen], payload...))
+			packet = ReadInitialPacket(buffer, c)
 		default:
 			spew.Dump(header)
 			panic(header.PacketType())

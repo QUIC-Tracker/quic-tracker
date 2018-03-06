@@ -10,6 +10,7 @@ packet2 = "/+lSIJDr2kW8/wAACWvaRb0SAEJ/FgMDAnoBAAJ2AwM2WWZT0TlZympEhBwMKUvSMOu+k
 packet3 = "/X2Vvy5oHiFm/wAACWvaRb4OwAAAAGBxbDgAAAA="
 packet4 = "/X2Vvy5oHiFm/wAACWvaRcAWAEJ/OhcDAwA19YpFSRK4K4S2F/jZOx8wh44ZV09z9uUCmvk+hONCu+INYWSjwwCRdyepuI/r3bhrD2yNAJ4OwAAAAGBxbDoAAAI="
 packet5 = "HX2Vvy5oHiFma9pFwRIEB0dFVCAvDQoOwAAAAGBxbDoAAAI="
+packet6 = "iamoMsiMk9+qAAAAAAyT36v/AAAIGhoaGg=="
 
 
 class ParseError(ValueError):
@@ -77,6 +78,9 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
         parse = struct_triggers.get(field, {}).get('parse', args.get('parse'))
         conditions = struct_triggers.get(field, {}).get('conditions', args.get('conditions'))
         triggers = struct_triggers.get(field, {}).get('triggers', args.get('triggers'))
+
+        if 'repeated' in args and len(buffer) >= length//4:
+            structure_description.append({field: args})
 
         if conditions:
             if not all(verify_condition(structure, field, formula) for c in conditions for field, formula in c.items()):
@@ -177,7 +181,7 @@ def get_example():
 if __name__ == "__main__":
     with open('protocol.yaml') as f:
         protocol = yaml.load(f)
-    hexdump(b64decode(packet5))
+    hexdump(b64decode(packet6))
     for _ in range(100000):
         pass
-    print(parse_packet(bytearray(b64decode(packet5)), protocol))
+    print(parse_packet(bytearray(b64decode(packet6)), protocol))

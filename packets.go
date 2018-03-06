@@ -142,7 +142,7 @@ type HandshakePacket struct {
 	AckFrames    []AckFrame
 	Padding      []PaddingFrame
 }
-func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.StreamFrames) > 0 } // TODO: A padding only packet should be flagged somewhere
+func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.StreamFrames) + len(p.Padding) > 0 } // TODO: A padding only packet should be flagged somewhere
 func (p HandshakePacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.StreamFrames {
@@ -193,7 +193,7 @@ type ProtectedPacket struct {
 }
 func (p ProtectedPacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
-		if _, ok :=  frame.(AckFrame); !ok {
+		if _, ok :=  frame.(*AckFrame); !ok {
 			return true
 		}
 	}

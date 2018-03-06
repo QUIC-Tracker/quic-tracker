@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block header %}
     <h1>QUIC dissector</h1>
-    <small></small>
+    <small>{{ trace.host }} - {{ trace.scenario }}</small>
 {% endblock %}
 {% macro print_struct(d) %}
     {% for name, value, s_idx, e_idx in d %}

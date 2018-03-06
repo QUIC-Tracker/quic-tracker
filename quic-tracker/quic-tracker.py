@@ -2,17 +2,18 @@ import os
 import re
 from datetime import datetime
 
-from flask import Flask, jsonify
-from flask import request
-from flask import url_for
+import yaml
+from flask import Flask, jsonify, request, url_for, abort
+from flask import redirect
 from flask.templating import render_template
 from sqlobject import LIKE
 from sqlobject import OR
 from sqlobject import sqlhub
 
 from database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
-from traces import get_example_trace
-from utils import find_latest_result_file, ByteArrayEncoder, is_tuple, decode
+from traces import get_example_trace, get_traces
+from traces import parse_trace
+from utils import find_latest_file, ByteArrayEncoder, is_tuple, decode
 
 app = Flask(__name__)
 setup_database()
@@ -43,10 +44,15 @@ def compute_stats(result):
 
 @app.route('/')
 def index():
-    return results(int(os.path.splitext(find_latest_result_file())[0]))
+    return redirect(url_for('tracker'))
 
 
-@app.route('/results/<int:d>')
+@app.route('/tracker')
+def tracker():
+    return results(int(os.path.splitext(find_latest_file('data'))[0]))
+
+
+@app.route('/tracker/results/<int:d>')
 def results(d):
     r = Result.selectBy(date=d).getOne(None)
     if r is None:
@@ -55,7 +61,7 @@ def results(d):
                            stats=compute_stats(r), ajax_url=url_for('results_data', d=d))
 
 
-@app.route('/results/<int:d>/data')
+@app.route('/tracker/results/<int:d>/data')
 def results_data(d):
     r = Result.selectBy(date=d).getOne(None)
     if r is None:
@@ -113,9 +119,31 @@ def results_data(d):
     return jsonify(response)
 
 
-@app.route('/dissector')
-def dissector():
-    return render_template('dissector.html', trace=get_example_trace())
+@app.route('/traces')
+def test_suite():
+    return traces(int(os.path.splitext(find_latest_file('traces'))[0]))
+
+
+@app.route('/traces/<int:traces_id>')
+def traces(traces_id):
+    traces = get_traces(traces_id)
+    if traces is None:
+        abort(404)
+
+    return render_template('traces.html', traces_id=traces_id, traces=traces, date=datetime.strptime(str(traces_id), '%Y%m%d').date())
+
+
+@app.route('/traces/<int:traces_id>/<int:trace_idx>')
+def dissector(traces_id, trace_idx):
+    traces = get_traces(traces_id)
+    if traces is None:
+        abort(404)
+
+    with open('protocol.yaml') as f:
+        protocol = yaml.load(f)
+
+    return render_template('dissector.html', trace=parse_trace(traces[trace_idx], protocol))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

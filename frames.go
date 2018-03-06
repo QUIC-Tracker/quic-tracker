@@ -340,10 +340,10 @@ func NewPongFrame(buffer *bytes.Reader) *PongFrame {
 }
 
 type AckFrame struct {
-	largestAcknowledged       uint64
-	ackDelay                  uint64
-	ackBlockCount              uint64
-	ackBlocks                 []AckBlock
+	LargestAcknowledged uint64
+	ackDelay            uint64
+	ackBlockCount       uint64
+	ackBlocks           []AckBlock
 }
 type AckBlock struct {
 	gap uint64
@@ -352,7 +352,7 @@ type AckBlock struct {
 func (frame AckFrame) FrameType() FrameType { return AckType }
 func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.largestAcknowledged)
+	WriteVarInt(buffer, frame.LargestAcknowledged)
 	WriteVarInt(buffer, frame.ackDelay)
 	WriteVarInt(buffer, frame.ackBlockCount)
 	for i, ack := range frame.ackBlocks {
@@ -366,7 +366,7 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	frame := new(AckFrame)
 	buffer.ReadByte()  // Discard frame byte
 
-	frame.largestAcknowledged, _ = ReadVarInt(buffer)
+	frame.LargestAcknowledged, _ = ReadVarInt(buffer)
 	frame.ackDelay, _ = ReadVarInt(buffer)
 	frame.ackBlockCount, _ = ReadVarInt(buffer)
 
@@ -385,7 +385,7 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 }
 func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 	frame := new(AckFrame)
-	frame.largestAcknowledged = largestAcknowledged
+	frame.LargestAcknowledged = largestAcknowledged
 	frame.ackBlockCount = 0
 	frame.ackDelay = 0
 	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockCount})

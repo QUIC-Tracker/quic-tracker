@@ -213,9 +213,9 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 	packetNumbers := reverse(c.ackQueue)
 	frame := new(AckFrame)
 	frame.ackBlocks = make([]AckBlock, 0, 255)
-	frame.largestAcknowledged = packetNumbers[0]
+	frame.LargestAcknowledged = packetNumbers[0]
 
-	previous := frame.largestAcknowledged
+	previous := frame.LargestAcknowledged
 	ackBlock := AckBlock{}
 	for _, number := range packetNumbers[1:] {
 		if previous - number == 1 {

@@ -2,7 +2,6 @@ package scenarii
 
 import (
 	m "masterthesis"
-	"github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -37,20 +36,21 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.SendProtectedPacket(protectedPacket)
 
 	var shouldResume bool
+	var isBlocked bool
 
 	for {
 		packet, err, _ := conn.ReadNextPacket()
 		if shouldResume {
-			spew.Dump(packet)
+			// TODO
 		}
 		if err != nil {
 			readOffset := conn.Streams[4].ReadOffset
-			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
+			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !isBlocked {
 				trace.ErrorCode = FC_RespectedLimitsButNoBlocked
+			} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) / 2 {
+				trace.ErrorCode = FC_HostDidNotResumeSending
 			} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
 				trace.ErrorCode = FC_NotEnoughDataAvailable
-			} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
-				trace.ErrorCode = FC_HostDidNotResumeSending
 			}
 			trace.Results["error"] = err.Error()
 			return
@@ -66,11 +66,10 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 			conn.SendProtectedPacket(protectedPacket)
 		}
 
-		if pp, ok := packet.(m.ProtectedPacket); ok {
-			var isBlocked bool
+		if pp, ok := packet.(*m.ProtectedPacket); ok {
 			for _, frame := range pp.Frames {
-				_, isGloballyBlocked := frame.(m.BlockedFrame)
-				_, isStreamBlocked := frame.(m.StreamBlockedFrame)
+				_, isGloballyBlocked := frame.(*m.BlockedFrame)
+				_, isStreamBlocked := frame.(*m.StreamBlockedFrame)
 				isBlocked = isGloballyBlocked || isStreamBlocked
 				if isBlocked {
 					break

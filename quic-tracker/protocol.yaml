@@ -146,7 +146,8 @@ PING:
       triggers:
         - Data:
             length: set
-  - Data
+  - Data:
+      length: 0
   - next: Frame
 BLOCKED:
   - type: Frame

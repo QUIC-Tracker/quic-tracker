@@ -12,7 +12,7 @@ _trace = {"commit":"89878dc3247ea3da1b3d7a077de1e49e2e2568d6","scenario":"flow_c
 
 
 def parse_trace(trace, protocol):
-    trace['stream'] = trace['stream'][:25]
+    trace['stream'] = (trace['stream'] or [])[:25]
     for packet in trace['stream']:
         packet['data'] = bytearray(b64decode(packet['data']))
         packet['dissection'] = parse_packet(packet['data'], deepcopy(protocol))

@@ -55,30 +55,41 @@
     </div>
 {% endmacro %}
 {% block content %}
-    <div class="box">
-        <div class="box-body">
-            <table class="table table-bordered table-hover stream">
-                <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Timestamp</th>
-                    <th>Direction</th>
-                    <th>Length</th>
-                    <th>Packet type</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for packet in trace.stream %}
-                    <tr data-packet-number="{{ loop.index }}">
-                        <td>{{ loop.index }}</td>
-                        <td>{{ packet.timestamp }}</td>
-                        <td>{{ packet.direction }}</td>
-                        <td>{{ packet.length }} bytes</td>
-                        <td>{{ packet.type }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="box">
+                <div class="box-body">
+                    <table class="table table-bordered table-hover stream">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Timestamp</th>
+                            <th>Direction</th>
+                            <th>Length</th>
+                            <th>Packet type</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for packet in trace.stream %}
+                            <tr data-packet-number="{{ loop.index }}">
+                                <td>{{ loop.index }}</td>
+                                <td>{{ packet.timestamp }}</td>
+                                <td>{{ packet.direction }}</td>
+                                <td>{{ packet.length }} bytes</td>
+                                <td>{{ packet.type }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="box">
+                <div class="box-body">
+                    <pre style="font-size: 10px;"><code>{{ trace.results|pretty_json }}</code></pre>
+                </div>
+            </div>
         </div>
     </div>
     {% for packet in trace.stream %}

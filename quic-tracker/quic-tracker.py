@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from datetime import datetime
 
 import yaml
@@ -20,6 +21,7 @@ setup_database()
 app.json_encoder = ByteArrayEncoder
 app.jinja_env.filters['is_tuple'] = is_tuple
 app.jinja_env.filters['decode'] = decode
+app.jinja_env.filters['pretty_json'] = lambda x: json.dumps(x, indent=2, separators=(',', ':'))
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['EXPLAIN_TEMPLATE_LOADING'] = True
 

@@ -29,6 +29,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	var scenarioName string
+	if len(os.Args) > 2 {
+		scenarioName = os.Args[2]
+	}
 	defer file.Close()
 
 	commit := GitCommit()
@@ -46,6 +50,9 @@ func main() {
 	results := make([]m.Trace, 0, 0)
 
 	for _, scenario := range scenarii {
+		if scenarioName != "" && scenario.Name() != scenarioName {
+			continue
+		}
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			host := scanner.Text()

@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	TP_NoTPReceived    = 1
-	TP_TPResentAfterVN = 2
+	TP_NoTPReceived     = 1
+	TP_TPResentAfterVN  = 2
+	TP_VNDidNotComplete = 3
 )
 
 type TransportParameterScenario struct {
@@ -53,7 +54,12 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace) {
 				trace.Results["transport_parameters"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters
 			}
 
-			conn.ProcessVersionNegotation(vn)
+			err = conn.ProcessVersionNegotation(vn)
+			if err != nil {
+				trace.ErrorCode = TP_VNDidNotComplete
+				trace.Results["error"] = err
+				return
+			}
 			conn.SendInitialPacket()
 		} else {
 			spew.Dump(packet)

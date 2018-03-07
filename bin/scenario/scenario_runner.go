@@ -35,6 +35,9 @@ func main() {
 	}
 	defer file.Close()
 
+	debugSwitch, ok := os.LookupEnv("SCENARIO_RUNNER_DEBUG")
+	debug := ok && debugSwitch == "1"
+
 	commit := GitCommit()
 
 	scenarii := [...]s.Scenario{
@@ -56,7 +59,9 @@ func main() {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			host := scanner.Text()
-			print(scenario.Name(), " ", host)
+			if debug {
+				print(scenario.Name(), " ", host)
+			}
 
 			trace := m.Trace{
 				Scenario: scenario.Name(),
@@ -87,7 +92,9 @@ func main() {
 			}
 
 			results = append(results, trace)
-			println(" ", trace.ErrorCode)
+			if debug {
+				println(" ", trace.ErrorCode)
+			}
 		}
 		file.Seek(0, 0)
 	}

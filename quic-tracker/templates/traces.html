@@ -6,7 +6,7 @@
 {% block content %}
     <div class="box">
         <div class="box-body">
-            <table class="table table-bordered">
+            <table class="table table-bordered table-hover">
                 <thead>
                 <tr>
                     <th>#</th>
@@ -37,7 +37,8 @@
     {{ super() }}
     <script>
         $(window).ready(function () {
-            $('tr[data-href]').click(function() {window.location = this.getAttribute('data-href');})
+            $('tr[data-href]').click(function() {window.location = this.getAttribute('data-href');});
+            $('table').DataTable();
         });
     </script>
 {% endblock %}

@@ -6,8 +6,7 @@ import re
 from sqlobject import SQLObject, IntCol, StringCol, ForeignKey, sqlhub, MultipleJoin, sqlbuilder, BoolCol
 from sqlobject.sqlbuilder import Insert
 from sqlobject.sqlite.sqliteconnection import SQLiteConnection
-
-from utils import join_root
+from quic_tracker.utils import join_root
 
 database_file = tempfile.mkstemp()[1]
 

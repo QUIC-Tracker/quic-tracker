@@ -13,7 +13,7 @@ from sqlobject import sqlhub
 
 from quic_tracker.database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
 from quic_tracker.traces import get_example_trace, get_traces, parse_trace
-from quic_tracker.utils import find_latest_result_file, ByteArrayEncoder, is_tuple, decode
+from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode
 
 app = Flask(__name__)
 setup_database()

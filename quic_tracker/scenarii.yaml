@@ -8,15 +8,15 @@ ack_only:
 flow_control:
   name: Flow control
   description: |
-    This test checks the proper behavior of the flow-control mechanisms, namely MAX_STREAM_DATA frames and the initial_max_stream_data transport parameters.
-    A hanshake will be performed and initial_max_stream_data will be set to 80 bytes. Then stream 4 is opened and a HTTP/0.9 GET request is performed.
-    The test checks if the host complies with the given limits, and will proceed to set an higher limit of 160 bytes with a MAX_STREAM_DATA once a STREAM_BLOCKED or a BLOCKED frame is received. The tests will check if data is sent after increasing the limit, and if the host complies with it. The connection is closed after 10s.
+    This test checks the proper behavior of the flow-control mechanisms, namely <code>MAX_STREAM_DATA</code> frames and the <code>initial_max_stream_data</code> transport parameters.
+    A handshake will be performed and <code>initial_max_stream_data</code> will be set to 80 bytes. Then stream 4 is opened and a HTTP/0.9 GET request is performed.
+    The test checks if the host complies with the given limits, and will proceed to set an higher limit of 160 bytes with a <code>MAX_STREAM_DATA</code> frame once a <code>STREAM_BLOCKED</code> or a <code>BLOCKED</code> frame is received. The tests will check if data is sent after increasing the limit, and if the host complies with it. The connection is closed after 10s.
   error_codes:
     1: The handshake did not complete
     2: The host sent more data than the offset advertised
     3: The host did not resume sending after increasing the limit
     4: No enough data was available to perform the test
-    5: No STREAM_BLOCKED or BLOCKED frame were received
+    5: No <code>STREAM_BLOCKED</code> or <code>BLOCKED</code> frame were received
 handshake:
   name: Handshake
   description: |
@@ -45,7 +45,7 @@ handshake_v6:
 padding:
   name: Padding only
   description: |
-    This test sends a Initial packet containing only PADDING frames. It will record any response sent by the host.
+    This test sends a <code>Initial</code> packet containing only <code>PADDING</code> frames. It will record any response sent by the host.
   error_codes:
     1: No version advertised by the host matched the versions of the test
     2: The host sent one or more packets in response
@@ -60,7 +60,7 @@ transport_parameters:
 version_negotiation:
   name: Version Negotiation
   description: |
-    This test will explicitly initiate a version negotation process by setting the Initial packet version to 0x1a2a3a4a. It will record the version negotation advertised by the host if any
+    This test will explicitly initiate a version negotiation process by setting the Initial packet version to <code>0x1a2a3a4a</code>. It will record the version negotiation advertised by the host if any
   error_codes:
     1: The host sent a packet type that was not expected
     2: VN_DidNotEchoVersion  # Not used anymore

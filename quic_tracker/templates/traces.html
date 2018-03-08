@@ -19,12 +19,13 @@
                 </thead>
                 <tbody>
                 {% for trace in traces %}
+                    {% set scenario_description = scenarii[trace.scenario] %}
                     <tr data-href="{{ url_for('dissector', traces_id=traces_id, trace_idx=loop.index0) }}">
                         <td>{{ loop.index }}</td>
                         <td>{{ trace.host }}</td>
-                        <td>{{ trace.scenario }}</td>
-                        <td>{{ trace.started_at }}</td>
-                        <td>{{ trace.error_code }}</td>
+                        <td>{{ scenario_description.name }}</td>
+                        <td>{{ trace.started_at|timestamp }} CET</td>
+                        <td>{{ print_test_error_code(trace.error_code, scenario_description) }}</td>
                         <td>{{ trace.stream|length if trace.stream else '~' }}</td>
                     </tr>
                 {% endfor %}
@@ -37,7 +38,9 @@
     {{ super() }}
     <script>
         $(window).ready(function () {
-            $('tr[data-href]').click(function() {window.location = this.getAttribute('data-href');});
+            $('tr[data-href]').click(function () {
+                window.location = this.getAttribute('data-href');
+            });
             $('table').DataTable();
         });
     </script>

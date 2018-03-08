@@ -1,0 +1,68 @@
+ack_only:
+  name: ACK only
+  description: |
+    This test performs a handshake, then opens stream 4 to perform an HTTP/0.9 GET request. It will ack every packet with a packet containing a single ACK frame. The test fails and the connection is closed as soon as the host sends an ACK-only packet in response of an ACK-only packet.
+  error_codes:
+    1: The handshake did not complete
+    2: Host sent an ACK-only packet in response of an ACK-only packet
+flow_control:
+  name: Flow control
+  description: |
+    This test checks the proper behavior of the flow-control mechanisms, namely MAX_STREAM_DATA frames and the initial_max_stream_data transport parameters.
+    A hanshake will be performed and initial_max_stream_data will be set to 80 bytes. Then stream 4 is opened and a HTTP/0.9 GET request is performed.
+    The test checks if the host complies with the given limits, and will proceed to set an higher limit of 160 bytes with a MAX_STREAM_DATA once a STREAM_BLOCKED or a BLOCKED frame is received. The tests will check if data is sent after increasing the limit, and if the host complies with it. The connection is closed after 10s.
+  error_codes:
+    1: The handshake did not complete
+    2: The host sent more data than the offset advertised
+    3: The host did not resume sending after increasing the limit
+    4: No enough data was available to perform the test
+    5: No STREAM_BLOCKED or BLOCKED frame were received
+handshake:
+  name: Handshake
+  description: |
+    This test performs a handshake and details which step made the handshake fail if any.
+  error_codes:
+    1: The host sent a packet type that was not expected
+    2: The TLS handshake failed
+    3: No version advertised by the host matched the versions of the test
+    4: The host timed out
+handshake_retransmission:
+  name: Handshake retransmission
+  description: |
+    This test initiates a handshake but will not ack any of the Handshake packets received. It will record the interval at the first Handshake packet and its retransmissions where received.
+  error_codes:
+    1: The host did not retransmit any Handshake packet
+    2: No version advertised by the host matched the versions of the test
+handshake_v6:
+  name: Handshake IPv6
+  description: |
+    This test performs the same Handshake test, but uses IPv6 if available.
+  error_codes:
+    1: The host sent a packet type that was not expected
+    2: The TLS handshake failed
+    3: No version advertised by the host matched the versions of the test
+    4: The host timed out
+padding:
+  name: Padding only
+  description: |
+    This test sends a Initial packet containing only PADDING frames. It will record any response sent by the host.
+  error_codes:
+    1: No version advertised by the host matched the versions of the test
+    2: The host sent one or more packets in response
+transport_parameters:
+  name: Transport Parameters
+  description: |
+    This test records the transport parameters sent by the host during a successful handshake. It will perform version negotation if needed and will check if transport parameters are resent after its success.
+  error_codes:
+    1: No transport parameters were received
+    2: No transport parameters were received after version negation
+    3: No version advertised by the host matched the versions of the test
+version_negotiation:
+  name: Version Negotation
+  description: |
+    This test will explicitly initiate a version negotation process by setting the Initial packet version to 0x1a2a3a4a. It will record the version negotation advertised by the host if any
+  error_codes:
+    1: The host sent a packet type that was not expected
+    2: VN_DidNotEchoVersion  # Not used anymore
+    3: VN_LastTwoVersionsAreActuallySeal  # Not used anymore
+    4: The host timed out before responding to version negotiation

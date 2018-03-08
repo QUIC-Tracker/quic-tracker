@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block header %}
     <h1>QUIC dissector</h1>
-    <small>{{ trace.host }} - {{ trace.scenario }}</small>
+    <small>{{ trace.host }} - {{ scenario.name }} - {{ trace.started_at|timestamp }} CET</small>
 {% endblock %}
 {% macro print_struct(d) %}
     {% for name, value, s_idx, e_idx in d %}
@@ -63,20 +63,25 @@
                         <thead>
                         <tr>
                             <th>#</th>
-                            <th>Timestamp</th>
+                            <th>Time after test start</th>
                             <th>Direction</th>
-                            <th>Length</th>
                             <th>Packet type</th>
+                            <th>Length</th>
                         </tr>
                         </thead>
                         <tbody>
+                        {% set start_timestamp = trace.stream[0].timestamp %}
                         {% for packet in trace.stream %}
                             <tr data-packet-number="{{ loop.index }}">
                                 <td>{{ loop.index }}</td>
-                                <td>{{ packet.timestamp }}</td>
-                                <td>{{ packet.direction }}</td>
-                                <td>{{ packet.length }} bytes</td>
+                                <td>{{ packet.timestamp - start_timestamp }} ms</td>
+                                {% if packet.direction == 'to_server' %}
+                                    <td><i class="fa fa-arrow-right"></i> sent to host</td>
+                                {% else %}
+                                    <td><i class="fa fa-arrow-left"></i> received by test</td>
+                                {% endif %}
                                 <td>{{ packet.type }}</td>
+                                <td>{{ packet.length }} bytes</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -85,9 +90,21 @@
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="box">
-                <div class="box-body">
-                    <pre style="font-size: 10px;"><code>{{ trace.results|pretty_json }}</code></pre>
+            <div class="nav-tabs-custom">
+                <ul class="nav nav-tabs">
+                    <li class="active"><a href="#results" data-toggle="tab">Test results</a></li>
+                    <li><a href="#description" data-toggle="tab">Test description</a></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane active" id="results">
+                        {% set t = trace.copy() %}
+                        {% set _ = t.pop('stream') %}
+                        <pre style="font-size: 10px;"><code>{{ t|pretty_json }}</code></pre>
+                        {{ print_test_error_code(trace.error_code, scenario) }}
+                    </div>
+                    <div class="tab-pane" id="description">
+                        <p style="text-align: justify">{{ scenario.description|replace('\n', '<br>')|safe }}</p>
+                    </div>
                 </div>
             </div>
         </div>

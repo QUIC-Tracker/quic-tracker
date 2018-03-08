@@ -13,7 +13,7 @@ from sqlobject import sqlhub
 
 from quic_tracker.database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
 from quic_tracker.traces import get_example_trace, get_traces, parse_trace
-from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode
+from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root
 
 app = Flask(__name__)
 setup_database()
@@ -21,6 +21,7 @@ app.json_encoder = ByteArrayEncoder
 app.jinja_env.filters['is_tuple'] = is_tuple
 app.jinja_env.filters['decode'] = decode
 app.jinja_env.filters['pretty_json'] = lambda x: json.dumps(x, indent=2, separators=(',', ':'))
+app.jinja_env.filters['timestamp'] = lambda x: datetime.fromtimestamp(x)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['EXPLAIN_TEMPLATE_LOADING'] = True
 
@@ -131,7 +132,10 @@ def traces(traces_id):
     if traces is None:
         abort(404)
 
-    return render_template('traces.html', traces_id=traces_id, traces=traces, date=datetime.strptime(str(traces_id), '%Y%m%d').date())
+    with open(join_root('scenarii.yaml')) as f:
+        scenarii = yaml.load(f)
+
+    return render_template('traces.html', traces_id=traces_id, traces=traces, date=datetime.strptime(str(traces_id), '%Y%m%d').date(), scenarii=scenarii)
 
 
 @app.route('/traces/<int:traces_id>/<int:trace_idx>')
@@ -140,10 +144,14 @@ def dissector(traces_id, trace_idx):
     if traces is None:
         abort(404)
 
-    with open('protocol.yaml') as f:
+    with open(join_root('protocol.yaml')) as f:
         protocol = yaml.load(f)
 
-    return render_template('dissector.html', trace=parse_trace(traces[trace_idx], protocol))
+    with open(join_root('scenarii.yaml')) as f:
+        scenarii = yaml.load(f)
+
+    trace = parse_trace(traces[trace_idx], protocol)
+    return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']])
 
 
 if __name__ == '__main__':

@@ -13,13 +13,13 @@ const (
 
 const ForceVersionNegotiation = 0x1a2a3a4a
 
-type VersionNegotationScenario struct {
+type VersionNegotiationScenario struct {
 	AbstractScenario
 }
-func NewVersionNegotationScenario() *VersionNegotationScenario {
-	return &VersionNegotationScenario{AbstractScenario{"version_negotation", 2, false}}
+func NewVersionNegotiationScenario() *VersionNegotiationScenario {
+	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
 }
-func (s *VersionNegotationScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace) {
 	conn.Version = ForceVersionNegotiation
 	conn.SendInitialPacket()
 	packet, err, _ := conn.ReadNextPacket()

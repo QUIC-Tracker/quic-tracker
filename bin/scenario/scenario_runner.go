@@ -41,7 +41,7 @@ func main() {
 	commit := GitCommit()
 
 	scenarii := [...]s.Scenario{
-		s.NewVersionNegotationScenario(),
+		s.NewVersionNegotiationScenario(),
 		s.NewHandshakeScenario(),
 		s.NewHandshakev6Scenario(),
 		s.NewTransportParameterScenario(),

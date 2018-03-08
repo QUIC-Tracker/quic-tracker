@@ -103,7 +103,7 @@
                         {{ print_test_error_code(trace.error_code, scenario) }}
                     </div>
                     <div class="tab-pane" id="description">
-                        <p style="text-align: justify">{{ scenario.description|replace('\n', '<br>') }}</p>
+                        <p style="text-align: justify">{{ scenario.description|replace('\n', '<br>')|safe }}</p>
                     </div>
                 </div>
             </div>

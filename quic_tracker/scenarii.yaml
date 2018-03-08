@@ -58,7 +58,7 @@ transport_parameters:
     2: No transport parameters were received after version negation
     3: No version advertised by the host matched the versions of the test
 version_negotiation:
-  name: Version Negotation
+  name: Version Negotiation
   description: |
     This test will explicitly initiate a version negotation process by setting the Initial packet version to 0x1a2a3a4a. It will record the version negotation advertised by the host if any
   error_codes:

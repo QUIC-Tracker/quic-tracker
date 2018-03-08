@@ -100,7 +100,7 @@
                         {% set t = trace.copy() %}
                         {% set _ = t.pop('stream') %}
                         <pre style="font-size: 10px;"><code>{{ t|pretty_json }}</code></pre>
-                        {{ print_test_error_code(trace.error_code, scenario) }}
+                        {{ print_test_error_code(trace.error_code, scenario)|safe }}
                     </div>
                     <div class="tab-pane" id="description">
                         <p style="text-align: justify">{{ scenario.description|replace('\n', '<br>')|safe }}</p>

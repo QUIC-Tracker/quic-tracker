@@ -25,7 +25,7 @@
                         <td>{{ trace.host }}</td>
                         <td>{{ scenario_description.name }}</td>
                         <td>{{ trace.started_at|timestamp }} CET</td>
-                        <td>{{ print_test_error_code(trace.error_code, scenario_description)|safe }}</td>
+                        <td>{{ print_test_error_code(trace.error_code, scenario_description) }}</td>
                         <td>{{ trace.stream|length if trace.stream else '~' }}</td>
                     </tr>
                 {% endfor %}

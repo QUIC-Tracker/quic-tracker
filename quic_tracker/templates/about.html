@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block header %}
+    <h1>About this project</h1>
+{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="box box-">
+                <div class="box-body">
+                    <h3>What is this website for ?</h3>
+                    <p>This web site serves two purposes:</p>
+                    <p>
+                        It collects HTTP <code>Alt-Svc</code> headers sent by web-servers of popular domain names in the
+                        hope of discovering IETF-QUIC capable hosts. It lists the versions advertised by the hosts,
+                        if any.
+                    <p>
+                    <p>
+                        It also runs a test suite that exchanges packets with IETF-QUIC implementations to verify
+                        whether an implementation conforms with the IETF specification of QUIC. The test suite is
+                        consisting of several test scenarii. Each of them aims at testing a particular feature of the
+                        QUIC protocol. The test suite runs daily, and its results are available on this website.
+                    </p>
+
+                    <h3>Who is behind this effort ?</h3>
+                    <p>
+                        This work is part of my master thesis for my master's degree in Computer Science at
+                        <a href="https://uclouvain.be" target="_blank">Université catholique de Louvain</a>. It is
+                        supervised by Olivier Bonaventure and Quentin De Coninck.
+                    </p>
+
+                    <p>
+                        <b> All the code for this website and the tools it runs is available at
+                            <a href="https://github.com/mpiraux/master-thesis/" target="_blank">
+                                https://github.com/mpiraux/master-thesis/
+                            </a>
+                        </b>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

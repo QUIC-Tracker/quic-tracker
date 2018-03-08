@@ -49,6 +49,11 @@ def index():
     return redirect(url_for('test_suite'))
 
 
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+
 @app.route('/tracker')
 def tracker():
     return results(int(os.path.splitext(find_latest_file('data'))[0]))

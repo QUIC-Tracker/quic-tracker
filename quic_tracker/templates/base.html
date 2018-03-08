@@ -82,6 +82,7 @@
                     <ul class="nav navbar-nav">
                         <li class="{{ 'active' if 'tracker' in request.path else '' }}"><a href="{{ url_for('tracker') }}">Tracker</a></li>
                         <li class="{{ 'active' if 'traces' in request.path else '' }}"><a href="{{ url_for('test_suite') }}">Test suite</a></li>
+                        <li class="{{ 'active' if 'about' in request.path else '' }}"><a href="{{ url_for('about') }}">About</a></li>
                     </ul>
                 </div>
             </div>
@@ -98,8 +99,9 @@
         </section>
     </div>
     <footer class="main-footer">
-        <strong>Copyright &copy; 2017 <a href="https://github.com/mpiraux">Maxime Piraux</a>.</strong> All rights
+        <strong>Copyright &copy; 2017 - 2018 <a href="https://github.com/mpiraux" target="_blank">Maxime Piraux</a>.</strong> All rights
         reserved.
+        <span class="pull-right"><b><a href="https://uclouvain.be" target="_blank">Université catholique de Louvain</a></b><span>
     </footer>
 </div>
 {% block js %}

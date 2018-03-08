@@ -29,7 +29,7 @@ handshake:
 handshake_retransmission:
   name: Handshake retransmission
   description: |
-    This test initiates a handshake but will not ack any of the Handshake packets received. It will record the interval at the first Handshake packet and its retransmissions where received.
+    This test initiates a handshake but will not ack any of the Handshake packets received. It will record the interval at which the first Handshake packet and its retransmissions where received.
   error_codes:
     1: The host did not retransmit any Handshake packet
     2: No version advertised by the host matched the versions of the test

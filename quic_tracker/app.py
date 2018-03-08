@@ -45,7 +45,7 @@ def compute_stats(result):
 
 @app.route('/')
 def index():
-    return redirect(url_for('tracker'))
+    return redirect(url_for('test_suite'))
 
 
 @app.route('/tracker')

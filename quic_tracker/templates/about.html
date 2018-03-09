@@ -40,3 +40,24 @@
         </div>
     </div>
 {% endblock %}
+{% block js %}
+    {{ super() }}
+    <script type="text/javascript" language="javascript">
+        const coded = "s2P8sz.H8F21P@YD1UzLD.1p0b1V28L.mz";
+        const key = "BWI0wU1NAfEkKtbPp9MSsa58VFQZLz3lXdu4OCRy6joxcGJDmgHivrY2ne7Tqh";
+        const shift = coded.length;
+        var link = "";
+        var ltr;
+        for (var i = 0; i < coded.length; i++) {
+            if (key.indexOf(coded.charAt(i)) == -1) {
+                ltr = coded.charAt(i);
+                link += (ltr);
+            }
+            else {
+                ltr = (key.indexOf(coded.charAt(i)) - shift + key.length) % key.length;
+                link += (key.charAt(ltr));
+            }
+        }
+        $('.box-body').append("You can provide me feedback on GitHub or via email at <a href='mailto:" + link + "'>"+ link +"</a>.");
+    </script>
+{% endblock %}

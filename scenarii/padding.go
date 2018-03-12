@@ -51,7 +51,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace) {
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			break
-		} else if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {
+		} else if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {  // TODO: Distinguish ACKs from other packets, see https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-9.1
 			trace.ErrorCode = P_ReceivedSmth
 			break
 		}

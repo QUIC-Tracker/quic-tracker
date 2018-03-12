@@ -4,8 +4,8 @@
   "main": "quic-tracker.py",
   "repository": "https://github.com/mpiraux/master-thesis",
   "author": "Maxime Piraux",
-  "license": "All rights reserved",
-  "private": true,
+  "license": "AGPL-3.0",
+  "private": false,
   "dependencies": {
     "admin-lte": "^2.4.0"
   }

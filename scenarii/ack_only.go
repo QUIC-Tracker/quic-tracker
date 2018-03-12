@@ -42,7 +42,7 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace) {
 	}
 
 	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /\r\n"), false)
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)

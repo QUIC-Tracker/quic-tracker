@@ -136,8 +136,10 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 				return false, nil
 			}
 		case mint.AlertWouldBlock:
-			clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
-			defer c.SendHandshakeProtectedPacket(clearTextPacket)
+			if packet.ShouldBeAcknowledged() {
+				clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
+				defer c.SendHandshakeProtectedPacket(clearTextPacket)
+			}
 			return true, nil
 		default:
 			return false, alert
@@ -311,6 +313,16 @@ func (c *Connection) CloseStream(streamId uint64) {
 		pkt.Frames = append(pkt.Frames, frame)
 		c.SendProtectedPacket(pkt)
 	}
+}
+func (c *Connection) SendHTTPGETRequest(url string) {
+	if _, ok := c.Streams[4]; !ok {
+		c.Streams[4] = new(Stream)
+	}
+	streamFrame := NewStreamFrame(4, c.Streams[4], []byte(fmt.Sprintf("GET %s\r\n",  url)), false)
+
+	protectedPacket := NewProtectedPacket(c)
+	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
+	c.SendProtectedPacket(protectedPacket)
 }
 func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)

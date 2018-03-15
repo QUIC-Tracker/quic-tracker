@@ -43,13 +43,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 		return
 	}
 
-	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false)
-	ackFrame := conn.GetAckFrame()
-
-	protectedPacket := m.NewProtectedPacket(conn)
-	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
-	conn.SendProtectedPacket(protectedPacket)
+	conn.SendHTTPGETRequest("/index.html")
 
 	var shouldResume bool
 	var isBlocked bool
@@ -77,7 +71,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
 		}
 
 		if packet.ShouldBeAcknowledged() {
-			protectedPacket = m.NewProtectedPacket(conn)
+			protectedPacket := m.NewProtectedPacket(conn)
 			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 			conn.SendProtectedPacket(protectedPacket)
 		}

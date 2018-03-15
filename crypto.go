@@ -22,17 +22,21 @@ import (
 	"encoding/hex"
 	"bytes"
 	"crypto"
+	"encoding/binary"
 )
 
 const (
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.2.1
+	// See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.1
 	quicVersionSalt    = "afc824ec5fc77eca1e9d36f37fb2d46518c36639"
 	clientHSecretLabel = "client hs"
 	serverHSecretLabel = "server hs"
 
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.2.3
+	// See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.3
 	clientPpSecret0Label = "EXPORTER-QUIC client 1rtt"
 	serverPpSecret0Label = "EXPORTER-QUIC server 1rtt"
+
+	// See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.6
+	packetNumberLabel = "EXPORTER-QUIC packet number"
 )
 
 type CryptoState struct {
@@ -88,4 +92,16 @@ func qhkdfExpand(hash crypto.Hash, secret []byte, label string, length int) []by
 	label = "QUIC " + label
 	info := string(length >> 8) + string(byte(length)) + string(len(label)) + label + string(0x00)
 	return mint.HkdfExpand(hash, secret, bytes.NewBufferString(info).Bytes(), length)
+}
+func GetPacketGap(conn *Connection) uint32 {
+	packetNumberSecret, err := conn.tls.ComputeExporter(packetNumberLabel, []byte{}, conn.cipherSuite.Hash.Size())
+	if err != nil {
+		panic(err)
+	}
+
+	sequence := make([]byte, 4, 4)
+	binary.BigEndian.PutUint32(sequence, uint32(conn.PacketNumber))
+
+	gapBytes := mint.HkdfExpandLabel(conn.cipherSuite.Hash, packetNumberSecret, "QUIC packet sequence gap", sequence, 4)
+	return binary.BigEndian.Uint32(gapBytes)
 }

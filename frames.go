@@ -300,23 +300,23 @@ func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdBlockedFrame {
 }
 
 type NewConnectionIdFrame struct {
-	sequence            uint64
-	connectionId        uint64
-	statelessResetToken [16]byte
+	Sequence            uint64
+	ConnectionId        uint64
+	StatelessResetToken [16]byte
 }
 func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
 func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.sequence)
-	WriteVarInt(buffer, frame.connectionId)
-	binary.Write(buffer, binary.BigEndian, frame.statelessResetToken)
+	WriteVarInt(buffer, frame.Sequence)
+	WriteVarInt(buffer, frame.ConnectionId)
+	binary.Write(buffer, binary.BigEndian, frame.StatelessResetToken)
 }
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.sequence, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.connectionId)
-	binary.Read(buffer, binary.BigEndian, &frame.statelessResetToken)
+	frame.Sequence, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.ConnectionId)
+	binary.Read(buffer, binary.BigEndian, &frame.StatelessResetToken)
 	return frame
 }
 

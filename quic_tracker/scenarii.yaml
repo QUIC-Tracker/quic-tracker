@@ -58,6 +58,15 @@ handshake_v6:
     2: The TLS handshake failed
     3: No version advertised by the host matched the versions of the test
     4: The host timed out
+new_connection_id:
+  Name: New Connection ID
+  description: |
+    This test checks the support of the <code>NEW_CONNECTION_ID</code> frame, if sent by the server. The test will change the connection ID used to the first alternative CID provided by the server, create a gap in packet numbers, and perform a an HTTP/0.9 GET request. It will record whether or not the host has responded to the request.
+  error_codes:
+    1: The handshake did not complete
+    2: The host did not provide alternative connection IDs
+    3: When using one of the alternative connection IDs, the host stopped responding
+    4: When using one of the alternative connection IDs, the host responded without changing the connection ID
 padding:
   name: Padding only
   description: |

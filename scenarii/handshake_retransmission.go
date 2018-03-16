@@ -33,7 +33,7 @@ type HandshakeRetransmissionScenario struct {
 func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
 	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 1, false}}
 }
-func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.SendInitialPacket()
 
 	arrivals := make([]uint64, 0, 10)

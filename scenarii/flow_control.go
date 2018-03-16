@@ -34,7 +34,7 @@ type FlowControlScenario struct {
 func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{"flow_control", 1, false}}
 }
-func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
 
 	if err := CompleteHandshake(conn); err != nil {

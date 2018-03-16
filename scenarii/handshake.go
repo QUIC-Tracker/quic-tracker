@@ -35,14 +35,16 @@ type HandshakeScenario struct {
 func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
 }
-func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.SendInitialPacket()
 
 	ongoingHandshake := true
 	defer func() {
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				println(err.Error())
+		if debug {
+			if r := recover(); r != nil {
+				if err, ok := r.(error); ok {
+					println(err.Error())
+				}
 			}
 		}
 		ongoingHandshake = false

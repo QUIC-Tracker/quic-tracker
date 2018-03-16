@@ -34,14 +34,16 @@ type TransportParameterScenario struct {
 func NewTransportParameterScenario() *TransportParameterScenario {
 	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 1, false}}
 }
-func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.SendInitialPacket()
 
 	ongoingHandshake := true
 	defer func() {
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				println(err.Error())
+		if debug {
+			if r := recover(); r != nil {
+				if err, ok := r.(error); ok {
+					println(err.Error())
+				}
 			}
 		}
 		ongoingHandshake = false

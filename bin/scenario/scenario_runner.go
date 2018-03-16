@@ -99,7 +99,7 @@ func main() {
 				}
 
 				start := time.Now()
-				scenario.Run(conn, &trace)
+				scenario.Run(conn, &trace, debug)
 				trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 				ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]

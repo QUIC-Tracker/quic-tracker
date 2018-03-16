@@ -32,7 +32,7 @@ type AckOnlyScenario struct {
 func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
-func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
 
 	if err := CompleteHandshake(conn); err != nil {

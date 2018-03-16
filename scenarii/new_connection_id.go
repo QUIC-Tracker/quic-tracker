@@ -34,7 +34,7 @@ type NewConnectionIDScenario struct {
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
 	return &NewConnectionIDScenario{AbstractScenario{"new_connection_id", 1, false}}
 }
-func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace) {
+func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 
 	if err := CompleteHandshake(conn); err != nil {

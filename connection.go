@@ -318,7 +318,7 @@ func (c *Connection) SendHTTPGETRequest(url string) {
 	if _, ok := c.Streams[4]; !ok {
 		c.Streams[4] = new(Stream)
 	}
-	streamFrame := NewStreamFrame(4, c.Streams[4], []byte(fmt.Sprintf("GET %s\r\n",  url)), false)
+	streamFrame := NewStreamFrame(4, c.Streams[4], []byte(fmt.Sprintf("GET %s\r\n",  url)), true)
 
 	protectedPacket := NewProtectedPacket(c)
 	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)

@@ -85,6 +85,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace) {
 				}
 			}
 		}
-
 	}
+
+	trace.Results["new_connection_ids"] = alternativeConnectionIDs
 }

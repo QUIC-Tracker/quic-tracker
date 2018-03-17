@@ -81,7 +81,8 @@ transport_parameters:
   error_codes:
     1: No transport parameters were received
     2: No transport parameters were received after version negation
-    3: No version advertised by the host matched the versions of the test
+    3: The handshake did not complete
+    4: The host did not include some mandatory transport parameters
 version_negotiation:
   name: Version Negotiation
   description: |

@@ -19,6 +19,7 @@ package masterthesis
 import (
 	"github.com/bifurcation/mint"
 	"github.com/bifurcation/mint/syntax"
+	"encoding/binary"
 )
 
 const QuicTPExtensionType = mint.ExtensionType(26)  // https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-9.2
@@ -37,11 +38,16 @@ const (
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
-	MaxStreamData   uint32
-	MaxData         uint32
-	MaxStreamIdBidi uint32
-	MaxStreamIdUni  uint32
-	IdleTimeout     uint16
+	MaxStreamData       uint32
+	MaxData             uint32
+	MaxStreamIdBidi     uint32
+	MaxStreamIdUni      uint32
+	IdleTimeout         uint16
+	OmitConnectionId    bool
+	MaxPacketSize       uint16
+	StatelessResetToken []byte
+	AckDelayExponent    uint8
+	ToJSON              map[string]interface{}
 }
 
 type TransportParameter struct {
@@ -93,10 +99,11 @@ type TLSTransportParameterHandler struct {
 	InitialVersion    uint32
 	QuicTransportParameters
 	*EncryptedExtensionsTransportParameters
+	ReceivedParameters *QuicTransportParameters
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{negotiatedVersion, initialVersion, QuicTransportParameters{16 * 1024, 32 * 1024, 17, 19,10}, nil}
+	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters: QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxStreamIdBidi: 17, MaxStreamIdUni: 19, IdleTimeout: 10}}
 }
 
 func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
@@ -135,7 +142,43 @@ func (h *TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.E
 		if err != nil {
 			panic(err)
 		}
-		// TODO process the list and update parameters that could have changed
+		receivedParameters := QuicTransportParameters{}
+		receivedParameters.ToJSON = make(map[string]interface{})
+
+		for _, p := range h.EncryptedExtensionsTransportParameters.Parameters {
+			switch p.ParameterType {
+			case InitialMaxStreamData:
+				receivedParameters.MaxStreamData = binary.BigEndian.Uint32(p.Value)
+				receivedParameters.ToJSON["initial_max_stream_data"] = receivedParameters.MaxStreamData
+			case InitialMaxData:
+				receivedParameters.MaxData = binary.BigEndian.Uint32(p.Value)
+				receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
+			case InitialMaxStreamIdBidi:
+				receivedParameters.MaxStreamIdBidi = binary.BigEndian.Uint32(p.Value)
+				receivedParameters.ToJSON["initial_max_stream_id_bidi"] = receivedParameters.MaxStreamIdBidi
+			case IdleTimeout:
+				receivedParameters.IdleTimeout = binary.BigEndian.Uint16(p.Value)
+				receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
+			case OmitConnectionId:
+				receivedParameters.OmitConnectionId = true
+				receivedParameters.ToJSON["omit_connection_id"] = receivedParameters.OmitConnectionId
+			case MaxPacketSize:
+				receivedParameters.MaxPacketSize = binary.BigEndian.Uint16(p.Value)
+				receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
+			case StatelessResetToken:
+				receivedParameters.StatelessResetToken = p.Value
+				receivedParameters.ToJSON["stateless_reset_token"] = receivedParameters.StatelessResetToken
+			case AckDelayExponent:
+				receivedParameters.AckDelayExponent = p.Value[0]
+				receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
+			case InitialMaxStreamIdUni:
+				receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint32(p.Value)
+				receivedParameters.ToJSON["initial_max_stream_id_uni"] = receivedParameters.MaxStreamIdUni
+			}
+		}
+
+		h.ReceivedParameters = &receivedParameters
+
 	}
 
 	return nil

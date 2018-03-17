@@ -65,8 +65,8 @@ new_connection_id:
   error_codes:
     1: The handshake did not complete
     2: The host did not provide alternative connection IDs
-    3: When using one of the alternative connection IDs, the host stopped responding
-    4: When using one of the alternative connection IDs, the host responded without changing the connection ID
+    3: When using the first of the alternative connection IDs, the host stopped responding
+    4: When using the first of the alternative connection IDs, the host responded without changing the connection ID
 padding:
   name: Padding only
   description: |

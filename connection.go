@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"crypto"
 	"errors"
+	"sort"
 )
 
 type Connection struct {
@@ -237,7 +238,8 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	return packet, nil, rec
 }
 func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on the packet numbers received
-	packetNumbers := reverse(c.ackQueue)
+	sort.Sort(PacketNumberQueue(c.ackQueue))
+	packetNumbers := c.ackQueue
 	frame := new(AckFrame)
 	frame.ackBlocks = make([]AckBlock, 0, 255)
 	frame.LargestAcknowledged = packetNumbers[0]

@@ -52,3 +52,9 @@ func Uint16ToBEBytes(uint16 uint16) []byte {
 	binary.BigEndian.PutUint16(b, uint16)
 	return b
 }
+
+type PacketNumberQueue []uint64
+
+func (a PacketNumberQueue) Less(i, j int) bool { return a[i] > a[j] }
+func (a PacketNumberQueue) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a PacketNumberQueue) Len() int           { return len(a) }

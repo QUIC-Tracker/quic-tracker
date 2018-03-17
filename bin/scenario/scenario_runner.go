@@ -66,6 +66,7 @@ func main() {
 		s.NewPaddingScenario(),
 		s.NewFlowControlScenario(),
 		s.NewAckOnlyScenario(),
+		s.NewStopSendingOnReceiveStreamScenario(),
 	}
 	results := make([]m.Trace, 0, 0)
 

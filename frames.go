@@ -125,28 +125,28 @@ func NewResetStream(buffer *bytes.Reader) *ResetStream {
 }
 
 type ConnectionCloseFrame struct {
-	errorCode          uint16
-	reasonPhraseLength uint64
-	reasonPhrase       string
+	ErrorCode          uint16
+	ReasonPhraseLength uint64
+	ReasonPhrase       string
 }
 func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
 func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	WriteVarInt(buffer, frame.reasonPhraseLength)
-	if frame.reasonPhraseLength > 0 {
-		buffer.Write([]byte(frame.reasonPhrase))
+	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
+	WriteVarInt(buffer, frame.ReasonPhraseLength)
+	if frame.ReasonPhraseLength > 0 {
+		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	frame.reasonPhraseLength, _ = ReadVarInt(buffer)
-	if frame.reasonPhraseLength > 0 {
-		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
+	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
+	frame.ReasonPhraseLength, _ = ReadVarInt(buffer)
+	if frame.ReasonPhraseLength > 0 {
+		reasonBytes := make([]byte, frame.ReasonPhraseLength, frame.ReasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
-		frame.reasonPhrase = string(reasonBytes)
+		frame.ReasonPhrase = string(reasonBytes)
 	}
 	return frame
 }
@@ -321,20 +321,20 @@ func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 }
 
 type StopSendingFrame struct {
-	streamId  uint64
-	errorCode uint16
+	StreamId  uint64
+	ErrorCode uint16
 }
 func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
 func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.streamId)
-	binary.Write(buffer, binary.BigEndian, frame.errorCode)
+	WriteVarInt(buffer, frame.StreamId)
+	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
 }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.streamId, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
+	frame.StreamId, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
 	return frame
 }
 

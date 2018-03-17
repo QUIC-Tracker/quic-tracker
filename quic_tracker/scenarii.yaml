@@ -74,6 +74,15 @@ padding:
   error_codes:
     1: No version advertised by the host matched the versions of the test
     2: The host sent one or more packets in response
+stop_sending_frame_on_receive_stream:
+  name: STOP_SENDING frame on a receive stream
+  description: |
+    This test sends a STOP_SENDING frame on the receive stream of the peer and verifies if it handles it correctly, i.e. closes the connection with a PROTOCOL_VIOLATION (0xA) error
+  error_codes:
+    1: The TLS handshake failed
+    2: The peer did not close the connection
+    3: The peer closed the connection but with the wrong error code
+    4: The peer advertised a too low max_stream_id_uni to perform the test
 transport_parameters:
   name: Transport Parameters
   description: |

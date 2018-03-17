@@ -32,6 +32,12 @@ const (
 	MaximumVersion         = 0xff000009
 )
 
+// errors
+
+const (
+	ERR_PROTOCOL_VIOLATION = 0xA
+)
+
 func reverse(s []uint64) []uint64 {
 	rev := make([]uint64, 0, len(s))
 	last := len(s) - 1

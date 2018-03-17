@@ -18,7 +18,7 @@ package main
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	m "masterthesis"
+	m "github.com/mpiraux/master-thesis"
 	"flag"
 	"strings"
 )

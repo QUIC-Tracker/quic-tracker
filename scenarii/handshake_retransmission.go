@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "masterthesis"
+	m "github.com/mpiraux/master-thesis"
 	"time"
 	"github.com/davecgh/go-spew/spew"
 )

@@ -19,8 +19,8 @@ package main
 import (
 	"os"
 	"bufio"
-	m "masterthesis"
-	s "masterthesis/scenarii"
+	m "github.com/mpiraux/master-thesis"
+	s "github.com/mpiraux/master-thesis/scenarii"
 	"time"
 	"os/exec"
 	"encoding/json"

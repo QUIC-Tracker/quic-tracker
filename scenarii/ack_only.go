@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "masterthesis"
+	m "github.com/mpiraux/master-thesis"
 )
 
 const (

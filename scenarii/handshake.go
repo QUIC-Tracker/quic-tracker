@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "masterthesis"
+	m "github.com/mpiraux/master-thesis"
 	"fmt"
 )
 
@@ -81,7 +81,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
 			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
 			conn.TransitionTo(version, m.QuicALPNToken)
-			s.Run(conn, trace)
+			s.Run(conn, trace, debug)
 			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return
 		} else {

@@ -7,3 +7,4 @@ kazuhooku.com:4433
 msquic.westus.cloudapp.azure.com:4433
 fb.mvfst.net:4433
 pandora.cm.in.tum.de:4433
+quic.tech:4433

@@ -33,8 +33,6 @@ Long Header:
         neq: 0
   - Packet number:
       length: 32
-      values:
-        neq: 0
   - Payload:
       parse: Frame
 Short Header:

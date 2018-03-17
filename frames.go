@@ -160,7 +160,7 @@ func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationClo
 func (frame ApplicationCloseFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	binary.Write(buffer, binary.BigEndian, frame.reasonPhraseLength)
+	WriteVarInt(buffer, frame.reasonPhraseLength)
 	if frame.reasonPhraseLength > 0 {
 		buffer.Write([]byte(frame.reasonPhrase))
 	}
@@ -467,6 +467,9 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	if frame.Offset == stream.ReadOffset {
 		stream.ReadOffset += uint64(frame.Length)
 		stream.ReadData = append(stream.ReadData, frame.StreamData...)
+		if frame.FinBit {
+			stream.ReadClosed = frame.FinBit
+		}
 	}
 
 	return frame
@@ -482,5 +485,6 @@ func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *
 	frame.StreamData = data
 	stream.WriteOffset += uint64(frame.Length)
 	stream.WriteData = append(stream.WriteData, data...)
+	stream.WriteClosed = frame.FinBit
 	return frame
 }

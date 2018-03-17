@@ -44,21 +44,21 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, deb
 
 		if err != nil {
 			trace.ErrorCode = TP_HandshakeDidNotComplete
-			trace.Results["error"] = err
+			trace.Results["error"] = err.Error()
 			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
 			ongoingHandhake, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				trace.ErrorCode = TP_HandshakeDidNotComplete
-				trace.Results["error"] = err
+				trace.Results["error"] = err.Error()
 				return
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			err = conn.ProcessVersionNegotation(vn)
 			if err != nil {
 				trace.ErrorCode = TP_HandshakeDidNotComplete
-				trace.Results["error"] = err
+				trace.Results["error"] = err.Error()
 				return
 			}
 			conn.SendInitialPacket()

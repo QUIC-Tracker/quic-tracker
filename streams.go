@@ -22,4 +22,7 @@ type Stream struct {
 
 	ReadData  []byte
 	WriteData []byte
+
+	ReadClosed bool
+	WriteClosed bool
 }

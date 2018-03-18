@@ -241,7 +241,7 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 	sort.Sort(PacketNumberQueue(c.ackQueue))
 	packetNumbers := c.ackQueue
 	frame := new(AckFrame)
-	frame.ackBlocks = make([]AckBlock, 0, 255)
+	frame.AckBlocks = make([]AckBlock, 0, 255)
 	frame.LargestAcknowledged = packetNumbers[0]
 
 	previous := frame.LargestAcknowledged
@@ -250,14 +250,14 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 		if previous - number == 1 {
 			ackBlock.block++
 		} else {
-			frame.ackBlocks = append(frame.ackBlocks, ackBlock)
+			frame.AckBlocks = append(frame.AckBlocks, ackBlock)
 			ackBlock = AckBlock{previous - number - 1, 0}
 		}
 		previous = number
 	}
-	frame.ackBlocks = append(frame.ackBlocks, ackBlock)
-	if len(frame.ackBlocks) > 0 {
-		frame.ackBlockCount = uint64(len(frame.ackBlocks) - 1)
+	frame.AckBlocks = append(frame.AckBlocks, ackBlock)
+	if len(frame.AckBlocks) > 0 {
+		frame.AckBlockCount = uint64(len(frame.AckBlocks) - 1)
 	}
 	return frame
 }
@@ -316,15 +316,15 @@ func (c *Connection) CloseStream(streamId uint64) {
 		c.SendProtectedPacket(pkt)
 	}
 }
-func (c *Connection) SendHTTPGETRequest(url string) {
-	if _, ok := c.Streams[4]; !ok {
-		c.Streams[4] = new(Stream)
-	}
-	streamFrame := NewStreamFrame(4, c.Streams[4], []byte(fmt.Sprintf("GET %s\r\n",  url)), true)
+func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) *ProtectedPacket {
+	c.Streams[streamID] = new(Stream)
 
-	protectedPacket := NewProtectedPacket(c)
-	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
-	c.SendProtectedPacket(protectedPacket)
+	streamFrame := NewStreamFrame(streamID, c.Streams[streamID], []byte(fmt.Sprintf("GET %s\r\n", path)), true)
+
+	pp := NewProtectedPacket(c)
+	// open the streams
+	pp.Frames = append(pp.Frames, streamFrame)
+	return pp
 }
 func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)

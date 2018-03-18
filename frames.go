@@ -357,9 +357,9 @@ func NewPongFrame(buffer *bytes.Reader) *PongFrame {
 
 type AckFrame struct {
 	LargestAcknowledged uint64
-	ackDelay            uint64
-	ackBlockCount       uint64
-	ackBlocks           []AckBlock
+	AckDelay            uint64
+	AckBlockCount       uint64
+	AckBlocks           []AckBlock
 }
 type AckBlock struct {
 	gap uint64
@@ -369,9 +369,9 @@ func (frame AckFrame) FrameType() FrameType { return AckType }
 func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.LargestAcknowledged)
-	WriteVarInt(buffer, frame.ackDelay)
-	WriteVarInt(buffer, frame.ackBlockCount)
-	for i, ack := range frame.ackBlocks {
+	WriteVarInt(buffer, frame.AckDelay)
+	WriteVarInt(buffer, frame.AckBlockCount)
+	for i, ack := range frame.AckBlocks {
 		if i > 0 {
 			WriteVarInt(buffer, ack.gap)
 		}
@@ -383,28 +383,28 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	buffer.ReadByte()  // Discard frame byte
 
 	frame.LargestAcknowledged, _ = ReadVarInt(buffer)
-	frame.ackDelay, _ = ReadVarInt(buffer)
-	frame.ackBlockCount, _ = ReadVarInt(buffer)
+	frame.AckDelay, _ = ReadVarInt(buffer)
+	frame.AckBlockCount, _ = ReadVarInt(buffer)
 
 	firstBlock := AckBlock{}
 	firstBlock.block, _ = ReadVarInt(buffer)
-	frame.ackBlocks = append(frame.ackBlocks, firstBlock)
+	frame.AckBlocks = append(frame.AckBlocks, firstBlock)
 
 	var i uint64
-	for i = 0; i < frame.ackBlockCount; i++ {
+	for i = 0; i < frame.AckBlockCount; i++ {
 		ack := AckBlock{}
 		ack.gap, _ = ReadVarInt(buffer)
 		ack.block, _ = ReadVarInt(buffer)
-		frame.ackBlocks = append(frame.ackBlocks, ack)
+		frame.AckBlocks = append(frame.AckBlocks, ack)
 	}
 	return frame
 }
 func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 	frame := new(AckFrame)
 	frame.LargestAcknowledged = largestAcknowledged
-	frame.ackBlockCount = 0
-	frame.ackDelay = 0
-	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockCount})
+	frame.AckBlockCount = 0
+	frame.AckDelay = 0
+	frame.AckBlocks = append(frame.AckBlocks, AckBlock{0, ackBlockCount})
 	return frame
 }
 

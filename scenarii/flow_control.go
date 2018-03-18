@@ -25,14 +25,15 @@ const (
 	FC_HostSentMoreThanLimit       = 2
 	FC_HostDidNotResumeSending     = 3
 	FC_NotEnoughDataAvailable      = 4
-	FC_RespectedLimitsButNoBlocked = 5
+	FC_RespectedLimitsButNoBlocked = 5  // After discussing w/ the implementers, it is not reasonable to expect a STREAM_BLOCKED or a BLOCKED frame to be sent.
+										// These frames should be sent to signal poor window size w.r.t. to the RTT
 )
 
 type FlowControlScenario struct {
 	AbstractScenario
 }
 func NewFlowControlScenario() *FlowControlScenario {
-	return &FlowControlScenario{AbstractScenario{"flow_control", 1, false}}
+	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false}}
 }
 func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
@@ -46,24 +47,13 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 	conn.SendHTTPGETRequest("/index.html")
 
 	var shouldResume bool
-	var isBlocked bool
 
 	for {
 		packet, err, _ := conn.ReadNextPacket()
-		if shouldResume {
-			// TODO
-		}
+
 		if err != nil {
-			readOffset := conn.Streams[4].ReadOffset
-			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !isBlocked {
-				trace.ErrorCode = FC_RespectedLimitsButNoBlocked
-			} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) / 2 {
-				trace.ErrorCode = FC_HostDidNotResumeSending
-			} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
-				trace.ErrorCode = FC_NotEnoughDataAvailable
-			}
 			trace.Results["error"] = err.Error()
-			return
+			break
 		}
 
 		if conn.Streams[4].ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
@@ -80,12 +70,15 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 			for _, frame := range pp.Frames {
 				_, isGloballyBlocked := frame.(*m.BlockedFrame)
 				_, isStreamBlocked := frame.(*m.StreamBlockedFrame)
-				isBlocked = isGloballyBlocked || isStreamBlocked
-				if isBlocked {
+				if isGloballyBlocked || isStreamBlocked {
 					break
 				}
 			}
-			if isBlocked && !shouldResume {
+			readOffset := conn.Streams[4].ReadOffset
+			if conn.Streams[4].ReadClosed {
+				continue
+			}
+			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
 				maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
 				conn.TLSTPHandler.MaxData *= 2
 				maxStreamData := m.MaxStreamDataFrame{4,uint64(conn.TLSTPHandler.MaxStreamData * 2)}
@@ -96,6 +89,17 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 				shouldResume = true
 			}
 		}
+	}
+
+	readOffset := conn.Streams[4].ReadOffset
+	if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
+		trace.ErrorCode = 0
+	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) / 2 {
+		trace.ErrorCode = FC_HostDidNotResumeSending
+	} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
+		trace.ErrorCode = FC_NotEnoughDataAvailable
+	} else if readOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
+		trace.ErrorCode = FC_HostSentMoreThanLimit
 	}
 
 	conn.CloseConnection(false, 42, "")

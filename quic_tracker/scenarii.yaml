@@ -100,3 +100,10 @@ version_negotiation:
     2: VN_DidNotEchoVersion  # Not used anymore
     3: VN_LastTwoVersionsAreActuallySeal  # Not used anymore
     4: The host timed out before responding to version negotiation
+stream_opening_reordering:
+  name: Stream opening reordering
+  description: |
+    This tests opens a stream, performs an HTTP request and then close the stream through the sending of a RST_STREAM. The test specifically tests for support of reordering by sending first the packet containing the RST_STREAM frame and then the packet containing STREAM frame. The first packet sent will have a higher packet number than the second.
+  error_codes:
+    1: No version advertised by the host matched the versions of the test
+    2: The host did not answered to the <code>GET</code> request

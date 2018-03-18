@@ -58,6 +58,32 @@ handshake_v6:
     2: The TLS handshake failed
     3: No version advertised by the host matched the versions of the test
     4: The host timed out
+http_get_and_wait:
+  name: HTTP GET and then wait
+  description: |
+    This test performs an HTTP GET request on index.html, setting initial_max_stream_id_bidi and
+    initial_max_stream_id_uni to 0, then reads and acknowledges the answer, waits
+    10 more seconds, analyzing the received packets and reporting any unexpected behavior.
+  error_codes:
+    1: The TLS handshake failed
+    2: Received an empty Stream Frame with no FIN bit
+    3: Received a duplicated ACK frame
+    4: Received data on a forbidden Stream ID
+    5: The error could not be determined
+    6: The peer did not close the connection after its Idle Timeout
+    7: Multiple errors have been detected, see the details of the test
+    8: The test could not be performed
+    9: The peer didn't send the requested data on stream 4
+http_get_on_uni_stream:
+  name: HTTP GET on Stream 2
+  description: |
+    This test performs an HTTP GET request on index.html on Stream 2 and verifies that nothing is received on stream 2, analyzing the received packets and reporting any unexpected behavior.
+  error_codes:
+    1: The TLS handshake failed
+    2: The announced initial_max_stream_uni is too low
+    3: The peer sent data on Stream 2
+    4: Received data on a forbidden Stream ID
+    5: Answered to a query made on a forbidden Stream (a stream with an ID higher than initial_max_stream_id_uni)
 new_connection_id:
   name: New Connection ID
   description: |

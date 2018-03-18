@@ -58,6 +58,14 @@ handshake_v6:
     2: The TLS handshake failed
     3: No version advertised by the host matched the versions of the test
     4: The host timed out
+multi_stream:
+  name: Multiple streams
+  description: |
+    This test checks the support of using multiple streams. It will open the first bidirectional stream in a separate packet, then it will open up to 4 other streams together in a separate packet, depending on the <code>initial_max_stream_id_bidi</code> announced by the host. An HTTP request will be performed on each streams at opening. The test checks that all streams were closed whenever the connection times out.
+  error_codes:
+    1: The TLS handshake failed
+    2: No transport parameters were received
+    3: Not all opened streams were closed
 new_connection_id:
   name: New Connection ID
   description: |

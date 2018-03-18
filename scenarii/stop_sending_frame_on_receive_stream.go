@@ -43,9 +43,9 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	pp := m.NewProtectedPacket(conn)
 	// open the streams
 	pp.Frames = append(pp.Frames, streamFrame)
+	conn.SendProtectedPacket(pp)
 
 	stopSendingFrame := m.StopSendingFrame{StreamId: 10, ErrorCode: 42}
-	conn.SendProtectedPacket(pp)
 
 	pp = m.NewProtectedPacket(conn)
 	// send the STOP_SENDING
@@ -62,7 +62,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				} else {
 					trace.ErrorCode = SSRS_UnknownError
 				}
-				trace.Results["error"] = e
+				trace.Results["error"] = e.Error()
 			}
 			return
 		}

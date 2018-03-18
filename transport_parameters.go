@@ -111,12 +111,41 @@ func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exte
 		panic(hs)
 	}
 
-	body, err := syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion, TransportParameterList{
-		{InitialMaxStreamData, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamData)},
-		{InitialMaxData, Uint32ToBEBytes(h.QuicTransportParameters.MaxData)},
-		{InitialMaxStreamIdBidi, Uint32ToBEBytes(h.QuicTransportParameters.MaxStreamIdBidi)},
-		{IdleTimeout, Uint16ToBEBytes(h.QuicTransportParameters.IdleTimeout)},
-	}})
+	var parameters []TransportParameter
+	addParameter := func(parametersType TransportParametersType, value interface{}){
+		switch val := value.(type) {
+		case uint32:
+			if val == 0 {
+				return
+			}
+			parameters = append(parameters, TransportParameter{parametersType, Uint32ToBEBytes(val)})
+		case uint16:
+			if val == 0 {
+				return
+			}
+			parameters = append(parameters, TransportParameter{parametersType, Uint16ToBEBytes(val)})
+		case byte:
+			if val == 0 {
+				return
+			}
+			parameters = append(parameters, TransportParameter{parametersType, []byte{val}})
+		case bool:
+			if !val {
+				return
+			}
+			parameters = append(parameters, TransportParameter{parametersType, []byte{}})
+		default:
+			panic("the parameter value should be uint32, uint16, byte or bool")
+		}
+	}
+
+	addParameter(InitialMaxStreamData, h.QuicTransportParameters.MaxStreamData)
+	addParameter(InitialMaxData, h.QuicTransportParameters.MaxData)
+	addParameter(InitialMaxStreamIdBidi, h.QuicTransportParameters.MaxStreamIdBidi)
+	addParameter(InitialMaxStreamIdUni, h.QuicTransportParameters.MaxStreamIdUni)
+	addParameter(IdleTimeout, h.QuicTransportParameters.IdleTimeout)
+	body, err := syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion,
+																TransportParameterList(parameters)})
 
 	if err != nil {
 		return err

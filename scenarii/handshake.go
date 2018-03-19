@@ -73,7 +73,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 				}
 			}
 			if version == 0 {
-				trace.MarkError(H_NoCompatibleVersionAvailable, err.Error())
+				trace.MarkError(H_NoCompatibleVersionAvailable, "")
 				trace.Results["supported_versions"] = vn.SupportedVersions
 				return
 			}

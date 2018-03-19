@@ -44,7 +44,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, deb
 		trace.ErrorCode = VN_Timeout
 	} else {
 		if _, isVN := packet.(m.VersionNegotationPacket); isVN {
-			trace.ErrorCode = VN_NotAnsweringToVN
+			trace.MarkError(VN_NotAnsweringToVN, "")
 			trace.Results["received_packet_type"] = packet.Header().PacketType()
 		} else {
 			packet, _ := packet.(*m.VersionNegotationPacket)

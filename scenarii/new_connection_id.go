@@ -38,8 +38,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, debug 
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 
 	if err := CompleteHandshake(conn); err != nil {
-		trace.ErrorCode = NCI_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(NCI_TLSHandshakeFailed, err.Error())
 		return
 	}
 
@@ -57,7 +56,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, debug 
 
 		if expectingResponse {
 			if packet.Header().ConnectionId() != conn.ConnectionId {
-				trace.ErrorCode = NCI_HostDidNotAdaptCID
+				trace.MarkError(NCI_HostDidNotAdaptCID, "")
 			} else {
 				trace.ErrorCode = 0
 			}

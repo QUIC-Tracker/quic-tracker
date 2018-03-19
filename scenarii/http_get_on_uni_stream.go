@@ -49,8 +49,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 	conn.TLSTPHandler.MaxStreamIdUni = 3
 	if err := CompleteHandshake(conn); err != nil {
 		errors[GS2_TLSHandshakeFailed] = true
-		trace.ErrorCode = GS2_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(GS2_TLSHandshakeFailed, err.Error())
 		return
 	}
 
@@ -96,13 +95,13 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 				switch f2 := f.(type) {
 				case *m.StreamFrame:
 					if f2.StreamId == 2 {
-						trace.ErrorCode = GS2_ReceivedDataOnStream2
+						trace.MarkError(GS2_ReceivedDataOnStream2, "")
 						return
 					} else if f2.StreamId > 3 {
-						trace.ErrorCode = GS2_ReceivedDataOnUnauthorizedStream
+						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
 					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
 						// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
-						trace.ErrorCode = GS2_AnswersToARequestOnAForbiddenStreamID
+						trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
 						return
 					}
 					shouldBeAcked = true

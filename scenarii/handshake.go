@@ -62,8 +62,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 				trace.Results["negotiated_version"] = conn.Version
 				conn.CloseConnection(false, 42, "")
 			} else if err != nil {
-				trace.ErrorCode = H_TLSHandshakeFailed
-				trace.Results["tls_error"] = err.Error()
+				trace.MarkError(H_TLSHandshakeFailed, err.Error())
 				conn.CloseStream(0)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
@@ -74,7 +73,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 				}
 			}
 			if version == 0 {
-				trace.ErrorCode = H_NoCompatibleVersionAvailable
+				trace.MarkError(H_NoCompatibleVersionAvailable, err.Error())
 				trace.Results["supported_versions"] = vn.SupportedVersions
 				return
 			}
@@ -85,7 +84,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return
 		} else {
-			trace.ErrorCode = H_ReceivedUnexpectedPacketType
+			trace.MarkError(H_ReceivedUnexpectedPacketType, "")
 			trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
 			return
 		}

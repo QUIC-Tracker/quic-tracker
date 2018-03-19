@@ -43,28 +43,25 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, deb
 		packet, err, _ := conn.ReadNextPacket()
 
 		if err != nil {
-			trace.ErrorCode = TP_HandshakeDidNotComplete
-			trace.Results["error"] = err.Error()
+			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
 			ongoingHandhake, err = conn.ProcessServerHello(scp)
 			if err != nil {
-				trace.ErrorCode = TP_HandshakeDidNotComplete
-				trace.Results["error"] = err.Error()
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 				return
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			err = conn.ProcessVersionNegotation(vn)
 			if err != nil {
-				trace.ErrorCode = TP_HandshakeDidNotComplete
-				trace.Results["error"] = err.Error()
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 				return
 			}
 			conn.SendInitialPacket()
 		} else {
 			trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
-			trace.ErrorCode = TP_HandshakeDidNotComplete
+			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 			if debug {
 				spew.Dump(packet)
 			}

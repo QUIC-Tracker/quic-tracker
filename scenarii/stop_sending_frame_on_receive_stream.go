@@ -20,6 +20,7 @@ import (
 	m "github.com/mpiraux/master-thesis"
 	"net"
 	"fmt"
+	"github.com/cloudflare/cfssl/errors"
 )
 
 const (
@@ -40,13 +41,12 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
-		trace.ErrorCode = SSRS_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error())
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
-		trace.ErrorCode = SSRS_MaxStreamUniTooLow
+		trace.MarkError(SSRS_MaxStreamUniTooLow, "")
 		trace.Results["expected_max_stream_uni"] = ">= 2"
 		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni
 		return
@@ -75,7 +75,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				if e.Timeout() {
 					trace.ErrorCode = SSRS_DidNotCloseTheConnection
 				} else {
-					trace.ErrorCode = SSRS_UnknownError
+					trace.MarkError(SSRS_UnknownError, "")
 				}
 				trace.Results["error"] = e.Error()
 			}
@@ -87,7 +87,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				switch f2 := f.(type) {
 				case *m.ConnectionCloseFrame:
 					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
-						trace.ErrorCode = SSRS_CloseTheConnectionWithWrongError
+						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "")
 						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
 						return
 					}

@@ -29,13 +29,22 @@ type Trace struct {
 	Stream          []TracePacket          `json:"stream"`
 }
 
+func (t *Trace) MarkError(error uint8, message string) {
+	t.ErrorCode = error
+	t.Stream[len(t.Stream) - 1].IsOfInterest = true
+	if message != "" {
+		t.Results["error"] = message
+	}
+}
+
 type Direction string
 
 const ToServer Direction = "to_server"
 const ToClient Direction = "to_client"
 
 type TracePacket struct {
-	Direction Direction `json:"direction"`
-	Timestamp int64     `json:"timestamp"`
-	Data      []byte    `json:"data"`
+	Direction    Direction `json:"direction"`
+	Timestamp    int64     `json:"timestamp"`
+	Data         []byte    `json:"data"`
+	IsOfInterest bool	   `json:"is_of_interest"`
 }

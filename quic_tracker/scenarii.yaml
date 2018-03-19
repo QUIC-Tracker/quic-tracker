@@ -74,6 +74,7 @@ http_get_and_wait:
     7: Multiple errors have been detected, see the details of the test
     8: The test could not be performed
     9: The host didn't send the requested data on stream 4
+    10: The host responded on stream 4 despite advertising a smaller <code>initial_max_stream_id_bidi</code>
 http_get_on_uni_stream:
   name: HTTP GET on stream 2
   description: |

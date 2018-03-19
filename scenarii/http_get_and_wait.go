@@ -33,6 +33,7 @@ const (
 	SGW_MultipleErrors                  = 7
 	SGW_TooLowStreamIdBidiToSendRequest = 8
 	SGW_DidntReceiveTheRequestedData    = 9
+	SGW_AnsweredOnUnannouncedStream     = 10
 )
 
 type SimpleGetAndWaitScenario struct {
@@ -58,6 +59,11 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 			trace.ErrorCode = SGW_DidntReceiveTheRequestedData
 			trace.Results["error"] = message
 		}
+		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 4 {
+			errors[SGW_AnsweredOnUnannouncedStream] = true
+			message := fmt.Sprintf("the host sent data on stream 4 despite setting initial_max_stream_bidi to %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi)
+			errorMessages = append(errorMessages, message)
+		}
 		// end of the test, the connection has well been closed
 		if len(errors) > 1 {
 			trace.ErrorCode = SGW_MultipleErrors
@@ -66,18 +72,17 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 			trace.ErrorCode = 0
 		}
 	}()
+
 	conn.TLSTPHandler.MaxStreamIdBidi = 0
 	conn.TLSTPHandler.MaxStreamIdUni = 0
 	if err := CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
-		trace.ErrorCode = SGW_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(SGW_TLSHandshakeFailed, err.Error())
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 4 {
-		trace.ErrorCode = SGW_TooLowStreamIdBidiToSendRequest
-		trace.Results["error"] = fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi)
+		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi))
 	}
 
 	pp := conn.SendHTTPGETRequest("/index.html", 4)
@@ -134,8 +139,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 							errors[SGW_WrongStreamIDReceived] = true
 							message := fmt.Sprintf("received StreamID %d", f2.StreamId)
 							errorMessages = append(errorMessages, message)
-							trace.ErrorCode = SGW_WrongStreamIDReceived
-							trace.Results["error"] = message
+							trace.MarkError(SGW_WrongStreamIDReceived, "")
 						}
 					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
 						shouldBeAcked = true
@@ -146,8 +150,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 							errors[SGW_EmptyStreamFrameNoFinBit] = true
 							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
 							errorMessages = append(errorMessages, message)
-							trace.ErrorCode = SGW_EmptyStreamFrameNoFinBit
-							trace.Results["error"] = message
+							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message)
 						}
 					}
 				case *m.AckFrame:
@@ -166,10 +169,9 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 						if duplicated {
 							if _, ok := errors[SGW_RetransmittedAck]; !ok {
 								errors[SGW_RetransmittedAck] = true
-								message := append(errorMessages, fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber))
-								errorMessages = message
-								trace.ErrorCode = SGW_RetransmittedAck
-								trace.Results["error"] = message
+								message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
+								errorMessages = append(errorMessages, message)
+								trace.MarkError(SGW_RetransmittedAck, message)
 							}
 						} else {
 							// record the received ack blocks

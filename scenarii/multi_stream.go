@@ -43,13 +43,13 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 
 	allClosed := true
 	if err := CompleteHandshake(conn); err != nil {
-		trace.ErrorCode = MS_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(MS_TLSHandshakeFailed, err.Error())
 		return
 	}
 
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-		trace.ErrorCode = MS_NoTPReceived
+		trace.MarkError(MS_NoTPReceived, "")
+		return
 	}
 
 	sendGet(conn, 4, "/index.html")

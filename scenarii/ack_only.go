@@ -34,8 +34,7 @@ func NewAckOnlyScenario() *AckOnlyScenario {
 }
 func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
-		trace.ErrorCode = AO_TLSHandshakeFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(AO_TLSHandshakeFailed, err.Error())
 		return
 	}
 
@@ -64,7 +63,7 @@ testCase:
 				if ack, ok := frame.(*m.AckFrame); ok {
 					for _, ackOnlyPacket := range ackOnlyPackets {
 						if ack.LargestAcknowledged == ackOnlyPacket {
-							trace.ErrorCode = AO_SentAOInResponseOfAO
+							trace.MarkError(AO_SentAOInResponseOfAO, "")
 							break testCase
 						}
 					}

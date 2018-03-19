@@ -40,8 +40,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 
 	if vn, ok := packet.(*m.VersionNegotationPacket); packet != nil && ok {
 		if err := conn.ProcessVersionNegotation(vn); err != nil {
-			trace.ErrorCode = P_VNDidNotComplete
-			trace.Results["error"] = err.Error()
+			trace.MarkError(P_VNDidNotComplete, err.Error())
 			return
 		}
 		sendEmptyInitialPacket()
@@ -52,7 +51,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 			trace.Results["error"] = err.Error()
 			break
 		} else if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {  // TODO: Distinguish ACKs from other packets, see https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-9.1
-			trace.ErrorCode = P_ReceivedSmth
+			trace.MarkError(P_ReceivedSmth, "")
 			break
 		}
 

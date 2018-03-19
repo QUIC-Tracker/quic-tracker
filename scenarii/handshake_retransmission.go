@@ -63,8 +63,7 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 			arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.ErrorCode = HR_VNDidNotComplete
-				trace.Results["error"] = err.Error()
+				trace.MarkError(HR_VNDidNotComplete, err.Error())
 				return
 			}
 			conn.SendInitialPacket()

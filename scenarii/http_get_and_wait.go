@@ -1,3 +1,19 @@
+/*
+    Maxime Piraux's master's thesis
+    Copyright (C) 2017-2018  Maxime Piraux
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License version 3
+	as published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 package scenarii
 
 import (
@@ -135,8 +151,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 						}
 					}
 				case *m.AckFrame:
-					// FIXME: we compare a real packet number with a "relative" one
-					if f2.LargestAcknowledged == uint64(requestPacketNumber) {
+					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber & 0xffffffff00000000) | uint64(requestPacketNumber) {
 						duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
 
 						// check if we already receive these ack blocks

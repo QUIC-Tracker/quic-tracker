@@ -59,31 +59,31 @@ handshake_v6:
     3: No version advertised by the host matched the versions of the test
     4: The host timed out
 http_get_and_wait:
-  name: HTTP GET and then wait
+  name: HTTP GET
   description: |
-    This test performs an HTTP GET request on index.html, setting initial_max_stream_id_bidi and
-    initial_max_stream_id_uni to 0, then reads and acknowledges the answer, waits
+    This test performs an HTTP GET request, setting <code>initial_max_stream_id_bidi</code> and
+    <code>initial_max_stream_id_uni</code> to 0, then reads and acknowledges the answer, waits
     10 more seconds, analyzing the received packets and reporting any unexpected behavior.
   error_codes:
     1: The TLS handshake failed
-    2: Received an empty Stream Frame with no FIN bit
+    2: Received an empty stream Frame with no FIN bit
     3: Received a duplicated ACK frame
-    4: Received data on a forbidden Stream ID
+    4: Received data on a forbidden stream ID
     5: The error could not be determined
-    6: The peer did not close the connection after its Idle Timeout
+    6: The host did not close the connection after its Idle Timeout
     7: Multiple errors have been detected, see the details of the test
     8: The test could not be performed
-    9: The peer didn't send the requested data on stream 4
+    9: The host didn't send the requested data on stream 4
 http_get_on_uni_stream:
-  name: HTTP GET on Stream 2
+  name: HTTP GET on stream 2
   description: |
-    This test performs an HTTP GET request on index.html on Stream 2 and verifies that nothing is received on stream 2, analyzing the received packets and reporting any unexpected behavior.
+    This test performs an HTTP GET request on stream 2 and verifies that nothing is received on this stream. It analyzes the received packets and reports any unexpected behavior.
   error_codes:
     1: The TLS handshake failed
-    2: The announced initial_max_stream_uni is too low
-    3: The peer sent data on Stream 2
-    4: Received data on a forbidden Stream ID
-    5: Answered to a query made on a forbidden Stream (a stream with an ID higher than initial_max_stream_id_uni)
+    2: The host advertised a too low <code>initial_max_stream_id_uni</code> to perform the test
+    3: The host sent back data on stream 2
+    4: The host sent back data on a stream ID greater than the announced <code>initial_max_stream_id_uni</code>
+    5: Answered to a query made on a forbidden stream (a stream with an ID higher than initial_max_stream_id_uni)
 new_connection_id:
   name: New Connection ID
   description: |
@@ -103,12 +103,12 @@ padding:
 stop_sending_frame_on_receive_stream:
   name: STOP_SENDING frame on a receive stream
   description: |
-    This test sends a STOP_SENDING frame on the receive stream of the peer and verifies if it handles it correctly, i.e. closes the connection with a PROTOCOL_VIOLATION (0xA) error
+    This test sends a STOP_SENDING frame after an HTTP request on stream on the receive stream of the host and verifies if it handles it correctly, i.e. closing the connection with a <code>PROTOCOL_VIOLATION (0xa)</code> error.
   error_codes:
     1: The TLS handshake failed
-    2: The peer did not close the connection
-    3: The peer closed the connection but with the wrong error code
-    4: The peer advertised a too low max_stream_id_uni to perform the test
+    2: The host did not close the connection
+    3: The host closed the connection with the wrong error code
+    4: The host advertised a too low <code>initial_max_stream_id_uni</code> to perform the test
 transport_parameters:
   name: Transport Parameters
   description: |

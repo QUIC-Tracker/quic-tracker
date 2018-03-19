@@ -1,3 +1,19 @@
+/*
+    Maxime Piraux's master's thesis
+    Copyright (C) 2017-2018  Maxime Piraux
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License version 3
+	as published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 package scenarii
 
 import (
@@ -43,11 +59,8 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 		trace.Results["error"] = fmt.Sprintf("the remote initial_max_stream_id_uni is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni)
 	}
 
-
 	pp := conn.SendHTTPGETRequest("/index.html", 2)
 	conn.SendProtectedPacket(pp)
-
-
 
 	for i := 0 ; i < 50 ; i++ {
 		readPacket, err, _ := conn.ReadNextPacket()
@@ -61,7 +74,6 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 						trace.ErrorCode = SGW_DidNotCloseTheConnection
 						errors[SGW_DidNotCloseTheConnection] = true
 						message := fmt.Sprintf("the peer did not close the connection after waiting %d seconds", conn.TLSTPHandler.ReceivedParameters.IdleTimeout)
-						errorMessages = append(errorMessages, message)
 						trace.Results["error"] = message
 						errorMessages = append(errorMessages, message)
 					} else {

@@ -1,3 +1,19 @@
+/*
+    Maxime Piraux's master's thesis
+    Copyright (C) 2017-2018  Maxime Piraux
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License version 3
+	as published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 package scenarii
 
 import (
@@ -28,7 +44,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 		trace.Results["error"] = err.Error()
 		return
 	}
-	// We open all client streams up to 2
+
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
 		trace.ErrorCode = SSRS_MaxStreamUniTooLow
 		trace.Results["expected_max_stream_uni"] = ">= 2"
@@ -38,19 +54,18 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 
 	conn.Streams[2] = new(m.Stream)
 
-	streamFrame := m.NewStreamFrame(2, conn.Streams[2], []byte("GET /index.html\r\n"), false)
+	streamFrame := m.NewStreamFrame(2, conn.Streams[2], []byte("GET /index.html\r\n"), true)
 
 	pp := m.NewProtectedPacket(conn)
-	// open the streams
 	pp.Frames = append(pp.Frames, streamFrame)
 	conn.SendProtectedPacket(pp)
 
-	stopSendingFrame := m.StopSendingFrame{StreamId: 10, ErrorCode: 42}
+	stopSendingFrame := m.StopSendingFrame{StreamId: 2, ErrorCode: 42}
 
 	pp = m.NewProtectedPacket(conn)
-	// send the STOP_SENDING
 	pp.Frames = append(pp.Frames, stopSendingFrame)
 	conn.SendProtectedPacket(pp)
+
 	for i := 0; i < 30; i++ {
 		readPacket, err, _ := conn.ReadNextPacket()
 		if err != nil {
@@ -73,7 +88,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				case *m.ConnectionCloseFrame:
 					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
 						trace.ErrorCode = SSRS_CloseTheConnectionWithWrongError
-						trace.Results["session_close_returned_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
+						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
 						return
 					}
 					trace.ErrorCode = 0

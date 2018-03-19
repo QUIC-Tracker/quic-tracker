@@ -48,7 +48,7 @@ type Connection struct {
 	Streams              map[uint64]*Stream
 	ConnectionId         uint64
 	PacketNumber         uint64
-	expectedPacketNumber uint64
+	ExpectedPacketNumber uint64
 	Version              uint32
 	omitConnectionId     bool
 	ackQueue             []uint64  // Stores the packet numbers to be acked
@@ -221,7 +221,7 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 			panic(header.PacketType())
 		}
 
-		fullPacketNumber := (c.expectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+		fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 
 		for _, number := range c.ackQueue {
 			if number == fullPacketNumber  {
@@ -232,7 +232,7 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 			}
 		}
 		c.ackQueue = append(c.ackQueue, fullPacketNumber)
-		c.expectedPacketNumber = fullPacketNumber + 1
+		c.ExpectedPacketNumber = fullPacketNumber + 1
 	}
 
 	return packet, nil, rec

@@ -112,6 +112,8 @@ CONNECTION_CLOSE:
       triggers:
         - Reason Phrase:
             length: set
+  - Reason Phrase:
+      length: 0
   - next: Frame
 APPLICATION_CLOSE:
   - type: Frame

@@ -57,6 +57,8 @@ func main() {
 	commit := GitCommit()
 
 	scenarii := [...]s.Scenario{
+		s.NewStreamOpeningReorderingScenario(),
+		s.NewMultiStreamScenario(),
 		s.NewNewConnectionIDScenario(),
 		s.NewVersionNegotiationScenario(),
 		s.NewHandshakeScenario(),

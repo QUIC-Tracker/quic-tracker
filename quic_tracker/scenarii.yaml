@@ -84,6 +84,14 @@ http_get_on_uni_stream:
     3: The host sent back data on stream 2
     4: The host sent back data on a stream ID greater than the announced <code>initial_max_stream_id_uni</code>
     5: Answered to a query made on a forbidden stream (a stream with an ID higher than initial_max_stream_id_uni)
+multi_stream:
+  name: Multiple streams
+  description: |
+    This test checks the support of using multiple streams. It will open the first bidirectional stream in a separate packet, then it will open up to 4 other streams together in a separate packet, depending on the <code>initial_max_stream_id_bidi</code> announced by the host. An HTTP request will be performed on each streams at opening. The test checks that all streams were closed whenever the connection times out.
+  error_codes:
+    1: The TLS handshake failed
+    2: No transport parameters were received
+    3: Not all opened streams were closed
 new_connection_id:
   name: New Connection ID
   description: |
@@ -127,3 +135,10 @@ version_negotiation:
     2: VN_DidNotEchoVersion  # Not used anymore
     3: VN_LastTwoVersionsAreActuallySeal  # Not used anymore
     4: The host timed out before responding to version negotiation
+stream_opening_reordering:
+  name: Stream opening reordering
+  description: |
+    This tests opens a stream, performs an HTTP request and then close the stream through the sending of a RST_STREAM. The test specifically tests for support of reordering by sending first the packet containing the RST_STREAM frame and then the packet containing STREAM frame. The first packet sent will have a higher packet number than the second.
+  error_codes:
+    1: No version advertised by the host matched the versions of the test
+    2: The host did not answer to the <code>GET</code> request

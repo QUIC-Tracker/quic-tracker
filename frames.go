@@ -104,23 +104,23 @@ func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 }
 
 type ResetStream struct {
-	streamId    uint64
-	errorCode   uint16
-	finalOffset uint64
+	StreamId    uint64
+	ErrorCode   uint16
+	FinalOffset uint64
 }
 func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
 func (frame ResetStream) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.streamId)
-	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	WriteVarInt(buffer, frame.finalOffset)
+	WriteVarInt(buffer, frame.StreamId)
+	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
+	WriteVarInt(buffer, frame.FinalOffset)
 }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	buffer.ReadByte()  // Discard frame type
-	frame.streamId, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	frame.finalOffset, _ = ReadVarInt(buffer)
+	frame.StreamId, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
+	frame.FinalOffset, _ = ReadVarInt(buffer)
 	return frame
 }
 

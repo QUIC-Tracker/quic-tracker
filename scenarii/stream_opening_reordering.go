@@ -21,57 +21,58 @@ import (
 )
 
 const (
-	AO_TLSHandshakeFailed   = 1
-	AO_SentAOInResponseOfAO = 2
+	SOR_TLSHandshakeFailed = 1
+	SOR_HostDidNotRespond  = 2
 )
 
-type AckOnlyScenario struct {
+type StreamOpeningReorderingScenario struct {
 	AbstractScenario
 }
 
-func NewAckOnlyScenario() *AckOnlyScenario {
-	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
+func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
+	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 1, false}}
 }
-func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
-		trace.ErrorCode = AO_TLSHandshakeFailed
+		trace.ErrorCode = SOR_TLSHandshakeFailed
 		trace.Results["error"] = err.Error()
 		return
 	}
 
-	conn.SendHTTPGETRequest("/index.html", 2)
+	conn.Streams[4] = &m.Stream{}
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), true)
 
-	var ackOnlyPackets []uint64
+	pp1 := m.NewProtectedPacket(conn)
+	pp1.Frames = append(pp1.Frames, streamFrame)
 
-testCase:
+	pp2 := m.NewProtectedPacket(conn)
+	pp2.Frames = append(pp2.Frames, m.ResetStream{4, 0, streamFrame.Length})
+
+	conn.SendProtectedPacket(pp2)
+	conn.SendProtectedPacket(pp1)
+
 	for {
 		packet, err, _ := conn.ReadNextPacket()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
-			return
+			break
 		}
 
 		if packet.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
 			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 			conn.SendProtectedPacket(protectedPacket)
-			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
 		}
 
-		if pp, ok := packet.(*m.ProtectedPacket); ok && !packet.ShouldBeAcknowledged() {
-			for _, frame := range pp.Frames {
-				if ack, ok := frame.(*m.AckFrame); ok {
-					for _, ackOnlyPacket := range ackOnlyPackets {
-						if ack.LargestAcknowledged == ackOnlyPacket {
-							trace.ErrorCode = AO_SentAOInResponseOfAO
-							break testCase
-						}
-					}
-				}
-			}
+		if conn.Streams[4].ReadClosed {
+			break
 		}
 	}
 
-	conn.CloseConnection(false, 42, "")
+	conn.CloseConnection(false, 0, "")
+	if !conn.Streams[4].ReadClosed {
+		trace.ErrorCode = SOR_HostDidNotRespond
+	}
+
 }

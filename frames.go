@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"io"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"errors"
 )
 
@@ -461,8 +460,8 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 
 	stream, ok := conn.Streams[frame.StreamId]
 	if !ok {
-		spew.Dump(frame)
-		panic(frame)
+		stream = &Stream{}
+		conn.Streams[frame.StreamId] = stream
 	}
 	if frame.Offset == stream.ReadOffset {
 		stream.ReadOffset += uint64(frame.Length)

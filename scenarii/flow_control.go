@@ -43,7 +43,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 		return
 	}
 
-	conn.SendHTTPGETRequest("/index.html", 2)
+	conn.SendHTTPGETRequest("/index.html", 4)
 
 	var shouldResume bool
 

@@ -148,11 +148,11 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	case OneBytePacketNumber:
 		var number uint8
 		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = (uint32(conn.expectedPacketNumber) & 0xffffff00) | uint32(number)
+		h.packetNumber = (uint32(conn.ExpectedPacketNumber) & 0xffffff00) | uint32(number)
 	case TwoBytesPacketNumber:
 		var number uint16
 		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = (uint32(conn.expectedPacketNumber) & 0xffff0000) | uint32(number)
+		h.packetNumber = (uint32(conn.ExpectedPacketNumber) & 0xffff0000) | uint32(number)
 	case FourBytesPacketNumber:
 		binary.Read(buffer, binary.BigEndian, &h.packetNumber)
 	}

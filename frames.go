@@ -125,28 +125,28 @@ func NewResetStream(buffer *bytes.Reader) *ResetStream {
 }
 
 type ConnectionCloseFrame struct {
-	errorCode          uint16
-	reasonPhraseLength uint64
-	reasonPhrase       string
+	ErrorCode          uint16
+	ReasonPhraseLength uint64
+	ReasonPhrase       string
 }
 func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
 func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	binary.Write(buffer, binary.BigEndian, frame.errorCode)
-	WriteVarInt(buffer, frame.reasonPhraseLength)
-	if frame.reasonPhraseLength > 0 {
-		buffer.Write([]byte(frame.reasonPhrase))
+	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
+	WriteVarInt(buffer, frame.ReasonPhraseLength)
+	if frame.ReasonPhraseLength > 0 {
+		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	buffer.ReadByte()  // Discard frame type
-	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	frame.reasonPhraseLength, _ = ReadVarInt(buffer)
-	if frame.reasonPhraseLength > 0 {
-		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
+	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
+	frame.ReasonPhraseLength, _ = ReadVarInt(buffer)
+	if frame.ReasonPhraseLength > 0 {
+		reasonBytes := make([]byte, frame.ReasonPhraseLength, frame.ReasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
-		frame.reasonPhrase = string(reasonBytes)
+		frame.ReasonPhrase = string(reasonBytes)
 	}
 	return frame
 }
@@ -321,20 +321,20 @@ func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 }
 
 type StopSendingFrame struct {
-	streamId  uint64
-	errorCode uint16
+	StreamId  uint64
+	ErrorCode uint16
 }
 func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
 func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	WriteVarInt(buffer, frame.streamId)
-	binary.Write(buffer, binary.BigEndian, frame.errorCode)
+	WriteVarInt(buffer, frame.StreamId)
+	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
 }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.streamId, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
+	frame.StreamId, _ = ReadVarInt(buffer)
+	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
 	return frame
 }
 
@@ -357,9 +357,9 @@ func NewPongFrame(buffer *bytes.Reader) *PongFrame {
 
 type AckFrame struct {
 	LargestAcknowledged uint64
-	ackDelay            uint64
-	ackBlockCount       uint64
-	ackBlocks           []AckBlock
+	AckDelay            uint64
+	AckBlockCount       uint64
+	AckBlocks           []AckBlock
 }
 type AckBlock struct {
 	gap uint64
@@ -369,9 +369,9 @@ func (frame AckFrame) FrameType() FrameType { return AckType }
 func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.LargestAcknowledged)
-	WriteVarInt(buffer, frame.ackDelay)
-	WriteVarInt(buffer, frame.ackBlockCount)
-	for i, ack := range frame.ackBlocks {
+	WriteVarInt(buffer, frame.AckDelay)
+	WriteVarInt(buffer, frame.AckBlockCount)
+	for i, ack := range frame.AckBlocks {
 		if i > 0 {
 			WriteVarInt(buffer, ack.gap)
 		}
@@ -383,28 +383,28 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	buffer.ReadByte()  // Discard frame byte
 
 	frame.LargestAcknowledged, _ = ReadVarInt(buffer)
-	frame.ackDelay, _ = ReadVarInt(buffer)
-	frame.ackBlockCount, _ = ReadVarInt(buffer)
+	frame.AckDelay, _ = ReadVarInt(buffer)
+	frame.AckBlockCount, _ = ReadVarInt(buffer)
 
 	firstBlock := AckBlock{}
 	firstBlock.block, _ = ReadVarInt(buffer)
-	frame.ackBlocks = append(frame.ackBlocks, firstBlock)
+	frame.AckBlocks = append(frame.AckBlocks, firstBlock)
 
 	var i uint64
-	for i = 0; i < frame.ackBlockCount; i++ {
+	for i = 0; i < frame.AckBlockCount; i++ {
 		ack := AckBlock{}
 		ack.gap, _ = ReadVarInt(buffer)
 		ack.block, _ = ReadVarInt(buffer)
-		frame.ackBlocks = append(frame.ackBlocks, ack)
+		frame.AckBlocks = append(frame.AckBlocks, ack)
 	}
 	return frame
 }
 func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 	frame := new(AckFrame)
 	frame.LargestAcknowledged = largestAcknowledged
-	frame.ackBlockCount = 0
-	frame.ackDelay = 0
-	frame.ackBlocks = append(frame.ackBlocks, AckBlock{0, ackBlockCount})
+	frame.AckBlockCount = 0
+	frame.AckDelay = 0
+	frame.AckBlocks = append(frame.AckBlocks, AckBlock{0, ackBlockCount})
 	return frame
 }
 

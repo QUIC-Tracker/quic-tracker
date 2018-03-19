@@ -79,7 +79,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, debug 
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.ConnectionId = nci.ConnectionId
 						conn.PacketNumber += uint64(m.GetPacketGap(conn))
-						conn.SendHTTPGETRequest("/index.html")
+						conn.SendHTTPGETRequest("/index.html", 2)
 						expectingResponse = true
 					}
 				}

@@ -20,7 +20,6 @@ import (
 	m "github.com/mpiraux/master-thesis"
 	"net"
 	"fmt"
-	"github.com/cloudflare/cfssl/errors"
 )
 
 const (

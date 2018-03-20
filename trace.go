@@ -16,6 +16,10 @@
 */
 package masterthesis
 
+import (
+	"os/exec"
+)
+
 type Trace struct {
 	Commit          string                 `json:"commit"`
 	Scenario        string                 `json:"scenario"`
@@ -27,6 +31,24 @@ type Trace struct {
 	Duration        uint64                 `json:"duration"`
 	ErrorCode       uint8                  `json:"error_code"`
 	Stream          []TracePacket          `json:"stream"`
+	Pcap 			[]byte				   `json:"pcap"`
+}
+
+func (t *Trace) AddPcap(c *exec.Cmd) error {
+	content, err := StopPcapCapture(c)
+	if err != nil {
+		return err
+	}
+	t.Pcap = content
+	return err
+}
+
+func (t *Trace) MarkError(error uint8, message string) {
+	t.ErrorCode = error
+	t.Stream[len(t.Stream) - 1].IsOfInterest = true
+	if message != "" {
+		t.Results["error"] = message
+	}
 }
 
 func (t *Trace) MarkError(error uint8, message string) {

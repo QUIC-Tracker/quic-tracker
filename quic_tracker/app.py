@@ -17,10 +17,11 @@
 import os
 import re
 import json
+from base64 import b64decode
 from datetime import datetime
 
 import yaml
-from flask import Flask, jsonify, request, url_for, abort
+from flask import Flask, jsonify, request, url_for, abort, make_response
 from flask import redirect
 from flask.templating import render_template
 from sqlobject import LIKE
@@ -172,7 +173,22 @@ def dissector(traces_id, trace_idx):
         scenarii = yaml.load(f)
 
     trace = parse_trace(traces[trace_idx], protocol)
-    return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']])
+    return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']],
+                           pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None)
+
+
+@app.route('/traces/<int:traces_id>/<int:trace_idx>/pcap')
+def trace_pcap(traces_id, trace_idx):
+    traces = get_traces(traces_id)
+    if traces is None:
+        abort(404)
+
+    trace = traces[trace_idx]
+
+    response = make_response(b64decode(trace['pcap']))
+    response.headers.set('Content-Type', 'application/vnd.tcpdump.pcap')
+    response.headers.set('Content-Disposition', 'attachment', filename='{}_{}_{}.pcap'.format(traces_id, trace['scenario'], trace['host'][:trace['host'].rfind(':')]))
+    return response
 
 
 if __name__ == '__main__':

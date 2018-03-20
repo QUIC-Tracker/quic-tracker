@@ -31,18 +31,25 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	pcap, err := m.StartPcapCapture(conn)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {spew.Dump(m.StopPcapCapture(pcap))}()
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	for ongoingHandhake {
 		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
-			panic(err)
+			spew.Dump(err)
+			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
 			ongoingHandhake, err = conn.ProcessServerHello(scp)
 			if err != nil {
-				panic(err)
+				spew.Dump(err)
+				return
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err == nil {
@@ -54,7 +61,7 @@ func main() {
 			}
 		} else {
 			spew.Dump(packet)
-			panic(packet)
+			return
 		}
 	}
 
@@ -69,7 +76,8 @@ func main() {
 	for {
 		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
-			panic(err)
+			spew.Dump(err)
+			break
 		}
 
 		spew.Dump("---> Received packet")

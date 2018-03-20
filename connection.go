@@ -54,6 +54,7 @@ type Connection struct {
 	ackQueue             []uint64  // Stores the packet numbers to be acked
 
 	UseIPv6 bool
+	Host  *net.UDPAddr
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
@@ -352,6 +353,7 @@ func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Con
 
 	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
 	c.UseIPv6 = useIPv6
+	c.Host = udpAddr
 	return c, nil
 }
 

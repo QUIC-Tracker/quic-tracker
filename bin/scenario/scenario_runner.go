@@ -96,6 +96,8 @@ func main() {
 			}
 
 			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
+			pcap, err := m.StartPcapCapture(conn)
+
 			if err == nil {
 				conn.ReceivedPacketHandler = func(data []byte) {
 					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
@@ -112,6 +114,11 @@ func main() {
 			} else {
 				trace.ErrorCode = 255
 				trace.Results["udp_error"] = err
+			}
+
+			err = trace.AddPcap(pcap)
+			if err != nil {
+				trace.Results["pcap_error"] = err.Error()
 			}
 
 			results = append(results, trace)

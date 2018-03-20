@@ -51,14 +51,6 @@ func (t *Trace) MarkError(error uint8, message string) {
 	}
 }
 
-func (t *Trace) MarkError(error uint8, message string) {
-	t.ErrorCode = error
-	t.Stream[len(t.Stream) - 1].IsOfInterest = true
-	if message != "" {
-		t.Results["error"] = message
-	}
-}
-
 type Direction string
 
 const ToServer Direction = "to_server"

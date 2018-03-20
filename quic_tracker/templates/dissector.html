@@ -89,7 +89,7 @@
                         {% set start_timestamp = trace.stream[0].timestamp %}
                         {% for packet in trace.stream %}
                             <tr data-packet-number="{{ loop.index }}">
-                                <td>{{ loop.index }}</td>
+                                <td>{{ loop.index }} {{ '<i class="fa fa-exclamation-triangle" style="margin-left: 10px;"></i>'|safe if packet.is_of_interest else '' }}</td>
                                 <td>{{ packet.timestamp - start_timestamp }} ms</td>
                                 {% if packet.direction == 'to_server' %}
                                     <td><i class="fa fa-arrow-right"></i> sent to host</td>

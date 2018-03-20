@@ -84,7 +84,7 @@ http_get_on_uni_stream:
     2: The host advertised a too low <code>initial_max_stream_id_uni</code> to perform the test
     3: The host sent back data on stream 2
     4: The host sent back data on a stream ID greater than the announced <code>initial_max_stream_id_uni</code>
-    5: Answered to a query made on a forbidden stream (a stream with an ID higher than initial_max_stream_id_uni)
+    5: Answered to a query made on a forbidden stream, i.e. a stream with an ID higher than advertised <code>initial_max_stream_id_uni</code>
 multi_stream:
   name: Multiple streams
   description: |
@@ -127,6 +127,15 @@ transport_parameters:
     2: No transport parameters were received after version negation
     3: The handshake did not complete
     4: The host did not include some mandatory transport parameters
+unsupported_tls_version:
+  name: Unsupported TLS version
+  description: |
+    This tests asserts the correct behavior of the host when encountering an unsupported TLS version, i.e. closing the connection with error code <code>TLS_HANDSHAKE_FAILED (0x201)</code>.
+  error_codes:
+    1: The host did not close the connection
+    2: The host closed the connection with an incorrect error code
+    3: No version advertised by the host matched the versions of the test
+    4: The host sent a packet type that was not expected
 version_negotiation:
   name: Version Negotiation
   description: |

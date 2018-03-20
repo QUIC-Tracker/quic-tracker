@@ -105,46 +105,55 @@ func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, ver
 	return p
 }
 
-type InitialPacket struct {
-	abstractPacket
-	StreamFrames []StreamFrame
-	Padding      []PaddingFrame
+type Framer interface {
+	Packet
+	GetFrames() []Frame
 }
-func (p InitialPacket) ShouldBeAcknowledged() bool { return true }
-func (p InitialPacket) EncodePayload() []byte {
-	buffer := new(bytes.Buffer)
-	for _, frame := range p.StreamFrames {
-		frame.writeTo(buffer)
+type FramePacket struct {
+	abstractPacket
+	Frames []Frame
+}
+func (p FramePacket) GetFrames() []Frame {
+	return p.Frames
+}
+func (p FramePacket) ShouldBeAcknowledged() bool {
+	for _, frame := range p.Frames {
+		if _, ok :=  frame.(*AckFrame); !ok {
+			return true
+		}
 	}
-	for _, frame := range p.Padding {
+	return false
+}
+func (p FramePacket) EncodePayload() []byte {
+	buffer := new(bytes.Buffer)
+	for _, frame := range p.Frames {
 		frame.writeTo(buffer)
 	}
 	return buffer.Bytes()
+}
+
+type InitialPacket struct {
+	FramePacket
 }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)
 	for {
-		typeByte, err := buffer.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
+		frame, err := NewFrame(buffer, conn)
+		if err != nil {
+			spew.Dump(p)
 			panic(err)
 		}
-		buffer.UnreadByte()
-		if FrameType(typeByte) != PaddingFrameType {
-			p.StreamFrames = append(p.StreamFrames, *ReadStreamFrame(buffer, conn))
-		} else {
-			p.Padding = append(p.Padding, *NewPaddingFrame(buffer))
+		if frame == nil {
+			break
 		}
+		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }
-func NewInitialPacket(streamFrames []StreamFrame, padding []PaddingFrame, conn *Connection) *InitialPacket {
+func NewInitialPacket(conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = NewLongHeader(Initial, conn)
-	p.StreamFrames = streamFrames
-	p.Padding = padding
 	return p
 }
 
@@ -153,74 +162,32 @@ type RetryPacket struct {
 }
 
 type HandshakePacket struct {
-	abstractPacket
-	StreamFrames []StreamFrame
-	AckFrames    []AckFrame
-	Padding      []PaddingFrame
-}
-func (p HandshakePacket) ShouldBeAcknowledged() bool { return len(p.StreamFrames) + len(p.Padding) > 0 } // TODO: A padding only packet should be flagged somewhere
-func (p HandshakePacket) EncodePayload() []byte {
-	buffer := new(bytes.Buffer)
-	for _, frame := range p.StreamFrames {
-		frame.writeTo(buffer)
-	}
-	for _, frame := range p.AckFrames {
-		frame.writeTo(buffer)
-	}
-	for _, frame := range p.Padding {
-		frame.writeTo(buffer)
-	}
-	return buffer.Bytes()
+	FramePacket
 }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = ReadLongHeader(buffer)
 	for {
-		typeByte, err := buffer.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
+		frame, err := NewFrame(buffer, conn)
+		if err != nil {
+			spew.Dump(p)
 			panic(err)
 		}
-		buffer.UnreadByte()
-		switch {
-		case typeByte == 0x0e:
-			p.AckFrames = append(p.AckFrames, *ReadAckFrame(buffer))
-		case 0x10 <= typeByte && typeByte <= 0x17:
-			p.StreamFrames = append(p.StreamFrames, *ReadStreamFrame(buffer, conn))
-		default:
-			p.Padding = append(p.Padding, *NewPaddingFrame(buffer))
+		if frame == nil {
+			break
 		}
+		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }
-func NewHandshakePacket(streamFrames []StreamFrame, ackFrames []AckFrame, padding []PaddingFrame, conn *Connection) *HandshakePacket {
+func NewHandshakePacket(conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = NewLongHeader(Handshake, conn)
-	p.StreamFrames = streamFrames
-	p.AckFrames = ackFrames
-	p.Padding = padding
 	return p
 }
 
 type ProtectedPacket struct {
-	abstractPacket
-	Frames []Frame
-}
-func (p ProtectedPacket) ShouldBeAcknowledged() bool {
-	for _, frame := range p.Frames {
-		if _, ok :=  frame.(*AckFrame); !ok {
-			return true
-		}
-	}
-	return false
-}
-func (p ProtectedPacket) EncodePayload() []byte {
-	buffer := new(bytes.Buffer)
-	for _, frame := range p.Frames {
-		frame.writeTo(buffer)
-	}
-	return buffer.Bytes()
+	FramePacket
 }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)

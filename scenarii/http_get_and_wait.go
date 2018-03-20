@@ -189,7 +189,8 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 			}
 
 		default:
-			toSend := m.NewHandshakePacket(nil, []m.AckFrame{*conn.GetAckFrame()}, nil, conn)
+			toSend := m.NewHandshakePacket(conn)
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
 			conn.SendHandshakeProtectedPacket(toSend)
 		}
 

@@ -56,6 +56,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
 		trace.ErrorCode = GS2_TooLowStreamIdUniToSendRequest
 		trace.Results["error"] = fmt.Sprintf("the remote initial_max_stream_id_uni is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni)
+		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
 	}
 
 	conn.SendHTTPGETRequest("/index.html", 2)
@@ -113,7 +114,8 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 			}
 
 		default:
-			toSend := m.NewHandshakePacket(nil, []m.AckFrame{*conn.GetAckFrame()}, nil, conn)
+			toSend := m.NewHandshakePacket(conn)
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
 			conn.SendHandshakeProtectedPacket(toSend)
 		}
 

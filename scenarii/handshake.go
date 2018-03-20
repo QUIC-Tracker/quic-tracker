@@ -36,7 +36,7 @@ func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
-	conn.SendInitialPacket()
+	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandshake := true
 	defer func() {

@@ -25,11 +25,11 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 			initialLength = m.MinimumInitialLength
 		}
 
-		initialPacket := m.NewInitialPacket(make([]m.StreamFrame, 0, 1), make([]m.PaddingFrame, 0, initialLength), conn)
+		initialPacket := m.NewInitialPacket(conn)
 
 		paddingLength := initialLength - (m.LongHeaderSize + len(initialPacket.EncodePayload()) + conn.Cleartext.Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
-			initialPacket.Padding = append(initialPacket.Padding, *new(m.PaddingFrame))
+			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
 		}
 
 		conn.SendHandshakeProtectedPacket(initialPacket)

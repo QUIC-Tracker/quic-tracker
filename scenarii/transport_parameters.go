@@ -36,7 +36,7 @@ func NewTransportParameterScenario() *TransportParameterScenario {
 	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 2, false}}
 }
 func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
-	conn.SendInitialPacket()
+	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	for ongoingHandhake {
@@ -58,7 +58,7 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, deb
 				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 				return
 			}
-			conn.SendInitialPacket()
+			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 		} else {
 			trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
 			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())

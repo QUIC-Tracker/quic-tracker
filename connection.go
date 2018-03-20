@@ -84,7 +84,7 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.UdpConnection.Write(finalPacket)
 }
-func (c *Connection) SendInitialPacket() {
+func (c *Connection) GetInitialPacket() *InitialPacket {
 	c.tls.Handshake()
 	handshakeResult := c.tlsBuffer.getOutput()
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
@@ -96,21 +96,23 @@ func (c *Connection) SendInitialPacket() {
 		initialLength = MinimumInitialLength
 	}
 
-	initialPacket := NewInitialPacket(make([]StreamFrame, 0, 1), make([]PaddingFrame, 0, initialLength), c)
-	initialPacket.StreamFrames = append(initialPacket.StreamFrames, *handshakeFrame)
+	initialPacket := NewInitialPacket(c)
+	initialPacket.Frames = append(initialPacket.Frames, handshakeFrame)
 	paddingLength := initialLength - (LongHeaderSize + len(initialPacket.EncodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
-		initialPacket.Padding = append(initialPacket.Padding, *new(PaddingFrame))
+		initialPacket.Frames = append(initialPacket.Frames, new(PaddingFrame))
 	}
 
-	c.SendHandshakeProtectedPacket(initialPacket)
+	return initialPacket
 }
 func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
-	for _, frame := range packet.StreamFrames {
-		serverData = append(serverData, frame.StreamData...)
+	for _, frame := range packet.Frames {
+		if streamFrame, ok := frame.(*StreamFrame); ok {
+			serverData = append(serverData, streamFrame.StreamData...)
+		}
 	}
 
 	var clearTextPacket *HandshakePacket
@@ -132,13 +134,15 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 
 				outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
 
-				clearTextPacket = NewHandshakePacket([]StreamFrame{*outputFrame}, []AckFrame{*ackFrame}, nil, c)
+				clearTextPacket = NewHandshakePacket(c)
+				clearTextPacket.Frames = append(clearTextPacket.Frames, outputFrame, ackFrame)
 				defer c.SendHandshakeProtectedPacket(clearTextPacket)
 				return false, nil
 			}
 		case mint.AlertWouldBlock:
 			if packet.ShouldBeAcknowledged() {
-				clearTextPacket = NewHandshakePacket(nil, []AckFrame{*ackFrame}, nil, c)
+				clearTextPacket = NewHandshakePacket(c)
+				clearTextPacket.Frames = append(clearTextPacket.Frames, ackFrame)
 				defer c.SendHandshakeProtectedPacket(clearTextPacket)
 			}
 			return true, nil
@@ -307,8 +311,8 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 func (c *Connection) CloseStream(streamId uint64) {
 	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
 	if c.protected == nil {
-		pkt := NewHandshakePacket(nil, nil, nil, c)
-		pkt.StreamFrames = append(pkt.StreamFrames, frame)
+		pkt := NewHandshakePacket(c)
+		pkt.Frames = append(pkt.Frames, frame)
 		c.SendHandshakeProtectedPacket(pkt)
 	} else {
 		pkt := NewProtectedPacket(c)

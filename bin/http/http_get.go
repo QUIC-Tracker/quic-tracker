@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	conn.SendInitialPacket()
+	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	for ongoingHandhake {
@@ -46,7 +46,7 @@ func main() {
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err == nil {
-				conn.SendInitialPacket()
+				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 			} else {
 				println("No version in common with " + *address)
 				spew.Dump(vn)

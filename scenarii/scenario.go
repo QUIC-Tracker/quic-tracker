@@ -45,7 +45,7 @@ func (s *AbstractScenario) IPv6() bool {
 }
 
 func CompleteHandshake(conn *m.Connection) error {
-	conn.SendInitialPacket()
+	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	for ongoingHandhake {
@@ -63,7 +63,7 @@ func CompleteHandshake(conn *m.Connection) error {
 			if err != nil {
 				return err
 			}
-			conn.SendInitialPacket()
+			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 		} else {
 			defer spew.Dump(packet)
 			return errors.New("Received incorrect packet type during handshake")

@@ -174,7 +174,15 @@ def dissector(traces_id, trace_idx):
 
     trace = parse_trace(traces[trace_idx], protocol)
     return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']],
-                           pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None)
+                           pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None,
+                           decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'decrypted_pcap' in trace else None)
+
+
+def serve_trace(traces_id, trace, pcap):
+    response = make_response(b64decode(pcap))
+    response.headers.set('Content-Type', 'application/vnd.tcpdump.pcap')
+    response.headers.set('Content-Disposition', 'attachment', filename='{}_{}_{}.pcap'.format(traces_id, trace['scenario'], trace['host'][:trace['host'].rfind(':')]))
+    return response
 
 
 @app.route('/traces/<int:traces_id>/<int:trace_idx>/pcap')
@@ -183,12 +191,16 @@ def trace_pcap(traces_id, trace_idx):
     if traces is None:
         abort(404)
 
-    trace = traces[trace_idx]
+    return serve_trace(traces_id, traces[trace_idx], traces[trace_idx]['pcap'])
 
-    response = make_response(b64decode(trace['pcap']))
-    response.headers.set('Content-Type', 'application/vnd.tcpdump.pcap')
-    response.headers.set('Content-Disposition', 'attachment', filename='{}_{}_{}.pcap'.format(traces_id, trace['scenario'], trace['host'][:trace['host'].rfind(':')]))
-    return response
+
+@app.route('/traces/<int:traces_id>/<int:trace_idx>/decrypted_pcap')
+def trace_decrypted_pcap(traces_id, trace_idx):
+    traces = get_traces(traces_id)
+    if traces is None:
+        abort(404)
+
+    return serve_trace(traces_id, traces[trace_idx], traces[trace_idx]['decrypted_pcap'])
 
 
 if __name__ == '__main__':

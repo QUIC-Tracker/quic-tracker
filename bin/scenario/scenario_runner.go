@@ -111,14 +111,19 @@ func main() {
 				trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 				ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]
+				trace.StartedAt = start.Unix()
 			} else {
 				trace.ErrorCode = 255
-				trace.Results["udp_error"] = err
+				trace.Results["udp_error"] = err.Error()
 			}
 
 			err = trace.AddPcap(pcap)
 			if err != nil {
 				trace.Results["pcap_error"] = err.Error()
+			}
+			trace.DecryptedPcap, err = m.DecryptPcap(&trace)
+			if err != nil {
+				trace.Results["pcap_decrypt_error"] = err.Error()
 			}
 
 			results = append(results, trace)

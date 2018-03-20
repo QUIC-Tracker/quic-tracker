@@ -32,6 +32,7 @@ type Trace struct {
 	ErrorCode       uint8                  `json:"error_code"`
 	Stream          []TracePacket          `json:"stream"`
 	Pcap 			[]byte				   `json:"pcap"`
+	DecryptedPcap 	[]byte				   `json:"decrypted_pcap"`
 }
 
 func (t *Trace) AddPcap(c *exec.Cmd) error {

@@ -114,12 +114,16 @@
                     {% if pcap_link %}
                         <li><a href="{{ pcap_link }}">Download pcap file</a></li>
                     {% endif %}
+                    {% if decrypted_pcap_link %}
+                        <li><a href="{{ decrypted_pcap_link }}">Download decrypted pcap file</a></li>
+                    {% endif %}
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane active" id="results">
                         {% set t = trace.copy() %}
                         {% set _ = t.pop('stream') %}
                         {% set _ = t.pop('pcap') if 'pcap' in t else None %}
+                        {% set _ = t.pop('decrypted_pcap') if 'decrypted_pcap' in t else None %}
                         <pre style="font-size: 10px;"><code>{{ t|pretty_json }}</code></pre>
                         {{ print_test_error_code(trace.error_code, scenario) }}
                     </div>

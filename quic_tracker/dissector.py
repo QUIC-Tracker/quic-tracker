@@ -108,6 +108,7 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
                 for ret, inc in yield_structures(buffer, parse, protocol, start_idx + i):
                     structure.append((field, ret, start_idx + i, start_idx + i + inc))
                     i += inc
+                    buffer = buffer[inc:]
             continue
         elif length:
             if length == 'varint':

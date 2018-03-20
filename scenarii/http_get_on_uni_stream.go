@@ -58,8 +58,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 		trace.Results["error"] = fmt.Sprintf("the remote initial_max_stream_id_uni is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni)
 	}
 
-	pp := conn.SendHTTPGETRequest("/index.html", 2)
-	conn.SendProtectedPacket(pp)
+	conn.SendHTTPGETRequest("/index.html", 2)
 
 	for i := 0 ; i < 50 ; i++ {
 		readPacket, err, _ := conn.ReadNextPacket()
@@ -90,7 +89,6 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 
 		switch pp := readPacket.(type) {
 		case *m.ProtectedPacket:
-			shouldBeAcked := false
 			for _, f := range pp.Frames {
 				switch f2 := f.(type) {
 				case *m.StreamFrame:
@@ -104,12 +102,11 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 						trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
 						return
 					}
-					shouldBeAcked = true
 				case *m.ConnectionCloseFrame:
 					return
 				}
 			}
-			if shouldBeAcked {
+			if pp.ShouldBeAcknowledged() {
 				toSend := m.NewProtectedPacket(conn)
 				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
 				conn.SendProtectedPacket(toSend)

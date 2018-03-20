@@ -85,9 +85,8 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi))
 	}
 
-	pp := conn.SendHTTPGETRequest("/index.html", 4)
-	requestPacketNumber := pp.Header().PacketNumber()
-	conn.SendProtectedPacket(pp)
+	requestPacketNumber := conn.PacketNumber + 1
+	conn.SendHTTPGETRequest("/index.html", 4)
 
 	receivedStreamOffsets := map[uint64]map[uint64]bool{
 		0: make(map[uint64]bool),

@@ -316,15 +316,14 @@ func (c *Connection) CloseStream(streamId uint64) {
 		c.SendProtectedPacket(pkt)
 	}
 }
-func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) *ProtectedPacket {
+func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
 	c.Streams[streamID] = new(Stream)
 
 	streamFrame := NewStreamFrame(streamID, c.Streams[streamID], []byte(fmt.Sprintf("GET %s\r\n", path)), true)
 
 	pp := NewProtectedPacket(c)
-	// open the streams
 	pp.Frames = append(pp.Frames, streamFrame)
-	return pp
+	c.SendProtectedPacket(pp)
 }
 func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)

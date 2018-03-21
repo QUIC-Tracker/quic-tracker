@@ -121,7 +121,8 @@
         $(document).ready(function () {
             $('table').DataTable({
                 serverSide: true,
-                ajax: '{{ ajax_url|safe }}'
+                ajax: '{{ ajax_url|safe }}',
+                stateSave: true
             });
         })
     </script>

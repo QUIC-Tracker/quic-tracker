@@ -57,7 +57,7 @@
             $('tr[data-href]').click(function () {
                 window.location = this.getAttribute('data-href');
             });
-            $('table').DataTable();
+            $('table').DataTable({stateSave: true});
         });
     </script>
 {% endblock %}

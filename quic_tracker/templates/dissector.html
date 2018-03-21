@@ -172,7 +172,7 @@
                 $('.packet-' + packet_number).addClass('shown').show();
             });
 
-            $('table').DataTable();
+            $('table').DataTable({stateSave: true});
         });
     </script>
 {% endblock %}

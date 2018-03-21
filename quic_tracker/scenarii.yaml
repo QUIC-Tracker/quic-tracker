@@ -150,5 +150,5 @@ stream_opening_reordering:
   description: |
     This tests opens a stream, performs an HTTP request and then close the stream through the sending of a RST_STREAM. The test specifically tests for support of reordering by sending first the packet containing the RST_STREAM frame and then the packet containing STREAM frame. The first packet sent will have a higher packet number than the second.
   error_codes:
-    1: No version advertised by the host matched the versions of the test
+    1: The TLS handshake failed
     2: The host did not answer to the <code>GET</code> request

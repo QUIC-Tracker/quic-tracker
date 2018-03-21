@@ -96,9 +96,10 @@ func main() {
 			}
 
 			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
-			pcap, err := m.StartPcapCapture(conn)
 
 			if err == nil {
+				pcap, err := m.StartPcapCapture(conn)
+
 				conn.ReceivedPacketHandler = func(data []byte) {
 					trace.Stream = append(trace.Stream, m.TracePacket{Direction: m.ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
 				}
@@ -112,19 +113,20 @@ func main() {
 				ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]
 				trace.StartedAt = start.Unix()
+
+				err = trace.AddPcap(pcap)
+				if err != nil {
+					trace.Results["pcap_error"] = err.Error()
+				}
+				trace.DecryptedPcap, err = m.DecryptPcap(&trace)
+				if err != nil {
+					trace.Results["pcap_decrypt_error"] = err.Error()
+				}
 			} else {
 				trace.ErrorCode = 255
 				trace.Results["udp_error"] = err.Error()
 			}
 
-			err = trace.AddPcap(pcap)
-			if err != nil {
-				trace.Results["pcap_error"] = err.Error()
-			}
-			trace.DecryptedPcap, err = m.DecryptPcap(&trace)
-			if err != nil {
-				trace.Results["pcap_decrypt_error"] = err.Error()
-			}
 
 			results = append(results, trace)
 			if debug {

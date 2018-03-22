@@ -30,7 +30,7 @@ from sqlobject import sqlhub
 
 from quic_tracker.database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
 from quic_tracker.traces import get_example_trace, get_traces, parse_trace
-from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root
+from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root, find_data_files
 
 app = Flask(__name__)
 setup_database()
@@ -145,7 +145,12 @@ def results_data(d):
 
 @app.route('/traces')
 def test_suite():
-    return traces(int(os.path.splitext(find_latest_file('traces'))[0]))
+    idx = 0
+    while True:
+        try:
+            return traces(int(os.path.splitext(list(find_data_files('traces'))[idx])[0]))
+        except:
+            idx += 1
 
 
 @app.route('/traces/<int:traces_id>')

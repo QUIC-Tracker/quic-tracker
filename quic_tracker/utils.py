@@ -26,8 +26,12 @@ def join_root(*paths):
     return os.path.join(get_root_path(), *paths)
 
 
+def find_data_files(directory):
+    return filter(lambda s: s.replace('.json', '').isdigit(), sorted(os.listdir(join_root(directory)), reverse=True))
+
+
 def find_latest_file(directory):
-    return next(filter(lambda s: s.replace('.json', '').isdigit(), sorted(os.listdir(join_root(directory)), reverse=True)))
+    return next(find_data_files(directory))
 
 
 class ByteArrayEncoder(JSONEncoder):

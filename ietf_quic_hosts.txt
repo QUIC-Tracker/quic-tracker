@@ -10,3 +10,4 @@ pandora.cm.in.tum.de:4433
 quic.tech:4433
 208.85.208.226:4433
 test.privateoctopus.com:4433
+quicker.edm.uhasselt.be:4433

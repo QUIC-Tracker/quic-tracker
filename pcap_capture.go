@@ -33,18 +33,21 @@ func StopPcapCapture(c *exec.Cmd) ([]byte, error) {
 	time.Sleep(1 * time.Second)
 	c.Process.Signal(syscall.SIGTERM)
 	c.Wait()
-	ret, err := ioutil.ReadFile(pcapTempPath)
-	os.Remove(pcapTempPath)
-	return ret, err
+	defer os.Remove(pcapTempPath)
+	return ioutil.ReadFile(pcapTempPath)
 }
 
 func DecryptPcap(trace *Trace) ([]byte, error) {
 	EncryptionOverhead := 16
 
+	ioutil.WriteFile(pcapTempPath, trace.Pcap, os.ModePerm)
+
 	handle, err := pcap.OpenOffline(pcapTempPath)
 	if err != nil {
 		return nil, err
 	}
+	defer handle.Close()
+	defer os.Remove(pcapTempPath)
 
 	f, _ := os.Create(pcapDecryptTempPath)
 	defer f.Close()

@@ -66,7 +66,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	conn.SendProtectedPacket(pp)
 
 	for i := 0; i < 30; i++ {
-		readPacket, err, _ := conn.ReadNextPacket()
+		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
 			switch e := err.(type) {
 			case *net.OpError:
@@ -74,13 +74,20 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				if e.Timeout() {
 					trace.ErrorCode = SSRS_DidNotCloseTheConnection
 				} else {
-					trace.MarkError(SSRS_UnknownError, "")
+					trace.ErrorCode = SSRS_UnknownError
 				}
 				trace.Results["error"] = e.Error()
 			}
 			return
 		}
-		switch ppReadPacket := readPacket.(type) {
+
+		if packet.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
+		}
+
+		switch ppReadPacket := packet.(type) {
 		case *m.ProtectedPacket:
 			for _, f := range ppReadPacket.Frames {
 				switch f2 := f.(type) {
@@ -96,8 +103,9 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				}
 			}
 		default:
+			// TODO: Detect spurious retransmissions
 			// handshake packet: should not happen here
-			trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", readPacket.Header().PacketType(), readPacket)
+			// trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", packet.Header().PacketType(), packet)
 		}
 
 	}

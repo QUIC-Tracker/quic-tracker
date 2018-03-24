@@ -30,7 +30,7 @@ type StreamOpeningReorderingScenario struct {
 }
 
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
-	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 1, false}}
+	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
@@ -39,13 +39,12 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 	}
 
 	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), true)
 
 	pp1 := m.NewProtectedPacket(conn)
-	pp1.Frames = append(pp1.Frames, streamFrame)
+	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false))
 
 	pp2 := m.NewProtectedPacket(conn)
-	pp2.Frames = append(pp2.Frames, m.ResetStream{4, 0, streamFrame.Length})
+	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte{}, true))
 
 	conn.SendProtectedPacket(pp2)
 	conn.SendProtectedPacket(pp1)

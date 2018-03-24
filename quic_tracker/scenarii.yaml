@@ -148,7 +148,7 @@ version_negotiation:
 stream_opening_reordering:
   name: Stream opening reordering
   description: |
-    This tests opens a stream, performs an HTTP request and then close the stream through the sending of a RST_STREAM. The test specifically tests for support of reordering by sending first the packet containing the RST_STREAM frame and then the packet containing STREAM frame. The first packet sent will have a higher packet number than the second.
+    This tests opens a stream, performs an HTTP request and then close the stream through the sending of a separate STREAM frame with the FIN bit set. The test specifically tests for support of reordering by sending first the packet containing the FIN bit and then the packet containing the STREAM frame. The first packet sent will have a higher packet number than the second.
   error_codes:
     1: The TLS handshake failed
     2: The host did not answer to the <code>GET</code> request

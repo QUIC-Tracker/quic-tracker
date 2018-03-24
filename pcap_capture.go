@@ -33,7 +33,9 @@ func StopPcapCapture(c *exec.Cmd) ([]byte, error) {
 	time.Sleep(1 * time.Second)
 	c.Process.Signal(syscall.SIGTERM)
 	c.Wait()
-	return ioutil.ReadFile(pcapTempPath)
+	ret, err := ioutil.ReadFile(pcapTempPath)
+	os.Remove(pcapTempPath)
+	return ret, err
 }
 
 func DecryptPcap(trace *Trace) ([]byte, error) {

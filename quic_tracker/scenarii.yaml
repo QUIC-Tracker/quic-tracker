@@ -85,6 +85,7 @@ http_get_on_uni_stream:
     3: The host sent back data on stream 2
     4: The host sent back data on a stream ID greater than the announced <code>initial_max_stream_id_uni</code>
     5: Answered to a query made on a forbidden stream, i.e. a stream with an ID higher than advertised <code>initial_max_stream_id_uni</code>
+    6: The host advertised a too low <code>initial_max_stream_id_uni</code>, but it did not close the connection when stream 2 was opened
 multi_stream:
   name: Multiple streams
   description: |

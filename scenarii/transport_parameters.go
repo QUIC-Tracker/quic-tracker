@@ -35,7 +35,7 @@ type TransportParameterScenario struct {
 func NewTransportParameterScenario() *TransportParameterScenario {
 	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 2, false}}
 }
-func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true

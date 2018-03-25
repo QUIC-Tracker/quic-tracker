@@ -39,7 +39,7 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 	return &GetOnStream2Scenario{AbstractScenario{"http_get_on_uni_stream", 1, false}}
 }
 
-func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.Streams[3] = new(m.Stream)
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
@@ -53,7 +53,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, debug boo
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
 	}
 
-	conn.SendHTTPGETRequest("/index.html", 2)
+	conn.SendHTTPGETRequest(preferredUrl, 2)
 
 outerLoop:
 	for i := 0 ; i < 50 ; i++ {

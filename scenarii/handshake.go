@@ -35,7 +35,7 @@ type HandshakeScenario struct {
 func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
 }
-func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandshake := true
@@ -80,7 +80,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) 
 			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
 			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
 			conn.TransitionTo(version, m.QuicALPNToken)
-			s.Run(conn, trace, debug)
+			s.Run(conn, trace, preferredUrl, debug)
 			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 			return
 		} else {

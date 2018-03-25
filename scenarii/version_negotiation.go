@@ -35,7 +35,7 @@ type VersionNegotiationScenario struct {
 func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
 }
-func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.Version = ForceVersionNegotiation
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 	packet, err, _ := conn.ReadNextPacket()

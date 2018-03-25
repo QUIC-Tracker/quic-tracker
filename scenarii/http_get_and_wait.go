@@ -44,7 +44,7 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 	return &SimpleGetAndWaitScenario{AbstractScenario{"http_get_and_wait", 1, false}}
 }
 
-func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 
 	errors := make(map[uint]bool)
 	var errorMessages []string
@@ -86,7 +86,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, debug
 	}
 
 	requestPacketNumber := conn.PacketNumber + 1
-	conn.SendHTTPGETRequest("/index.html", 4)
+	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	receivedStreamOffsets := map[uint64]map[uint64]bool{
 		0: make(map[uint64]bool),

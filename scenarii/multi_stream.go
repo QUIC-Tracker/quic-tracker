@@ -37,7 +37,7 @@ type MultiStreamScenario struct {
 func NewMultiStreamScenario() *MultiStreamScenario {
 	return &MultiStreamScenario{AbstractScenario{"multi_stream", 1, false}}
 }
-func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.TLSTPHandler.MaxData = 1024 * 1024
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
 
@@ -52,14 +52,14 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 		return
 	}
 
-	sendGet(conn, 4, "/index.html")
+	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	protectedPacket := m.NewProtectedPacket(conn)
 	for i := uint64(8); i <= uint64(conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi - 4) && len(protectedPacket.Frames) < 4; i += 4 {
 		if _, ok := conn.Streams[i]; !ok {
 			conn.Streams[i] = new(m.Stream)
 		}
-		streamFrame := m.NewStreamFrame(i, conn.Streams[i], []byte("GET /index.html\r\n"), true)
+		streamFrame := m.NewStreamFrame(i, conn.Streams[i], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
 	}
 
@@ -101,15 +101,4 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 			trace.Results[fmt.Sprintf("stream_%d_rec_closed", streamId)] = stream.ReadClosed
 		}
 	}
-}
-
-func sendGet(conn *m.Connection, streamId uint64, url string) {
-	if _, ok := conn.Streams[streamId]; !ok {
-		conn.Streams[streamId] = new(m.Stream)
-	}
-	streamFrame := m.NewStreamFrame(streamId, conn.Streams[streamId], []byte(fmt.Sprintf("GET %s\r\n",  url)), true)
-
-	protectedPacket := m.NewProtectedPacket(conn)
-	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
-	conn.SendProtectedPacket(protectedPacket)
 }

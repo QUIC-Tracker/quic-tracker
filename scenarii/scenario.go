@@ -26,7 +26,7 @@ type Scenario interface {
 	Name() string
 	Version() int
 	IPv6() bool
-	Run(conn *m.Connection, trace *m.Trace, debug bool)
+	Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool)
 }
 
 type AbstractScenario struct {

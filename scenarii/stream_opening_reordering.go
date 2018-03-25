@@ -18,6 +18,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+	"fmt"
 )
 
 const (
@@ -32,7 +33,7 @@ type StreamOpeningReorderingScenario struct {
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
 }
-func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(SOR_TLSHandshakeFailed, "")
 		return
@@ -41,7 +42,7 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 	conn.Streams[4] = &m.Stream{}
 
 	pp1 := m.NewProtectedPacket(conn)
-	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false))
+	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
 
 	pp2 := m.NewProtectedPacket(conn)
 	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte{}, true))

@@ -81,18 +81,19 @@ func main() {
 		}
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			host := scanner.Text()
+			args := strings.Split(scanner.Text(), "\t")
+			host, preferredUrl := args[0], args[1]
 			if debug {
 				print(scenario.Name(), " ", host)
 			}
 
 			trace := m.Trace{
-				Scenario: scenario.Name(),
+				Scenario:        scenario.Name(),
 				ScenarioVersion: scenario.Version(),
-				Commit:    commit,
-				Host:      host,
-				StartedAt: time.Now().Unix(),
-				Results:   make(map[string]interface{}),
+				Commit:          commit,
+				Host:            host,
+				StartedAt:       time.Now().Unix(),
+				Results:         make(map[string]interface{}),
 			}
 
 			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
@@ -108,7 +109,7 @@ func main() {
 				}
 
 				start := time.Now()
-				scenario.Run(conn, &trace, debug)
+				scenario.Run(conn, &trace, preferredUrl, debug)
 				trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 				ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]

@@ -21,11 +21,13 @@ import (
 	m "github.com/mpiraux/master-thesis"
 	"flag"
 	"strings"
+	"fmt"
 )
 
 func main() {
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
+	url := flag.String("url", "/index.html", "The URL to request")
 	flag.Parse()
 	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], *useIPv6)
 	if err != nil {
@@ -66,7 +68,7 @@ func main() {
 	}
 
 	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte("GET /index.html\r\n"), false)
+	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)

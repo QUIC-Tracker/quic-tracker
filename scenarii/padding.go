@@ -16,7 +16,7 @@ type PaddingScenario struct {
 func NewPaddingScenario() *PaddingScenario {
 	return &PaddingScenario{AbstractScenario{"padding", 1, false}}
 }
-func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	sendEmptyInitialPacket := func() {
 		var initialLength int
 		if conn.UseIPv6 {

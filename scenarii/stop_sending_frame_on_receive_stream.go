@@ -38,7 +38,7 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 	return &StopSendingOnReceiveStreamScenario{AbstractScenario{"stop_sending_frame_on_receive_stream", 1, false}}
 }
 
-func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error())
 		return
@@ -51,17 +51,11 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 		return
 	}
 
-	conn.Streams[2] = new(m.Stream)
-
-	streamFrame := m.NewStreamFrame(2, conn.Streams[2], []byte("GET /index.html\r\n"), true)
-
-	pp := m.NewProtectedPacket(conn)
-	pp.Frames = append(pp.Frames, streamFrame)
-	conn.SendProtectedPacket(pp)
+	conn.SendHTTPGETRequest(preferredUrl, 2)
 
 	stopSendingFrame := m.StopSendingFrame{StreamId: 2, ErrorCode: 42}
 
-	pp = m.NewProtectedPacket(conn)
+	pp := m.NewProtectedPacket(conn)
 	pp.Frames = append(pp.Frames, stopSendingFrame)
 	conn.SendProtectedPacket(pp)
 

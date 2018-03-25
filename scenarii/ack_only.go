@@ -32,13 +32,13 @@ type AckOnlyScenario struct {
 func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
-func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(AO_TLSHandshakeFailed, err.Error())
 		return
 	}
 
-	conn.SendHTTPGETRequest("/index.html", 4)
+	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	var ackOnlyPackets []uint64
 

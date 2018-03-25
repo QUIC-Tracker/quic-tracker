@@ -35,7 +35,7 @@ type FlowControlScenario struct {
 func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false}}
 }
-func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool) {
+func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
 
 	if err := CompleteHandshake(conn); err != nil {
@@ -43,7 +43,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, debug bool
 		return
 	}
 
-	conn.SendHTTPGETRequest("/index.html", 4)
+	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	var shouldResume bool
 

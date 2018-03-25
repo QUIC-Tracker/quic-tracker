@@ -118,7 +118,9 @@ func (p FramePacket) GetFrames() []Frame {
 }
 func (p FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
-		if _, ok :=  frame.(*AckFrame); !ok {
+		switch frame.(type) {
+		case *AckFrame, *PaddingFrame:
+		default:
 			return true
 		}
 	}

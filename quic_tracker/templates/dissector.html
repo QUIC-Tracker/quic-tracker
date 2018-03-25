@@ -16,6 +16,14 @@
 #}
 {% extends 'base.html' %}
 {% block header %}
+    <div class="btn-group pull-right">
+        {% if previous %}
+            <a href="{{ previous }}" class="btn btn-default"><i class="fa fa-chevron-left"></i> Previous result</a>
+        {% endif %}
+        {% if next %}
+            <a href="{{ next }}" class="btn btn-default"><i class="fa fa-chevron-right"></i> Next result</a>
+        {% endif %}
+    </div>
     <h1>QUIC dissector</h1>
     <small>{{ trace.host }} - {{ scenario.name }} - {{ trace.started_at|timestamp }} CET</small>
 {% endblock %}

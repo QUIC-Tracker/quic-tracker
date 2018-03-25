@@ -26,12 +26,20 @@ def join_root(*paths):
     return os.path.join(get_root_path(), *paths)
 
 
-def find_data_files(directory):
-    return filter(lambda s: s.replace('.json', '').isdigit(), sorted(os.listdir(join_root(directory)), reverse=True))
+def find_data_files(directory, reverse=True):
+    return filter(lambda s: s.replace('.json', '').isdigit(), sorted(os.listdir(join_root(directory)), reverse=reverse))
 
 
 def find_latest_file(directory):
     return next(find_data_files(directory))
+
+
+def find_previous_file(id, directory):
+    return next(filter(lambda d: int(d.replace('.json', '')) < id, find_data_files(directory)), None)
+
+
+def find_next_file(id, directory):
+    return next(filter(lambda d: int(d.replace('.json', '')) > id, find_data_files(directory, reverse=False)), None)
 
 
 class ByteArrayEncoder(JSONEncoder):

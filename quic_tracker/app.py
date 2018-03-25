@@ -29,8 +29,9 @@ from sqlobject import OR
 from sqlobject import sqlhub
 
 from quic_tracker.database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
-from quic_tracker.traces import get_example_trace, get_traces, parse_trace
-from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root, find_data_files
+from quic_tracker.traces import get_example_trace, get_traces, parse_trace, find_similar_trace_idx
+from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root, find_data_files, \
+    find_previous_file, find_next_file
 
 app = Flask(__name__)
 setup_database()
@@ -178,9 +179,17 @@ def dissector(traces_id, trace_idx):
         scenarii = yaml.load(f)
 
     trace = parse_trace(traces[trace_idx], protocol)
+
+    previous_id = (find_previous_file(traces_id, 'traces') or '').replace('.json', '')
+    previous_trace_idx = find_similar_trace_idx(trace, get_traces(previous_id))
+    next_id = (find_next_file(traces_id, 'traces') or '').replace('.json', '')
+    next_trace_idx = find_similar_trace_idx(trace, get_traces(next_id))
+
     return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']],
                            pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None,
-                           decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'decrypted_pcap' in trace else None)
+                           decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'decrypted_pcap' in trace else None,
+                           previous=url_for('dissector', traces_id=previous_id, trace_idx=previous_trace_idx) if previous_trace_idx is not None else '',
+                           next=url_for('dissector', traces_id=next_id, trace_idx=next_trace_idx) if next_trace_idx is not None else '')
 
 
 def serve_trace(traces_id, trace, pcap):

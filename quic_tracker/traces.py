@@ -68,5 +68,11 @@ def get_traces(trace_id):
     with open(file_path) as f:
         return json.load(f)
 
+
+def find_similar_trace_idx(trace, traces):
+    for i, t in enumerate(traces or []):
+        if t['host'] == trace['host'] and t['scenario'] == trace['scenario']:
+            return i
+
 if __name__ == "__main__":
     print(get_example_trace())

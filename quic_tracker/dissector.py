@@ -19,6 +19,7 @@ from base64 import b64decode
 
 import itertools
 import yaml
+from copy import deepcopy
 from hexdump import hexdump
 
 packet = "/X2Vvy5oHiFm/wAACWBxbDoWAETEQvLzVywFokej+d/ZLabcAXliHotfW5fawFuIex6nPdH7I5AuQ6BkRrNKM1v7fHBQYlgYAc7d63nSmwsJA2NvCDTg2kNzuGBmQM2BOO0/k87LkYhT/GnX3f65ZEcJ08THZfAVluwhZFO4fsdBb6Lf5RBdD6tGiVeVjYKF2jcdBfHQZj/CJim7IzrSnApjcMfT8Ea8nNkm028dRQlBgui9cxfjREPctWHop1kXLanmAz9uSvqxmFc+ks/pdFUc13EAcvMeumCJetv5dXbYOWww6X1lek1qtCWZslf7ooYnjtMhz+vdEI5+9Kvfpcs7WAOIWqVIhymMNFb+KTCdJC9s3Hjt0fKDok9dYGBfm8UbFTqhwfsu0xK+GtWLpgBuW4G99Qo0jh6MrC2XYH7TytoK2rCuHZkI3BQhVFzYfCL+32Fi5u2fBdj7PvrHkZmtWVyzKua2fO6x+dibnFle7sjV1dix4VwJqQ1sYfEGejaHrzVTHGJH7neCfn+XiNez2HR44FkAFviD1SwgIiuxOa//nwikp9lXqn/soKlkuxcDAwEZC7qHRCJjIrogivWzpHFu345bOEVghVOJhHt6vz0abZ5B65PoV/25KNZbb/8r/CaDrcZScoyNjZsvUsT2Nkc7C3oL5ow42Ozn8jWw+v0R3W0peH7BNDlLyYv2gJQyiudkWvW+AYDlH6sd/g475/U2jh89+huo76bEvDMQuvDHAdF/ucTP9EHbsAu6eJ5R2dQdX2aUDay2O73GjYS85Cm2YVsbmYMKGr2CCUNhPmBHRSSDzOsQEUFVXSq0+Ui+w3JYVQN++MnKNSoTPd9Lv25gAcTX7WD2cfxT7aTMuXeLz1ATB0lXFgRZl6FDyhzdOsYLoNZDNx8EGMlY9F5277mZvyyeVKGHD1iEa1nEfHiqmognsY8hEPqH940XAwMANWJ2tiG4p5Ggh7cNBa8nICwddAdXW0tPulQ/yy05411QAgvRVNaVpawgCDorGUzFhcO5Pkim"
@@ -71,7 +72,7 @@ def parse_structure_type(buffer, type_name, protocol, start_idx):
     for struct_name, struct_description in structures:
         try:
             struct, inc, next_struct = parse_structure(buffer, struct_description, protocol, start_idx)
-            return (struct_name, struct), inc, next_struct
+            return (struct_name, struct, start_idx, start_idx + inc), inc, next_struct
         except ParseError as e:
             #print('%s: %s' % (struct_name, e))
             continue
@@ -86,10 +87,12 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
     previous_len = 0
     next_struct = None
 
-    for field, args in (list(d.items())[0] for d in structure_description):
+    structure_description = list(reversed(structure_description))
+    while structure_description and buffer:
+        field, args = list(structure_description.pop().items())[0]
         if field == 'next':
             next_struct = args
-            break
+            continue
         elif field == 'type':
             continue
 

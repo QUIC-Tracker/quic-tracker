@@ -27,7 +27,11 @@
             {% else %}
                 {{ name }}: {{ value[0] }}
                 <ul data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">
-                    {{ print_struct(value[1]) }}
+                    {% if value[0] != 'PADDING' %}
+                        {{ print_struct(value[1]) }}
+                    {% else %}
+                        <li data-start-offset="{{ s_idx }}" data-end-offset="{{ e_idx }}">Length: {{ value[1]|length }}</li>
+                    {% endif %}
                 </ul>
             {% endif %}
         </li>

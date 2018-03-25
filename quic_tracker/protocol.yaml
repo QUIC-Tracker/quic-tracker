@@ -87,6 +87,7 @@ PADDING:
   - Frame Type:
       length: 8
       values: 0x00
+      repeated:
   - next: Frame
 RST_STREAM:
   - type: Frame

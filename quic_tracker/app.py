@@ -180,10 +180,17 @@ def dissector(traces_id, trace_idx):
 
     trace = parse_trace(traces[trace_idx], protocol)
 
-    previous_id = (find_previous_file(traces_id, 'traces') or '').replace('.json', '')
-    previous_trace_idx = find_similar_trace_idx(trace, get_traces(previous_id))
-    next_id = (find_next_file(traces_id, 'traces') or '').replace('.json', '')
-    next_trace_idx = find_similar_trace_idx(trace, get_traces(next_id))
+    try:
+        previous_id = (find_previous_file(traces_id, 'traces') or '').replace('.json', '')
+        previous_trace_idx = find_similar_trace_idx(trace, get_traces(previous_id))
+    except:
+        previous_id, previous_trace_idx = None, None
+
+    try:
+        next_id = (find_next_file(traces_id, 'traces') or '').replace('.json', '')
+        next_trace_idx = find_similar_trace_idx(trace, get_traces(next_id))
+    except:
+        next_id, next_trace_idx = None, None
 
     return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']],
                            pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None,

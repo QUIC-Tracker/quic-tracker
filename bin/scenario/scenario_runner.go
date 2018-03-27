@@ -115,6 +115,8 @@ func main() {
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]
 				trace.StartedAt = start.Unix()
 
+				trace.ClientRandom = conn.ClientRandom
+				trace.ExporterSecret = conn.ExporterSecret
 				err = trace.AddPcap(pcap)
 				if err != nil {
 					trace.Results["pcap_error"] = err.Error()

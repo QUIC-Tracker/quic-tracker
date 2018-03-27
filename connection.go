@@ -53,8 +53,10 @@ type Connection struct {
 	omitConnectionId     bool
 	ackQueue             []uint64  // Stores the packet numbers to be acked
 
-	UseIPv6 bool
-	Host  *net.UDPAddr
+	UseIPv6        bool
+	Host           *net.UDPAddr
+	ClientRandom   []byte
+	ExporterSecret []byte
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
@@ -88,6 +90,8 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 func (c *Connection) GetInitialPacket() *InitialPacket {
 	c.tls.Handshake()
 	handshakeResult := c.tlsBuffer.getOutput()
+	c.ClientRandom = make([]byte, 32, 32)
+	copy(c.ClientRandom, handshakeResult[11:11+32])
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
 
 	var initialLength int
@@ -128,6 +132,9 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 			tlsOutput := c.tlsBuffer.getOutput()
 
 			state := c.tls.ConnectionState()
+			if c.tls.StateConnected().ExporterSecret() != nil {
+				c.ExporterSecret = c.tls.StateConnected().ExporterSecret()
+			}
 			if state.HandshakeState == mint.StateClientConnected {
 				// TODO: Check negotiated ALPN ?
 				c.cipherSuite = &state.CipherSuite

@@ -33,6 +33,8 @@ type Trace struct {
 	Stream          []TracePacket          `json:"stream"`
 	Pcap 			[]byte				   `json:"pcap"`
 	DecryptedPcap 	[]byte				   `json:"decrypted_pcap"`
+	ClientRandom    []byte				   `json:"client_random"`
+	ExporterSecret  []byte				   `json:"exporter_secret"`
 }
 
 func (t *Trace) AddPcap(c *exec.Cmd) error {

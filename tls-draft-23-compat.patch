@@ -1,5 +1,5 @@
 diff --git a/common.go b/common.go
-index 565d15e..93447fa 100644
+index 0fdba60..bc34a88 100644
 --- a/common.go
 +++ b/common.go
 @@ -6,7 +6,7 @@ import (
@@ -56,10 +56,19 @@ index 565d15e..93447fa 100644
  
  // enum {...} NamedGroup
 diff --git a/conn.go b/conn.go
-index 5345d52..28a575b 100644
+index 0ce05b2..79f0301 100644
 --- a/conn.go
 +++ b/conn.go
-@@ -377,6 +377,9 @@ func (c *Conn) consumeRecord() error {
+@@ -276,6 +276,8 @@ type Conn struct {
+ 	hsCtx      HandshakeContext
+ }
+ 
++func (conn *Conn) StateConnected() stateConnected {return conn.state}
++
+ func NewConn(conn net.Conn, config *Config, isClient bool) *Conn {
+ 	c := &Conn{conn: conn, config: config, isClient: isClient}
+ 	if !config.UseDTLS {
+@@ -377,6 +379,9 @@ func (c *Conn) consumeRecord() error {
  	case RecordTypeApplicationData:
  		c.readBuffer = append(c.readBuffer, pt.fragment...)
  		logf(logTypeIO, "extended buffer: [%d] %x", len(c.readBuffer), c.readBuffer)
@@ -106,3 +115,16 @@ index 761a868..dcf421e 100644
  		seq := cipher.seq
  		if r.datagram {
  			seq = header[3:11]
+diff --git a/state-machine.go b/state-machine.go
+index 7639c5f..3d44bda 100644
+--- a/state-machine.go
++++ b/state-machine.go
+@@ -104,6 +104,8 @@ func (state stateConnected) State() State {
+ 	return StateServerConnected
+ }
+ 
++func (state stateConnected) ExporterSecret() []byte {return state.exporterSecret}
++
+ func (state *stateConnected) KeyUpdate(request KeyUpdateRequest) ([]HandshakeAction, Alert) {
+ 	var trafficKeys keySet
+ 	if state.isClient {

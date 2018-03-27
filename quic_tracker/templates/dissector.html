@@ -123,12 +123,22 @@
                     <li class="active"><a href="#results" data-toggle="tab">Test results</a></li>
                     <li><a href="#description" data-toggle="tab">Test description</a></li>
                     <li><a href="https://github.com/mpiraux/master-thesis/blob/{{ trace.commit }}/scenarii/{{ trace.scenario }}.go" target="_blank">Go to test source code</a></li>
-                    {% if pcap_link %}
-                        <li><a href="{{ pcap_link }}">Download pcap file</a></li>
-                    {% endif %}
-                    {% if decrypted_pcap_link %}
-                        <li><a href="{{ decrypted_pcap_link }}">Download decrypted pcap file</a></li>
-                    {% endif %}
+                    <li class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+                            Download <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            {% if pcap_link %}
+                                <li><a href="{{ pcap_link }}">Download pcap file</a></li>
+                            {% endif %}
+                            {% if decrypted_pcap_link %}
+                                <li><a href="{{ decrypted_pcap_link }}">Download decrypted pcap file</a></li>
+                            {% endif %}
+                            {% if secrets_link %}
+                                <li><a href="{{ secrets_link }}">Download secrets file</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane active" id="results">

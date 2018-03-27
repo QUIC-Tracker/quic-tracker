@@ -196,7 +196,8 @@ def dissector(traces_id, trace_idx):
                            pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None,
                            decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'decrypted_pcap' in trace else None,
                            previous=url_for('dissector', traces_id=previous_id, trace_idx=previous_trace_idx) if previous_trace_idx is not None else '',
-                           next=url_for('dissector', traces_id=next_id, trace_idx=next_trace_idx) if next_trace_idx is not None else '')
+                           next=url_for('dissector', traces_id=next_id, trace_idx=next_trace_idx) if next_trace_idx is not None else '',
+                           secrets_link=url_for('trace_secrets', traces_id=traces_id, trace_idx=trace_idx) if trace.get('exporter_secret') else None)
 
 
 def serve_trace(traces_id, trace, pcap):
@@ -222,6 +223,20 @@ def trace_decrypted_pcap(traces_id, trace_idx):
         abort(404)
 
     return serve_trace(traces_id, traces[trace_idx], traces[trace_idx]['decrypted_pcap'])
+
+
+@app.route('/traces/<int:traces_id>/<int:trace_idx>/secrets')
+def trace_secrets(traces_id, trace_idx):
+    traces = get_traces(traces_id)
+    if traces is None:
+        abort(404)
+
+    trace = traces[trace_idx]
+    secret_log_file = 'EXPORTER_SECRET {} {}'.format(b64decode(trace['client_random']).hex(), b64decode(trace['exporter_secret']).hex())
+    response = make_response(secret_log_file)
+    response.headers.set('Content-type', 'text/plain')
+    response.headers.set('Content-Disposition', 'attachment', filename='{}_{}_{}.keys'.format(traces_id, trace['scenario'], trace['host'][:trace['host'].rfind(':')]))
+    return response
 
 
 if __name__ == '__main__':

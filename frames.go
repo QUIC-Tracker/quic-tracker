@@ -22,11 +22,13 @@ import (
 	"io"
 	"fmt"
 	"errors"
+	"time"
 )
 
 type Frame interface {
 	FrameType() FrameType
 	writeTo(buffer *bytes.Buffer)
+	shouldBeRetransmitted() bool
 }
 func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 	typeByte, err := buffer.ReadByte()
@@ -74,22 +76,24 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 }
 type FrameType uint8
 
-const PaddingFrameType FrameType = 0x00
-const ResetStreamType FrameType = 0x01
-const ConnectionCloseType FrameType = 0x02
-const ApplicationCloseType FrameType = 0x03
-const MaxDataType FrameType = 0x04
-const MaxStreamDataType FrameType = 0x05
-const MaxStreamIdType FrameType = 0x06
-const PingType FrameType = 0x07
-const BlockedType FrameType = 0x08
-const StreamBlockedType FrameType = 0x09
-const StreamIdBlockedType FrameType = 0x0a
-const NewConnectionIdType FrameType = 0x0b
-const StopSendingType FrameType = 0x0c
-const PongType FrameType = 0x0d
-const AckType FrameType = 0x0e
-const StreamType FrameType = 0x10
+const (
+	PaddingFrameType     FrameType = 0x00
+	ResetStreamType      FrameType = 0x01
+	ConnectionCloseType  FrameType = 0x02
+	ApplicationCloseType FrameType = 0x03
+	MaxDataType          FrameType = 0x04
+	MaxStreamDataType    FrameType = 0x05
+	MaxStreamIdType      FrameType = 0x06
+	PingType             FrameType = 0x07
+	BlockedType          FrameType = 0x08
+	StreamBlockedType    FrameType = 0x09
+	StreamIdBlockedType  FrameType = 0x0a
+	NewConnectionIdType  FrameType = 0x0b
+	StopSendingType      FrameType = 0x0c
+	PongType             FrameType = 0x0d
+	AckType              FrameType = 0x0e
+	StreamType           FrameType = 0x10
+)
 
 type PaddingFrame byte
 
@@ -97,6 +101,7 @@ func (frame PaddingFrame) FrameType() FrameType { return PaddingFrameType }
 func (frame PaddingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 }
+func (frame PaddingFrame) shouldBeRetransmitted() bool { return false }
 func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 	buffer.ReadByte()  // Discard frame payload
 	return new(PaddingFrame)
@@ -114,6 +119,7 @@ func (frame ResetStream) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
 	WriteVarInt(buffer, frame.FinalOffset)
 }
+func (frame ResetStream) shouldBeRetransmitted() bool { return true }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	buffer.ReadByte()  // Discard frame type
@@ -137,6 +143,7 @@ func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
 		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
+func (frame ConnectionCloseFrame) shouldBeRetransmitted() bool { return false }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -164,6 +171,7 @@ func (frame ApplicationCloseFrame) writeTo(buffer *bytes.Buffer) {
 		buffer.Write([]byte(frame.reasonPhrase))
 	}
 }
+func (frame ApplicationCloseFrame) shouldBeRetransmitted() bool { return false }
 func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 	frame := new(ApplicationCloseFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -186,6 +194,7 @@ func (frame MaxDataFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.MaximumData)
 }
+func (frame MaxDataFrame) shouldBeRetransmitted() bool { return true }
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -203,6 +212,7 @@ func (frame MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.MaximumStreamData)
 }
+func (frame MaxStreamDataFrame) shouldBeRetransmitted() bool { return true }
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -219,6 +229,7 @@ func (frame MaxStreamIdFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.maximumStreamId)
 }
+func (frame MaxStreamIdFrame) shouldBeRetransmitted() bool { return true }
 func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamIdFrame {
 	frame := new(MaxStreamIdFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -239,6 +250,7 @@ func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
 		buffer.Write(frame.data)
 	}
 }
+func (frame PingFrame) shouldBeRetransmitted() bool { return true }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 	frame := new(PingFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -258,6 +270,7 @@ func (frame BlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.offset)
 }
+func (frame BlockedFrame) shouldBeRetransmitted() bool { return true }
 func NewBlockedFrame(buffer *bytes.Reader) *BlockedFrame {
 	frame := new(BlockedFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -275,6 +288,7 @@ func (frame StreamBlockedFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, frame.streamId)
 	WriteVarInt(buffer, frame.offset)
 }
+func (frame StreamBlockedFrame) shouldBeRetransmitted() bool { return true }
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamBlockedFrame {
 	frame := new(StreamBlockedFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -291,6 +305,7 @@ func (frame StreamIdBlockedFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.streamId)
 }
+func (frame StreamIdBlockedFrame) shouldBeRetransmitted() bool { return true }
 func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdBlockedFrame {
 	frame := new(StreamIdBlockedFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -310,6 +325,7 @@ func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, frame.ConnectionId)
 	binary.Write(buffer, binary.BigEndian, frame.StatelessResetToken)
 }
+func (frame NewConnectionIdFrame) shouldBeRetransmitted() bool { return true }
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -329,6 +345,7 @@ func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, frame.StreamId)
 	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
 }
+func (frame StopSendingFrame) shouldBeRetransmitted() bool { return true }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -342,7 +359,7 @@ type PongFrame struct {
 }
 
 func (frame PongFrame) FrameType() FrameType { return PongType }
-
+func (frame PongFrame) shouldBeRetransmitted() bool { return false }
 func NewPongFrame(buffer *bytes.Reader) *PongFrame {
 	frame := new(PongFrame)
 	buffer.ReadByte()  // Discard frame type
@@ -365,6 +382,7 @@ type AckBlock struct {
 	block uint64
 }
 func (frame AckFrame) FrameType() FrameType { return AckType }
+func (frame AckFrame) shouldBeRetransmitted() bool { return false }
 func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
 	WriteVarInt(buffer, frame.LargestAcknowledged)
@@ -439,6 +457,7 @@ func (frame StreamFrame) writeTo(buffer *bytes.Buffer) {
 	}
 	buffer.Write(frame.StreamData)
 }
+func (frame StreamFrame) shouldBeRetransmitted() bool { return true }
 func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame := new(StreamFrame)
 	typeByte, _ := buffer.ReadByte()
@@ -487,3 +506,19 @@ func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *
 	stream.WriteClosed = frame.FinBit
 	return frame
 }
+
+type RetransmitBatch []RetransmittableFrames
+
+type RetransmittableFrames struct {
+	Frames    []Frame
+	Timestamp time.Time
+}
+func NewRetransmittableFrames(frames []Frame) *RetransmittableFrames {
+	r := new(RetransmittableFrames)
+	r.Frames = frames
+	r.Timestamp = time.Now()
+	return r
+}
+func (a RetransmitBatch) Less(i, j int) bool { return a[i].Timestamp.Before(a[j].Timestamp) }
+func (a RetransmitBatch) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a RetransmitBatch) Len() int           { return len(a) }

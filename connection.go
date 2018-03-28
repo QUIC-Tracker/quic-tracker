@@ -52,6 +52,8 @@ type Connection struct {
 	Version              uint32
 	omitConnectionId     bool
 	ackQueue             []uint64  // Stores the packet numbers to be acked
+	retransmissionBuffer map[uint64]RetransmittableFrames
+	RetransmissionTicker *time.Ticker
 
 	UseIPv6        bool
 	Host           *net.UDPAddr
@@ -65,10 +67,29 @@ func (c *Connection) nextPacketNumber() uint64 {
 	c.PacketNumber++
 	return c.PacketNumber
 }
+func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split in smaller packets if needed
+	sort.Sort(frames)
+	for _, f := range frames {
+		if c.protected != nil {
+			packet := NewProtectedPacket(c)
+			packet.Frames = f.Frames
+			c.SendProtectedPacket(packet)
+		} else {
+			packet := NewHandshakePacket(c)
+			packet.Frames = f.Frames
+			c.SendHandshakeProtectedPacket(packet)
+		}
+	}
+}
 func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
+
+	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
+		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+	}
+
 	header := packet.EncodeHeader()
 	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
@@ -80,6 +101,11 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
+
+	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
+		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+	}
+
 	header := packet.EncodeHeader()
 	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
@@ -245,6 +271,14 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 		}
 		c.ackQueue = append(c.ackQueue, fullPacketNumber)
 		c.ExpectedPacketNumber = fullPacketNumber + 1
+
+		if framePacket, ok := packet.(Framer); ok {
+			for _, f := range framePacket.GetFrames() {
+				if ack, ok := f.(*AckFrame); ok {
+					c.RetransmitFrames(c.ProcessAck(ack))
+				}
+			}
+		}
 	}
 
 	return packet, nil, rec
@@ -272,6 +306,29 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 		frame.AckBlockCount = uint64(len(frame.AckBlocks) - 1)
 	}
 	return frame
+}
+func (c *Connection) ProcessAck(ack *AckFrame) RetransmitBatch {
+	var frames RetransmitBatch
+	currentPacketNumber := ack.LargestAcknowledged
+	delete(c.retransmissionBuffer, currentPacketNumber)
+	for i := uint64(0); i < ack.AckBlocks[0].block; i++ {
+		currentPacketNumber--
+		delete(c.retransmissionBuffer, currentPacketNumber)
+	}
+	for _, ackBlock := range ack.AckBlocks[1:] {
+		for i := uint64(0); i <= ackBlock.gap; i++ {  // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
+			if f, ok := c.retransmissionBuffer[currentPacketNumber]; ok {
+				frames = append(frames, f)
+			}
+			currentPacketNumber--
+			delete(c.retransmissionBuffer, currentPacketNumber)
+		}
+		for i := uint64(0); i < ackBlock.block; i++ {
+			currentPacketNumber--
+			delete(c.retransmissionBuffer, currentPacketNumber)
+		}
+	}
+	return frames
 }
 func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.tlsBuffer = newConnBuffer()
@@ -371,6 +428,22 @@ func NewConnection(serverName string, version uint32, ALPN string, connectionId 
 	c.ConnectionId = connectionId
 	c.PacketNumber = c.ConnectionId & 0x7fffffff
 	c.omitConnectionId = false
+	c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
+
+	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
+
+	go func() {
+		for range c.RetransmissionTicker.C {
+			var frames RetransmitBatch
+			for k, v := range c.retransmissionBuffer {
+				if time.Now().Sub(v.Timestamp).Nanoseconds() > 500e6 {
+					frames = append(frames, v)
+					delete(c.retransmissionBuffer, k)
+				}
+			}
+			c.RetransmitFrames(frames)
+		}
+	}()
 
 	c.TransitionTo(version, ALPN)
 

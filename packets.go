@@ -108,6 +108,7 @@ func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, ver
 type Framer interface {
 	Packet
 	GetFrames() []Frame
+	GetRetransmittableFrames() []Frame
 }
 type FramePacket struct {
 	abstractPacket
@@ -115,6 +116,15 @@ type FramePacket struct {
 }
 func (p FramePacket) GetFrames() []Frame {
 	return p.Frames
+}
+func (p FramePacket) GetRetransmittableFrames() []Frame {
+	var frames []Frame
+	for _, frame := range p.Frames {
+		if frame.shouldBeRetransmitted() {
+			frames = append(frames, frame)
+		}
+	}
+	return frames
 }
 func (p FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {

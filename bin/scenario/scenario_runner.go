@@ -130,7 +130,7 @@ func main() {
 				trace.Results["udp_error"] = err.Error()
 			}
 
-
+			conn.RetransmissionTicker.Stop()
 			results = append(results, trace)
 			if debug {
 				println(" ", trace.ErrorCode)

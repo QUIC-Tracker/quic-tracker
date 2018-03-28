@@ -12,7 +12,6 @@ import (
 	"github.com/google/gopacket"
 	"encoding/binary"
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket/pcap"
 )
 
@@ -103,7 +102,7 @@ func getFirstPacketOfLen(packets []TracePacket, length int, blacklist map[int]bo
 		}
 	}
 
-	spew.Dump(len(packets), blacklist)
+	//spew.Dump(len(packets), blacklist)
 
 	return -1, nil
 }

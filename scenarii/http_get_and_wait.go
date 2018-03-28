@@ -125,7 +125,6 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 		switch pp := readPacket.(type) {
 		case *m.ProtectedPacket:
-			shouldBeAcked := false
 			for _, f := range pp.Frames {
 				switch f2 := f.(type) {
 				case *m.StreamFrame:
@@ -141,7 +140,6 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 							trace.MarkError(SGW_WrongStreamIDReceived, "")
 						}
 					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
-						shouldBeAcked = true
 						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
 					}
 					if f2.Length == 0 && !f2.FinBit {
@@ -182,7 +180,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 				}
 
 			}
-			if shouldBeAcked {
+			if pp.ShouldBeAcknowledged() {
 				toSend := m.NewProtectedPacket(conn)
 				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
 				conn.SendProtectedPacket(toSend)

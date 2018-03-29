@@ -223,6 +223,9 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	var packet Packet
 	if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
 		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+		for k := range c.retransmissionBuffer {
+			delete(c.retransmissionBuffer, k)
+		}
 		saveCleartext(rec)
 	} else {
 		switch header.PacketType() {

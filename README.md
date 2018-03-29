@@ -14,7 +14,7 @@ It is two-fold:
 
 The test suite comprises a minimal Go implementation of QUIC which is currently draft-09 and TLS-1.3-draft-23 compatible, as well as several test scenarii built upon this implementation. The test suite outputs its result as JSON files, which contains the result, the decrypted packets exchanged, as well as a pcap file and exporter secrets.
 
-You should have Go 1.9, libpcap libraries and header installed before starting.
+You should have Go 1.9, tcpdump, libpcap libraries and header installed before starting.
 
 ```
 go get github.com/mpiraux/master-thesis
@@ -40,6 +40,8 @@ The web application is a Python Flask application that presents the test results
 It is known to be working with Python 3.6, but it should be compatible with earlier Python 3 versions. It requires the following packages:
 
 `pip3 install flask pyyaml sqlobject`
+
+Fetch dependencies using `yarn install` in `quic_tracker/static`
 
 Start the application with:
 

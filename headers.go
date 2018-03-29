@@ -90,9 +90,9 @@ const (
 	Handshake        PacketType = 0x7d
 	ZeroRTTProtected PacketType = 0x7c
 
-	OneBytePacketNumber   PacketType = 0x1f
-	TwoBytesPacketNumber  PacketType = 0x1e
-	FourBytesPacketNumber PacketType = 0x1d
+	OneBytePacketNumber   PacketType = 0x0
+	TwoBytesPacketNumber  PacketType = 0x1
+	FourBytesPacketNumber PacketType = 0x2
 )
 
 type ShortHeader struct {
@@ -111,6 +111,7 @@ func (h ShortHeader) encode() []byte {
 	if h.keyPhase == KeyPhaseOne {
 		typeByte |= 0x20
 	}
+	typeByte |= 0x10
 	typeByte |= uint8(h.packetType)
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	if !h.omitConnectionIdFlag {
@@ -140,7 +141,10 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	typeByte, _ := buffer.ReadByte()
 	h.omitConnectionIdFlag = (typeByte & 0x40) == 0x40
 	h.keyPhase = (typeByte & 0x20) == 0x20
-	h.packetType = PacketType(typeByte & 0x1F)
+	if typeByte & 0x10 != 0x10 || typeByte & 0x8 != 0x8 {
+		println("SH fixed bits not respected")
+	}
+	h.packetType = PacketType(typeByte & 0x7)
 	if !h.omitConnectionIdFlag {
 		binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	}

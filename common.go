@@ -20,16 +20,16 @@ import (
 	"encoding/binary"
 )
 
-var QuicVersion uint32 = 0xff000009 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-09"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff00000a // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-10"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	LongHeaderSize         = 17
 	MaxUDPPayloadSize      = 65507
-	MinimumVersion         = 0xff000009
-	MaximumVersion         = 0xff000009
+	MinimumVersion         = 0xff000010
+	MaximumVersion         = 0xff000010
 )
 
 // errors

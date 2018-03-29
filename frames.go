@@ -68,6 +68,10 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 		return Frame(NewStopSendingFrame(buffer)), nil
 	case frameType == AckType:
 		return Frame(ReadAckFrame(buffer)), nil
+	case frameType == PathChallengeType:
+		return Frame(ReadPathChallenge(buffer)), nil
+	case frameType == PathResponseType:
+		return Frame(ReadPathResponse(buffer)), nil
 	case (frameType & StreamType) == StreamType && frameType <= 0x17:
 		return Frame(ReadStreamFrame(buffer, conn)), nil
 	default:
@@ -90,8 +94,9 @@ const (
 	StreamIdBlockedType  FrameType = 0x0a
 	NewConnectionIdType  FrameType = 0x0b
 	StopSendingType      FrameType = 0x0c
-	PongType             FrameType = 0x0d
-	AckType              FrameType = 0x0e
+	AckType              FrameType = 0x0d
+	PathChallengeType    FrameType = 0x0e
+	PathResponseType     FrameType = 0x0f
 	StreamType           FrameType = 0x10
 )
 
@@ -238,27 +243,15 @@ func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamIdFrame {
 }
 
 
-type PingFrame struct {
-	length uint8
-	data []byte
-}
+type PingFrame byte
 func (frame PingFrame) FrameType() FrameType { return PingType }
 func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	buffer.WriteByte(frame.length)
-	if frame.length > 0 {
-		buffer.Write(frame.data)
-	}
 }
 func (frame PingFrame) shouldBeRetransmitted() bool { return true }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 	frame := new(PingFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.length, _ = buffer.ReadByte()
-	if frame.length > 0 {
-		frame.data = make([]byte, frame.length, frame.length)
-		buffer.Read(frame.data)
-	}
 	return frame
 }
 
@@ -354,23 +347,6 @@ func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	return frame
 }
 
-type PongFrame struct {
-	PingFrame
-}
-
-func (frame PongFrame) FrameType() FrameType { return PongType }
-func (frame PongFrame) shouldBeRetransmitted() bool { return false }
-func NewPongFrame(buffer *bytes.Reader) *PongFrame {
-	frame := new(PongFrame)
-	buffer.ReadByte()  // Discard frame type
-	frame.length, _ = buffer.ReadByte()
-	if frame.length > 0 {
-		frame.data = make([]byte, frame.length, frame.length)
-		buffer.Read(frame.data)
-	}
-	return frame
-}
-
 type AckFrame struct {
 	LargestAcknowledged uint64
 	AckDelay            uint64
@@ -422,6 +398,43 @@ func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 	frame.AckBlockCount = 0
 	frame.AckDelay = 0
 	frame.AckBlocks = append(frame.AckBlocks, AckBlock{0, ackBlockCount})
+	return frame
+}
+
+type PathChallenge struct {
+	data [8]byte
+}
+func (frame PathChallenge) FrameType() FrameType { return PathChallengeType }
+func (frame PathChallenge) writeTo(buffer *bytes.Buffer) {
+	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	buffer.Write(frame.data[:])
+}
+func (frame PathChallenge) shouldBeRetransmitted() bool { return true }
+func ReadPathChallenge(buffer *bytes.Reader) *PathChallenge {
+	frame := new(PathChallenge)
+	buffer.ReadByte()  // Discard frame byte
+	buffer.Read(frame.data[:])
+	return frame
+}
+
+type PathResponse struct {
+	data [8]byte
+}
+func (frame PathResponse) FrameType() FrameType { return PathResponseType }
+func (frame PathResponse) writeTo(buffer *bytes.Buffer) {
+	binary.Write(buffer, binary.BigEndian, frame.FrameType())
+	buffer.Write(frame.data[:])
+}
+func (frame PathResponse) shouldBeRetransmitted() bool { return false }
+func ReadPathResponse(buffer *bytes.Reader) *PathResponse {
+	frame := new(PathResponse)
+	buffer.ReadByte()  // Discard frame byte
+	buffer.Read(frame.data[:])
+	return frame
+}
+func NewPathResponse(data [8]byte) *PathResponse {
+	frame := new(PathResponse)
+	frame.data = data
 	return frame
 }
 
@@ -512,6 +525,7 @@ type RetransmitBatch []RetransmittableFrames
 type RetransmittableFrames struct {
 	Frames    []Frame
 	Timestamp time.Time
+	IsInitial bool
 }
 func NewRetransmittableFrames(frames []Frame) *RetransmittableFrames {
 	r := new(RetransmittableFrames)

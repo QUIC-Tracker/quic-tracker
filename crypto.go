@@ -19,15 +19,18 @@ package masterthesis
 import (
 	"crypto/cipher"
 	"github.com/bifurcation/mint"
-	"encoding/hex"
 	"bytes"
 	"crypto"
 	"encoding/binary"
 )
 
+var quicVersionSalt = []byte {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.1
+	0x9c, 0x10, 0x8f, 0x98, 0x52, 0x0a, 0x5c, 0x5c,
+	0x32, 0x96, 0x8e, 0x95, 0x0e, 0x8a, 0x2c, 0x5f,
+	0xe0, 0x6d, 0x6c, 0x38,
+}
+
 const (
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.1
-	quicVersionSalt    = "afc824ec5fc77eca1e9d36f37fb2d46518c36639"
 	clientHSecretLabel = "client hs"
 	serverHSecretLabel = "server hs"
 
@@ -82,15 +85,11 @@ func newProtectedAead(secret []byte, cipherSuite *mint.CipherSuiteParams) cipher
 	return aead
 }
 func saltSecret(secret []byte, hash crypto.Hash) []byte {
-	salt, err := hex.DecodeString(quicVersionSalt)
-	if err != nil {
-		panic(err)
-	}
-	return mint.HkdfExtract(hash, salt, secret)
+	return mint.HkdfExtract(hash, quicVersionSalt, secret)
 }
 func qhkdfExpand(hash crypto.Hash, secret []byte, label string, length int) []byte {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.3
 	label = "QUIC " + label
-	info := string(length >> 8) + string(byte(length)) + string(len(label)) + label + string(0x00)
+	info := string(length >> 8) + string(byte(length)) + string(len(label)) + label
 	return mint.HkdfExpand(hash, secret, bytes.NewBufferString(info).Bytes(), length)
 }
 func GetPacketGap(conn *Connection) uint32 {

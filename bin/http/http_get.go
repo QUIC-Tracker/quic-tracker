@@ -67,6 +67,9 @@ func main() {
 		}
 	}
 
+	spew.Dump(conn.ClientRandom)
+	spew.Dump(conn.ExporterSecret)
+
 	conn.Streams[4] = &m.Stream{}
 	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
 	ackFrame := conn.GetAckFrame()

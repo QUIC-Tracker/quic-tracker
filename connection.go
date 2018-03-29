@@ -74,6 +74,10 @@ func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split 
 			packet := NewProtectedPacket(c)
 			packet.Frames = f.Frames
 			c.SendProtectedPacket(packet)
+		} else if f.IsInitial {
+			packet := NewInitialPacket(c)
+			packet.Frames = f.Frames
+			c.SendHandshakeProtectedPacket(packet)
 		} else {
 			packet := NewHandshakePacket(c)
 			packet.Frames = f.Frames
@@ -87,7 +91,10 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	}
 
 	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
-		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+		fullPacketNumber := (c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+		batch := NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+		_, batch.IsInitial = framePacket.(*InitialPacket)
+		c.retransmissionBuffer[fullPacketNumber] = *batch
 	}
 
 	header := packet.EncodeHeader()

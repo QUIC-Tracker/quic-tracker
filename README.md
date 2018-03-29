@@ -41,8 +41,10 @@ It is known to be working with Python 3.6, but it should be compatible with earl
 
 `pip3 install flask pyyaml sqlobject`
 
-Fetch dependencies using `yarn install` in `quic_tracker/static`
+Then 
 
-Start the application with:
+- Fetch web dependencies using `yarn install` in `quic_tracker/static`
 
-`PYTHONPATH=$PYTHONPATH:$PWD python3 quic_tracker/app.py`
+- Add the project root directory to `$PYTHONPATH` using `export PYTHONPATH=$PYTHONPATH:$PWD`
+
+- Start the application with `python3 quic_tracker/app.py`

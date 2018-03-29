@@ -16,12 +16,8 @@ The test suite comprises a minimal Go implementation of QUIC which is currently 
 
 You should have Go 1.9, libpcap libraries and header installed before starting.
 
-Go dependencies:
-
 ```
-go get github.com/bifurcation/mint
-go get github.com/google/gopacket
-go get github.com/davecgh/go-spew/spew
+go get github.com/mpiraux/master-thesis
 ```
 
 Apply the patch `tls-draft-23-compat.patch` to commit `30a67d8` of mint to add draft-23 compatibility and be able to export exporter secrets.

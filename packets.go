@@ -147,6 +147,9 @@ func (p FramePacket) EncodePayload() []byte {
 type InitialPacket struct {
 	FramePacket
 }
+func (p InitialPacket) GetRetransmittableFrames() []Frame {
+	return p.Frames
+}
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)

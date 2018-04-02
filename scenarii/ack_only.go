@@ -61,11 +61,9 @@ testCase:
 		if pp, ok := packet.(*m.ProtectedPacket); ok && !packet.ShouldBeAcknowledged() {
 			for _, frame := range pp.Frames {
 				if ack, ok := frame.(*m.AckFrame); ok {
-					for _, ackOnlyPacket := range ackOnlyPackets {
-						if ack.LargestAcknowledged == ackOnlyPacket {
-							trace.MarkError(AO_SentAOInResponseOfAO, "")
-							break testCase
-						}
+					if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
+						trace.MarkError(AO_SentAOInResponseOfAO, "")
+						break testCase
 					}
 				}
 			}
@@ -73,4 +71,21 @@ testCase:
 	}
 
 	conn.CloseConnection(false, 42, "")
+}
+
+
+func containsAll(a []uint64, b []uint64) bool { // Checks a \in b
+	for _, i := range a {
+		contains := false
+		for _, j := range b {
+			if i == j {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			return false
+		}
+	}
+	return true
 }

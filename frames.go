@@ -371,6 +371,27 @@ func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 		WriteVarInt(buffer, ack.block)
 	}
 }
+func (frame AckFrame) GetAckedPackets() []uint64 {
+	var packets []uint64
+
+	currentPacketNumber := frame.LargestAcknowledged
+	packets = append(packets, currentPacketNumber)
+	for i := uint64(0); i < frame.AckBlocks[0].block; i++ {
+		currentPacketNumber--
+		packets = append(packets, currentPacketNumber)
+	}
+	for _, ackBlock := range frame.AckBlocks[1:] {
+		for i := uint64(0); i <= ackBlock.gap; i++ {  // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
+			currentPacketNumber--
+			packets = append(packets, currentPacketNumber)
+		}
+		for i := uint64(0); i < ackBlock.block; i++ {
+			currentPacketNumber--
+			packets = append(packets, currentPacketNumber)
+		}
+	}
+	return packets
+}
 func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	frame := new(AckFrame)
 	buffer.ReadByte()  // Discard frame byte

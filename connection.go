@@ -87,7 +87,9 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	}
 
 	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
-		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+		if _, ok := framePacket.(*InitialPacket); !ok {  // Disable Initial retransmit until fixed
+			c.retransmissionBuffer[(c.PacketNumber&0xffffffff00000000)|uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+		}
 	}
 
 	header := packet.EncodeHeader()

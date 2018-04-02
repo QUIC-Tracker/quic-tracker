@@ -122,7 +122,7 @@ stop_sending_frame_on_receive_stream:
 transport_parameters:
   name: Transport Parameters
   description: |
-    This test records the transport parameters sent by the host during a successful handshake. It will perform version negotation if needed and will check if transport parameters are resent after its success.
+    This test records the transport parameters sent by the host during a successful handshake. It also sends 16 transport parameters reserved for private use. It will perform version negotation if needed and will check if transport parameters are resent after its success.
   error_codes:
     1: No transport parameters were received
     2: No transport parameters were received after version negation

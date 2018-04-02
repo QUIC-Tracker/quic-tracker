@@ -19,6 +19,7 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"github.com/davecgh/go-spew/spew"
+	"encoding/binary"
 )
 
 const (
@@ -33,9 +34,16 @@ type TransportParameterScenario struct {
 }
 
 func NewTransportParameterScenario() *TransportParameterScenario {
-	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 2, false}}
+	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 3, false}}
 }
 func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	for i := uint16(0xff00); i <= 0xff0f; i++ {
+		p := m.TransportParameter{ParameterType: m.TransportParametersType(i)}
+		p.Value = make([]byte, 2, 2)
+		binary.BigEndian.PutUint16(p.Value, i)
+		conn.TLSTPHandler.AdditionalParameters.AddParameter(p)
+	}
+
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true

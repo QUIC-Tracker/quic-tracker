@@ -38,16 +38,17 @@ const (
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
-	MaxStreamData       uint32
-	MaxData             uint32
-	MaxStreamIdBidi     uint32
-	MaxStreamIdUni      uint32
-	IdleTimeout         uint16
-	OmitConnectionId    bool
-	MaxPacketSize       uint16
-	StatelessResetToken []byte
-	AckDelayExponent    uint8
-	ToJSON              map[string]interface{}
+	MaxStreamData        uint32
+	MaxData              uint32
+	MaxStreamIdBidi      uint32
+	MaxStreamIdUni       uint32
+	IdleTimeout          uint16
+	OmitConnectionId     bool
+	MaxPacketSize        uint16
+	StatelessResetToken  []byte
+	AckDelayExponent     uint8
+	AdditionalParameters TransportParameterList
+	ToJSON               map[string]interface{}
 }
 
 type TransportParameter struct {
@@ -57,13 +58,17 @@ type TransportParameter struct {
 
 type TransportParameterList []TransportParameter
 
-func (list *TransportParameterList) getParameter(id TransportParametersType) []byte {
+func (list *TransportParameterList) GetParameter(id TransportParametersType) []byte {
 	for _, ex := range *list {
 		if ex.ParameterType == id {
 			return ex.Value
 		}
 	}
 	return nil
+}
+
+func (list *TransportParameterList) AddParameter(p TransportParameter) {
+	*list = append(*list, p)
 }
 
 type ClientHelloTransportParameters struct {
@@ -135,7 +140,7 @@ func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exte
 			}
 			parameters = append(parameters, TransportParameter{parametersType, []byte{}})
 		default:
-			panic("the parameter value should be uint32, uint16, byte or bool")
+			panic("the parameter value should be uint32, uint16, byte, bool or []byte")
 		}
 	}
 
@@ -144,6 +149,9 @@ func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exte
 	addParameter(InitialMaxStreamIdBidi, h.QuicTransportParameters.MaxStreamIdBidi)
 	addParameter(InitialMaxStreamIdUni, h.QuicTransportParameters.MaxStreamIdUni)
 	addParameter(IdleTimeout, h.QuicTransportParameters.IdleTimeout)
+	for _, p := range h.QuicTransportParameters.AdditionalParameters {
+		parameters = append(parameters, p)
+	}
 	body, err := syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion,
 																TransportParameterList(parameters)})
 
@@ -203,6 +211,9 @@ func (h *TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.E
 			case InitialMaxStreamIdUni:
 				receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint32(p.Value)
 				receivedParameters.ToJSON["initial_max_stream_id_uni"] = receivedParameters.MaxStreamIdUni
+			default:
+				receivedParameters.AdditionalParameters.AddParameter(p)
+				receivedParameters.ToJSON[string(p.ParameterType)] = p.Value
 			}
 		}
 

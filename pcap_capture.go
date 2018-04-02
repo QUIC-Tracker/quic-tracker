@@ -65,7 +65,7 @@ func DecryptPcap(trace *Trace) ([]byte, error) {
 		payload := l[len(l) - 1].LayerContents()
 
 		var length int
-		if binary.BigEndian.Uint32(payload[9:13]) == 0 {  // Dirty hack to detect VN
+		if len(payload) < 13 || binary.BigEndian.Uint32(payload[9:13]) == 0 {  // Dirty hack to detect VN
 			length = len(payload)
 		} else {
 			length = len(payload) - EncryptionOverhead

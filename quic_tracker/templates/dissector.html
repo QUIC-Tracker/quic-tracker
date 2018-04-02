@@ -47,7 +47,7 @@
 {% endmacro %}
 {% macro print_dissection(i, packet) %}
     {% set data = packet.data %}
-    {% set dissection = packet.dissection %}
+    {% set draft, dissection = packet.dissection %}
     <div class="row packet packet-{{ i }}">
         <div class="col-lg-6">
             <div class="box">
@@ -76,6 +76,7 @@
         <div class="col-lg-6">
             <div class="box">
                 <div class="box-body structure" style="word-wrap: break-word;">
+                    <span class="pull-right">Dissected using {{ draft }}</span>
                     <ul>{{ print_struct(dissection) }}</ul>
                 </div>
             </div>
@@ -94,6 +95,7 @@
                             <th>Time after test start</th>
                             <th>Direction</th>
                             <th>Packet type</th>
+                            <th>Packet number</th>
                             <th>Length</th>
                         </tr>
                         </thead>
@@ -109,6 +111,7 @@
                                     <td><i class="fa fa-arrow-left"></i> received by test</td>
                                 {% endif %}
                                 <td>{{ packet.type }}</td>
+                                <td>{{ packet.number|default('~') }}</td>
                                 <td>{{ packet.length }} bytes</td>
                             </tr>
                         {% endfor %}

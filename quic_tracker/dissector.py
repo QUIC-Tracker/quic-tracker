@@ -13,7 +13,7 @@
 #
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import os
 import struct
 from base64 import b64decode
 
@@ -29,20 +29,37 @@ packet6 = "iamoMsiMk9+qAAAAAAyT36v/AAAIGhoaGg=="
 packet7 = "/XJRewjLFQwZ/wAACQAAAAAQABYDAwB7AgAAdwMDoH5Lss803CeP61bMMZeuK/4vyTyupMZxUMrhBS9iGEMAEwEAAE8AKwACfxcAMwBFABcAQQSO2AM89bsvUVkpJ+qBwF1+Wrvt+3JoZ1MnPz4955sez5KYCPAkeU7Dsvu4Lu3VvwQaHf0pH9fuxMIisA92I/+AFwMDAFxa4m5YCBj7EEtsrayULufxaVRNsQzL9fy/rA5IwxNaWC0NXKLutM2upQxhygIQr6LygZKdQEdBlrrmrKiae1WFaaGoD1L3Vzwg8UosG6tIHFOK6C6euJla8NnJYBcDAwNcMR+lAWzEpBmYpS/Afkzo1GDzhno1UvhNQwURmCZs9AQeDvyhxTrsDVKw/fIoJnI8zuVMjskNztD4f51J46Ow6mzYyX09BMxhZrYTuB06MhLs5j+aEK/zHlVDVHtnc7mbo1TQvREbXS6sFOjm9Jt/7HtC8qfK4zjY8LIn/lmrjAQocg6/CwORPVnbRckE0Fdwsvj1XuEFoCaf3JPehu1vUsyxgh26aYoNDKAaI2gBsEYthYJURzVVrFlC3y2IFhjlRhoG7pLlrxU0sE/twwbaxwiwzpJ8tySzs8R0KBb4l7EEOC+Km9lg5d7KSkLVmf1ixzElVQurFguomoL9nkHaOfNnqfggFsNWRVfyR3ViDdLYiBRO3rN+BjXIuEdsERnhbT2WOYFoaeUhnqB09D9ccZD4YGE7MGKb5zk8xXJRCZaYArYh+D67FbRqDrm5qf9dzh6XoARc7M9bDMMOWJR4kJMbIFK3LLSDkALSA/O5cdh+TizVNk4fG2WQ+cS50WCHTxZhqogdHNu4oZcc7Z6quDxK43LKypz7u7EyQO0pM5zcJsqo5kdXXZ0UIRwHRsaV05ZcNISzbKqHwJOvpA0t+ESicxSxkEI1W+nKogvauAah+/y4HcEmub45k/NaybuKSX2+lTz+fOtpXcVpKvzmz2pNYCneZNzbxzcQ1NCOVfOrG+JfWf79J/FxHtmFh3hoU6Yl2uBxMhUd3+ULElKNxTMNbeI11QVjgAOkn7J+hGQ0Wy4KRBcZ4lo8U/WTmZ1QMO7kcho1cNRpkTpT1uZeiqhadJqrJ3LUXxh8cuqauX06t5VHxxWoY5CqrannuLTbqpULmGQeVz+ktDeM6u2OZywutJsDXLp+ajFohg3qjXIqib5lUHDipf1atn7tFQq5Wn3B5FMqtVAjva1NwBWp28V0e2ziUntasfqiYbDOjFnNUSMP7zEBM5SnTh7QN85iKKjf6PzTMGZvkVOZ2NzW4HJdQXb7Lo+5NI5j/s1WvodHEYl50UPqTKSOQkT1e5okkzyWPBmTFpzRAxb+p90InWBxeliOBdzj2yH8f8x14z2Bq/Bsg7hs9Lmnyomvm2tJ1jsN6CNjA7uI3vQ4gIGdqddXxisVdU8+VXT/CW0KvNko/TwJPKDbmDc1ySwXAwMBGV4az8HJkAppr8C5SqOzwZkFVAX8uq5oBOLFHuIMXhgXGWkH2vrLD9Wi312gyAg1CGwW3MdkgMUNNuHEU/Oj1uJtxHGLKFzmZAIoUUuvJtyhuhUfLbL/O/ozLtiYNg9BNO/rO4hFGcUH5qirD19xAkfzTv4aQ0cHehZ42OTxSZ2u5lgUXZH+7B5vcj6VbaufbCwIIBt4zw=="
 packet8 = "Hr4eek/c1Pohxs0CAAAnZmFpbGVkIHRyYW5zcG9ydCBwYXJhbWV0ZXIgdmVyaWZpY2F0aW9u"
 packet9 = "HZ72POB/B/2SOoB3JQ7AAAAAU3u0IwABAAECAQQAAAA="
+packet10 = '/YpfQ+hj7g3m/wAACivxmnEAAAAAAAAAABAAFgMDAHsCAAB3AwPymi36tGsMkZl8TH9thewJs3V8bVPzomNRctrs2GPX1QATAQAATwArAAJ/FwAzAEUAFwBBBIZDv8iyIaTS9Q4NHtvjXPmzA7KSFZlCU7Wx/Eabsp7nBkVYAvUgzjnbz2xridAbset6UGgqXR4uFOMc/DtOjYAXAwMAet4kHjX6ymXF61TT9CkDxvoHjG8GzgBM+i4l5oVzxI93QwbD9sHgI8Jc5NXdBuc/s+SqYtyXrsVQfs6EFUAP5be60nzQfjzl4NdFBIVG0atanozdWLFQmmYP6FXFr2OY+k2Pd34rBIgD5EmugMFcTPG52R7relGEn7wrFwMDA1LzbQ8s1KMXfSOAOwy+SAOo+qyuBsFM5uJjTxiCWBkuz+o04RIgeuIlwH0v0NFKNwX1REPtxLaf1VO8rAJDjyyFF0atuHTVPFVA0vYGuyEL3z75Nf06fKUJAeYxSyC1RfiyTqtA9jPmF8B6O/FBSuRM9dIS6L2+6zj7EvpuXtZQS8FE4SWTROQZyf+mK2ioM5Of88uSQBvE1Y2vr7WngabdvDAQyUqRcZiHgpH0PmsGqs1I2ld1PvmdFr5uzJ5B987CoTWWnXOjdE9JlO58PZMPXkuscn83uw1tw1kmeE4JreqXuRsiOxa5H/3j5Bi6wJol9djvCSoOgYGGYV/KV95BPfAYy7xJQ3MO9F3nqmdopEZ+X8CWjsnbIS9KQrrC/n8GVqpAROwW1bSzDoJ3cHqwMnVLD+n6kTp061L/ayj8Dw3d+ausNOKeww6ODY4m1pUb9aObiVflQs4b73beOZa3T1ndn7JybUDebnoSeONfgBI3kft3s2qyMgCG5hVFYPRE0cyADiF90aQzuyVDSzR1aOUKgxJACrPFHnVzUAIU3UE0+b/q6FwD1myad84hzELl0qhqhvsQVk5fou7ttR9cjI8TzTiuVmih7Vihxq1FPKChKyuk/cSLSC7Uzg5rqtNt3pCSbnUMrxhxpzQDk5meQ62L7/bPWjUvH8/GF2WfY1DKnHpctwCct7zUV6uL5fjQ56YlfFw/YVbAvd6XLJqgk0pEJ/boowVzTtvujzZTazaob9gIizzJo2SHHc+TW46C31HJQO9+ktqhxb61V21ikLracSFqso/gIS9Cpq9rYuirMLlnIT2KAWEPKos7E6GVfxz0YUSUnzHilv5eGINgkHy2IxIoH14t6Cr2MHW1Q7H4OoNvrpaqSKKTxxKKOzrAaKY7+s09tRptMT//q0lLFQDos/TKTO/crsb7bRezI9AmPWCEuPJ1L1JWc+zCfAP6o669QzS80mNriSXLcqdBXDSdtXjfz8A5iI1Y7UNxLyXBrLlT5CsRJoEF/aSykHPO8RyufrFLzB7q+IlJpEYR/n8oY+5v7ri+cVHV88+IxLxAJquZaFf16NBcICBcwaOKz9TbBEz5cl9+eLn/c062pRywbFCXWEcRNQrb8yFVboiwFwMDARlUZFQTxFRMl0rfoWBbbuRsX9LaVyD/GnXOYSd2fI4Ojb2pO+Tp8ggXL0EZP1Ryq6QxKOXzjzxvTbO8iIFQ8/D+Y8lxruJoDK6OZtc3XcnehtQt5qOIHAhB2AATFhXr'
 
 
 class ParseError(ValueError):
     pass
 
 
-def parse_packet(buffer, protocol):
+def parse_packet(buffer):
+    last_e = None
+    for p in sorted(os.listdir('protocol')):
+        with open(os.path.join('protocol', p)) as f:
+            try:
+                return p, parse_packet_with(buffer[:], protocol=yaml.load(f))
+            except Exception as e:
+                last_e = e
+                continue
+    raise last_e
+
+
+def parse_packet_with(buffer, protocol):
     top_level = protocol.pop('top')
+    last_e = None
     for top_struct in top_level:
         try:
-            ret, inc, _ = parse_structure(buffer, protocol[top_struct], protocol, 0)
+            ret, inc, _ = parse_structure(buffer[:], protocol[top_struct], protocol, 0)
             return [(top_struct, ('', ret, 0, inc), 0, inc)]
-        except ParseError:
+        except ParseError as e:
+            last_e = e
             pass
+    if last_e:
+        raise last_e
     return []
 
 
@@ -74,8 +91,7 @@ def parse_structure_type(buffer, type_name, protocol, start_idx):
         except ParseError as e:
             #print('%s: %s' % (struct_name, e))
             continue
-
-    return (None, []), 0, None
+    raise ParseError('No structure could be parsed for type {}'.format(type_name))
 
 
 def parse_structure(buffer, structure_description, protocol, start_idx):
@@ -84,6 +100,8 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
     i = 0
     previous_len = 0
     next_struct = None
+    repeating = False
+    successful_repeated = False
 
     structure_description = list(reversed(structure_description))
     while structure_description and buffer:
@@ -105,7 +123,7 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
         triggers = struct_triggers.get(field, {}).get('triggers', args.get('triggers'))
 
         if 'repeated' in args and len(buffer) >= length//4:
-            structure_description.append({field: args})
+            repeating = True
 
         if conditions:
             if not all(verify_condition(structure, field, formula) for c in conditions for field, formula in c.items()):
@@ -137,22 +155,27 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
                     if previous_len < 8:
                         length = previous_len + length
 
+            try:
+                if values is not None:
+                    if type(values) is dict:
+                        err = ParseError('Value %s for field %s does not fulfill conditions %s' % (str(val), str(field), str(values)))
+                        for op, v in values.items():
+                            if op == 'eq' and val != v:
+                                raise err
+                            elif op == 'neq' and val == v:
+                                raise err
+                    elif (type(values) is list and val not in values) or (type(values) is not list and val != values):
+                        raise ParseError('Value %s for field %s not acceptable (%s)' % (str(val), str(field), str(values)))
+            except ParseError:
+                if not (repeating and successful_repeated):
+                    raise
+                continue
+
             structure.append((field, val, start_idx + i, start_idx + i + (length//8 or 1)))
 
             if length >= 8:
                 buffer = buffer[length//8:]
                 i += length//8
-
-        if values is not None:
-            if type(values) is dict:
-                err = ParseError('Value %s for field %s does not fulfill conditions %s' % (str(val), str(field), str(values)))
-                for op, v in values.items():
-                    if op == 'eq' and val != v:
-                        raise err
-                    elif op == 'neq' and val == v:
-                        raise err
-            elif (type(values) is list and val not in values) or (type(values) is not list and val != values):
-                raise ParseError('Value %s for field %s not acceptable (%s)' % (str(val), str(field), str(values)))
 
         if triggers:
             for trigger_field, actions in itertools.chain.from_iterable(t.items() for t in triggers):
@@ -163,6 +186,10 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
                     elif type(action) is dict:
                         d[attribute] = action[val]
                     struct_triggers[trigger_field] = d
+
+        if repeating:
+            successful_repeated = True
+            structure_description.append({field: args})
 
         previous_len = length
 
@@ -198,15 +225,9 @@ def verify_condition(structure, field, formula):
     return False
 
 
-def get_example():
-    with open('protocol.yaml') as f:
-        protocol = yaml.load(f)
-    return parse_packet(bytearray(b64decode(packet5)), protocol)
-
-
 if __name__ == "__main__":
-    with open('protocol.yaml') as f:
+    with open('protocol/draft-10.yaml') as f:
         protocol = yaml.load(f)
     for _ in range(100000):
         pass
-    print(parse_packet(bytearray(b64decode(packet9)), protocol))
+    print(parse_packet_with(bytearray(b64decode(packet10)), protocol))

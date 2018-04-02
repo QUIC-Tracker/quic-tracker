@@ -29,7 +29,7 @@ from sqlobject import OR
 from sqlobject import sqlhub
 
 from quic_tracker.database import setup_database, SQLObjectThreadConnection, Result, load_result, Record, records_to_datatables_data
-from quic_tracker.traces import get_example_trace, get_traces, parse_trace, find_similar_trace_idx
+from quic_tracker.traces import get_traces, parse_trace, find_similar_trace_idx
 from quic_tracker.utils import find_latest_file, ByteArrayEncoder, is_tuple, decode, join_root, find_data_files, \
     find_previous_file, find_next_file
 
@@ -172,13 +172,10 @@ def dissector(traces_id, trace_idx):
     if traces is None:
         abort(404)
 
-    with open(join_root('protocol.yaml')) as f:
-        protocol = yaml.load(f)
-
     with open(join_root('scenarii.yaml')) as f:
         scenarii = yaml.load(f)
 
-    trace = parse_trace(traces[trace_idx], protocol)
+    trace = parse_trace(traces[trace_idx])
 
     try:
         previous_id = (find_previous_file(traces_id, 'traces') or '').replace('.json', '')

@@ -25,6 +25,7 @@ const (
 	VN_DidNotEchoVersion              = 2  // draft-07 and below were stating that VN packets should echo the version of the client. It is not used anymore
 	VN_LastTwoVersionsAreActuallySeal = 3  // draft-05 and below used AEAD to seal cleartext packets, VN packets should not be sealed, but some implementations did anyway.
 	VN_Timeout                        = 4
+	VN_UnusedFieldIsIdentical		  = 5  // See https://github.com/quicwg/base-drafts/issues/963
 )
 
 const ForceVersionNegotiation = 0x1a2a3a4a
@@ -36,19 +37,43 @@ func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
 }
 func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	handlePacket := func (packet m.Packet, err error) *m.VersionNegotationPacket {
+		if err != nil {
+			trace.ErrorCode = VN_Timeout
+			return nil
+		} else {
+			if _, isVN := packet.(m.VersionNegotationPacket); isVN {
+				trace.MarkError(VN_NotAnsweringToVN, "")
+				trace.Results["received_packet_type"] = packet.Header().PacketType()
+				return nil
+			} else {
+				packet, _ := packet.(*m.VersionNegotationPacket)
+				trace.Results["supported_versions"] = packet.SupportedVersions
+				return packet
+			}
+		}
+	}
+
+	conn.RetransmissionTicker.Stop()
 	conn.Version = ForceVersionNegotiation
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	initial := conn.GetInitialPacket()
+	conn.SendHandshakeProtectedPacket(initial)
 	packet, err, _ := conn.ReadNextPacket()
 
-	if err != nil {
-		trace.ErrorCode = VN_Timeout
-	} else {
-		if _, isVN := packet.(m.VersionNegotationPacket); isVN {
-			trace.MarkError(VN_NotAnsweringToVN, "")
-			trace.Results["received_packet_type"] = packet.Header().PacketType()
-		} else {
-			packet, _ := packet.(*m.VersionNegotationPacket)
-			trace.Results["supported_versions"] = packet.SupportedVersions
+	vn1 := handlePacket(packet, err)
+	if vn1 != nil {
+		conn.SendHandshakeProtectedPacket(initial)
+		packet, err, _ = conn.ReadNextPacket()
+		vn2 := handlePacket(packet, err)
+		if vn2 != nil && vn1.UnusedField == vn2.UnusedField {
+			conn.SendHandshakeProtectedPacket(initial)
+			packet, err, _ = conn.ReadNextPacket()
+			vn3 := handlePacket(packet, err)
+			if vn3 != nil && vn3.UnusedField != vn2.UnusedField {
+				trace.ErrorCode = 0
+			} else {
+				trace.ErrorCode = VN_UnusedFieldIsIdentical
+			}
 		}
 	}
 }

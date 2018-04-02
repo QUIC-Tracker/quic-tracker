@@ -140,12 +140,13 @@ unsupported_tls_version:
 version_negotiation:
   name: Version Negotiation
   description: |
-    This test will explicitly initiate a version negotiation process by setting the Initial packet version to <code>0x1a2a3a4a</code>. It will record the version negotiation advertised by the host if any
+    This test will explicitly initiate a version negotiation process by setting the Initial packet version to <code>0x1a2a3a4a</code>. It will record the version negotiation advertised by the host if any. If a Version Negotiation packet is received, other Initial will be sent to check the Unused fields received to be random.
   error_codes:
     1: The host sent a packet type that was not expected
     2: VN_DidNotEchoVersion  # Not used anymore
     3: VN_LastTwoVersionsAreActuallySeal  # Not used anymore
     4: The host timed out before responding to version negotiation
+    5: The host sent Version Negotiation packets with identical Unused field.
 stream_opening_reordering:
   name: Stream opening reordering
   description: |

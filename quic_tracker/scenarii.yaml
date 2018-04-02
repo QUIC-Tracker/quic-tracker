@@ -21,6 +21,14 @@ ack_only:
   error_codes:
     1: The handshake did not complete
     2: Host sent an ACK-only packet in response of an ACK-only packet
+connection_migration:
+  name: Connection Migration
+  description: |
+    This test performs and handshake and then replace its UDP connection with a new one, which will change the source port used to communicate with the host. It will open stream 4 to perform an HTTP/0.9 GET request and check if the host respond through this new connection.
+  error_codes:
+    1: The TLS handshake failed
+    2: Another UDP connection could not be established
+    3: The host did not respond through the new connection
 flow_control:
   name: Flow control
   description: |

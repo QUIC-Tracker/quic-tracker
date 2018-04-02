@@ -399,6 +399,14 @@ func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
 	pp.Frames = append(pp.Frames, streamFrame)
 	c.SendProtectedPacket(pp)
 }
+func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
+	udpConn, err := net.DialUDP(addr.Network(), nil, addr)
+	if err != nil {
+		return nil, err
+	}
+	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
+	return udpConn, nil
+}
 func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
@@ -414,11 +422,10 @@ func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Con
 	if err != nil {
 		return nil, err
 	}
-	udpConn, err := net.DialUDP(network, nil, udpAddr)
+	udpConn, err := EstablishUDPConnection(udpAddr)
 	if err != nil {
 		return nil, err
 	}
-	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 
 	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
 	c.UseIPv6 = useIPv6

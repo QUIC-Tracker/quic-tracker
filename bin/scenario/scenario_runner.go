@@ -57,6 +57,7 @@ func main() {
 	commit := GitCommit()
 
 	scenarii := [...]s.Scenario{
+		s.NewConnectionMigrationScenario(),
 		s.NewUnsupportedTLSVersionScenario(),
 		s.NewStreamOpeningReorderingScenario(),
 		s.NewMultiStreamScenario(),

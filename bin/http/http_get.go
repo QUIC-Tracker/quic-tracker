@@ -22,6 +22,8 @@ import (
 	"flag"
 	"strings"
 	"fmt"
+	"io/ioutil"
+	"os"
 )
 
 func main() {
@@ -37,7 +39,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer func() {spew.Dump(m.StopPcapCapture(pcap))}()
+	defer func() {
+		pcap, err := m.StopPcapCapture(pcap)
+		if err == nil {
+			ioutil.WriteFile("/tmp/http_get.pcap", pcap, os.ModePerm)
+		}
+	}()
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true

@@ -141,7 +141,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	typeByte, _ := buffer.ReadByte()
 	h.omitConnectionIdFlag = (typeByte & 0x40) == 0x40
 	h.keyPhase = (typeByte & 0x20) == 0x20
-	if typeByte & 0x10 != 0x10 || typeByte & 0x8 != 0x8 {
+	if typeByte & 0x10 != 0x10 || typeByte & 0x8 != 0 {
 		println("SH fixed bits not respected")
 	}
 	h.packetType = PacketType(typeByte & 0x7)

@@ -150,6 +150,8 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 	for _, frame := range packet.Frames {
 		if streamFrame, ok := frame.(*StreamFrame); ok {
 			serverData = append(serverData, streamFrame.StreamData...)
+		} else {
+			// TODO: Process ACKs and PATH_CHALLENGE
 		}
 	}
 

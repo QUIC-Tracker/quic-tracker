@@ -57,13 +57,16 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 			return
 		}
 		if handshake, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandshake, err = conn.ProcessServerHello(handshake)
+			ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
 			if err == nil && !ongoingHandshake {
 				trace.Results["negotiated_version"] = conn.Version
 				conn.CloseConnection(false, 42, "")
 			} else if err != nil {
 				trace.MarkError(H_TLSHandshakeFailed, err.Error())
 				conn.CloseStream(0)
+			}
+			if packet != nil {
+				conn.SendHandshakeProtectedPacket(packet)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			var version uint32

@@ -143,15 +143,13 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	return initialPacket
 }
-func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
+func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *HandshakePacket, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
 	for _, frame := range packet.Frames {
 		if streamFrame, ok := frame.(*StreamFrame); ok {
 			serverData = append(serverData, streamFrame.StreamData...)
-		} else {
-			// TODO: Process ACKs and PATH_CHALLENGE
 		}
 	}
 
@@ -179,18 +177,17 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 
 				clearTextPacket = NewHandshakePacket(c)
 				clearTextPacket.Frames = append(clearTextPacket.Frames, outputFrame, ackFrame)
-				defer c.SendHandshakeProtectedPacket(clearTextPacket)
-				return false, nil
+				return false, clearTextPacket, nil
 			}
 		case mint.AlertWouldBlock:
 			if packet.ShouldBeAcknowledged() {
 				clearTextPacket = NewHandshakePacket(c)
 				clearTextPacket.Frames = append(clearTextPacket.Frames, ackFrame)
-				defer c.SendHandshakeProtectedPacket(clearTextPacket)
+				return true, clearTextPacket, nil
 			}
-			return true, nil
+			return true, nil, nil
 		default:
-			return false, alert
+			return false, nil, alert
 		}
 	}
 }
@@ -289,6 +286,12 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 				if ack, ok := f.(*AckFrame); ok {
 					c.RetransmitFrames(c.ProcessAck(ack))
 				}
+			}
+
+			if pathChallenge := framePacket.GetFirst(PathChallengeType); pathChallenge != nil {
+				handshakeResponse := NewHandshakePacket(c)
+				handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).data})
+				c.SendHandshakeProtectedPacket(handshakeResponse)
 			}
 		}
 	}

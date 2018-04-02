@@ -47,18 +47,21 @@ func main() {
 	}()
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
-	ongoingHandhake := true
-	for ongoingHandhake {
+	ongoingHandshake := true
+	for ongoingHandshake {
 		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
 			spew.Dump(err)
 			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, err = conn.ProcessServerHello(scp)
+			ongoingHandshake, packet, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				spew.Dump(err)
 				return
+			}
+			if packet != nil {
+				conn.SendHandshakeProtectedPacket(packet)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err == nil {

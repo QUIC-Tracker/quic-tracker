@@ -49,6 +49,8 @@ handshake_retransmission:
   error_codes:
     1: The host did not retransmit any Handshake packet
     2: No version advertised by the host matched the versions of the test
+    3: The TLS handshake failed
+    4: The host sent more than 3 Handshake packets but did not include a <code>PATH_CHALLENGE</code>
 handshake_v6:
   name: Handshake IPv6
   description: |

@@ -22,6 +22,8 @@ import (
 	"flag"
 	"strings"
 	"fmt"
+	"io/ioutil"
+	"os"
 )
 
 func main() {
@@ -37,21 +39,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer func() {spew.Dump(m.StopPcapCapture(pcap))}()
+	defer func() {
+		pcap, err := m.StopPcapCapture(pcap)
+		if err == nil {
+			ioutil.WriteFile("/tmp/http_get.pcap", pcap, os.ModePerm)
+		}
+	}()
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
-	ongoingHandhake := true
-	for ongoingHandhake {
+	ongoingHandshake := true
+	for ongoingHandshake {
 		packet, err, _ := conn.ReadNextPacket()
 		if err != nil {
 			spew.Dump(err)
 			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, err = conn.ProcessServerHello(scp)
+			ongoingHandshake, packet, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				spew.Dump(err)
 				return
+			}
+			if packet != nil {
+				conn.SendHandshakeProtectedPacket(packet)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err == nil {
@@ -66,6 +76,9 @@ func main() {
 			return
 		}
 	}
+
+	spew.Dump(conn.ClientRandom)
+	spew.Dump(conn.ExporterSecret)
 
 	conn.Streams[4] = &m.Stream{}
 	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", *url)), true)

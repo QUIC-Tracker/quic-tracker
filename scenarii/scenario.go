@@ -54,9 +54,12 @@ func CompleteHandshake(conn *m.Connection) error {
 			return err
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, err = conn.ProcessServerHello(scp)
+			ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				return err
+			}
+			if packet != nil {
+				conn.SendHandshakeProtectedPacket(packet)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			err := conn.ProcessVersionNegotation(vn)

@@ -55,10 +55,13 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			return
 		}
 		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, err = conn.ProcessServerHello(scp)
+			ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
 			if err != nil {
 				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 				return
+			}
+			if packet != nil {
+				conn.SendHandshakeProtectedPacket(packet)
 			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			err = conn.ProcessVersionNegotation(vn)

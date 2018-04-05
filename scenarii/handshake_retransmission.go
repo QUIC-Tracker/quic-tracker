@@ -19,32 +19,41 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"time"
-	"github.com/davecgh/go-spew/spew"
 )
 
 const (
 	HR_DidNotRetransmitHandshake = 1
 	HR_VNDidNotComplete          = 2
+	HR_TLSHandshakeFailed        = 3
+	HR_NoPathChallengeReceived   = 4
 )
 
 type HandshakeRetransmissionScenario struct {
 	AbstractScenario
 }
 func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
-	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 1, false}}
+	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 2, false}}
 }
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	initial := conn.GetInitialPacket()
+	conn.SendHandshakeProtectedPacket(initial)
 
-	arrivals := make([]uint64, 0, 10)
+	var arrivals []uint64
+	totalDataReceived := 0
 
 	var start time.Time
-	for  i := 0; i < 20; i++ {
-		packet, err, _ := conn.ReadNextPacket()
+	ongoingHandshake := true
+	receivedPathChallenge := false
+	handshakePacketReceived := 0
+	handshakePacketReceivedBeforePC := 0
+	for {
+		packet, err, rec := conn.ReadNextPacket()
 
 		if err != nil {
 			break
 		}
+
+		totalDataReceived += len(rec)
 
 		if handshake, ok := packet.(*m.HandshakePacket); ok {
 			var isRetransmit bool
@@ -54,28 +63,51 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 					break
 				}
 			}
-			if !isRetransmit {
-				continue
+
+			if isRetransmit {
+				if start.IsZero() {
+					start = time.Now()
+				}
+				arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
 			}
-			if start.IsZero() {
-				start = time.Now()
+
+			if ongoingHandshake {
+				ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+				if err != nil {
+					trace.MarkError(HR_TLSHandshakeFailed, err.Error())
+					break
+				}
 			}
-			arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
+
+			handshakePacketReceived++
+			if !receivedPathChallenge {
+				handshakePacketReceivedBeforePC++
+			}
+
+			if handshake.Contains(m.PathChallengeType) {
+				receivedPathChallenge = true
+			}
 		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err != nil {
 				trace.MarkError(HR_VNDidNotComplete, err.Error())
-				return
+				break
 			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+			initial = conn.GetInitialPacket()
+			conn.SendHandshakeProtectedPacket(initial)
+			totalDataReceived = 0
 		} else {
-			spew.Dump(packet)
-			return
+			continue
 		}
 	}
 
 	if len(arrivals) == 1 {
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
 	}
-	trace.Results["arrival_times"] = arrivals
+	if handshakePacketReceived > 3 && !receivedPathChallenge {
+		trace.ErrorCode = HR_NoPathChallengeReceived
+	}
 
+	trace.Results["arrival_times"] = arrivals
+	trace.Results["total_data_received"] = totalDataReceived
+	trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 }

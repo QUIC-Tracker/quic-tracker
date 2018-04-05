@@ -109,6 +109,8 @@ type Framer interface {
 	Packet
 	GetFrames() []Frame
 	GetRetransmittableFrames() []Frame
+	Contains(frameType FrameType) bool
+	GetFirst(frameType FrameType) Frame
 }
 type FramePacket struct {
 	abstractPacket
@@ -125,6 +127,22 @@ func (p FramePacket) GetRetransmittableFrames() []Frame {
 		}
 	}
 	return frames
+}
+func (p FramePacket) Contains(frameType FrameType) bool {
+	for _, f := range p.Frames {
+		if f.FrameType() == frameType {
+			return true
+		}
+	}
+	return false
+}
+func (p FramePacket) GetFirst(frameType FrameType) Frame {
+	for _, f := range p.Frames {
+		if f.FrameType() == frameType {
+			return f
+		}
+	}
+	return nil
 }
 func (p FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {

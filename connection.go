@@ -74,6 +74,10 @@ func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split 
 			packet := NewProtectedPacket(c)
 			packet.Frames = f.Frames
 			c.SendProtectedPacket(packet)
+		} else if f.IsInitial {
+			packet := NewInitialPacket(c)
+			packet.Frames = f.Frames
+			c.SendHandshakeProtectedPacket(packet)
 		} else {
 			packet := NewHandshakePacket(c)
 			packet.Frames = f.Frames
@@ -87,9 +91,10 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	}
 
 	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
-		if _, ok := framePacket.(*InitialPacket); !ok {  // Disable Initial retransmit until fixed
-			c.retransmissionBuffer[(c.PacketNumber&0xffffffff00000000)|uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
-		}
+		fullPacketNumber := (c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+		batch := NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
+		_, batch.IsInitial = framePacket.(*InitialPacket)
+		c.retransmissionBuffer[fullPacketNumber] = *batch
 	}
 
 	header := packet.EncodeHeader()
@@ -138,7 +143,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	return initialPacket
 }
-func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) { // Returns whether or not the TLS Handshake should continue
+func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *HandshakePacket, error) { // Returns whether or not the TLS Handshake should continue
 	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 
 	var serverData []byte
@@ -172,18 +177,17 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, error) {
 
 				clearTextPacket = NewHandshakePacket(c)
 				clearTextPacket.Frames = append(clearTextPacket.Frames, outputFrame, ackFrame)
-				defer c.SendHandshakeProtectedPacket(clearTextPacket)
-				return false, nil
+				return false, clearTextPacket, nil
 			}
 		case mint.AlertWouldBlock:
 			if packet.ShouldBeAcknowledged() {
 				clearTextPacket = NewHandshakePacket(c)
 				clearTextPacket.Frames = append(clearTextPacket.Frames, ackFrame)
-				defer c.SendHandshakeProtectedPacket(clearTextPacket)
+				return true, clearTextPacket, nil
 			}
-			return true, nil
+			return true, nil, nil
 		default:
-			return false, alert
+			return false, nil, alert
 		}
 	}
 }
@@ -282,6 +286,12 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 				if ack, ok := f.(*AckFrame); ok {
 					c.RetransmitFrames(c.ProcessAck(ack))
 				}
+			}
+
+			if pathChallenge := framePacket.GetFirst(PathChallengeType); pathChallenge != nil {
+				handshakeResponse := NewHandshakePacket(c)
+				handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).data})
+				c.SendHandshakeProtectedPacket(handshakeResponse)
 			}
 		}
 	}

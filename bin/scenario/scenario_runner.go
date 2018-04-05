@@ -57,6 +57,7 @@ func main() {
 	commit := GitCommit()
 
 	scenarii := [...]s.Scenario{
+		s.NewZeroRTTScenario(),
 		s.NewConnectionMigrationScenario(),
 		s.NewUnsupportedTLSVersionScenario(),
 		s.NewStreamOpeningReorderingScenario(),
@@ -97,7 +98,7 @@ func main() {
 				Results:         make(map[string]interface{}),
 			}
 
-			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], scenario.IPv6())
+			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], nil, scenario.IPv6())
 
 			if err == nil {
 				pcap, err := m.StartPcapCapture(conn)
@@ -131,8 +132,8 @@ func main() {
 				trace.Results["udp_error"] = err.Error()
 			}
 
-			if conn != nil && conn.RetransmissionTicker != nil {
-				conn.RetransmissionTicker.Stop()
+			if conn != nil {
+				conn.Close()
 			}
 			results = append(results, trace)
 			if debug {

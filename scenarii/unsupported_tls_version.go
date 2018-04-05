@@ -18,6 +18,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+	"bytes"
 )
 
 const (
@@ -81,6 +82,10 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 
 func sendUnsupportedInitial(conn *m.Connection) {
 	initialPacket := conn.GetInitialPacket()
-	initialPacket.Frames[0].(*m.StreamFrame).StreamData[60] = 0x00 // Advertise support of TLS 1.3 draft-00
+	for _, f := range initialPacket.Frames {  // Advertise support of TLS 1.3 draft-00 only
+		if streamFrame, ok := f.(*m.StreamFrame); ok {
+			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x7f, 0x1c, 0x7f, 0x1b, 0x7f, 0x1a}, []byte{0x7f, 0x00, 0x7f, 0x00, 0x7f, 0x00}, 1)
+		}
+	}
 	conn.SendHandshakeProtectedPacket(initialPacket)
 }

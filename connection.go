@@ -17,7 +17,6 @@
 package masterthesis
 
 import (
-	"github.com/bifurcation/mint"
 	"crypto/rand"
 	"encoding/binary"
 	"net"
@@ -26,21 +25,21 @@ import (
 	"time"
 	"os"
 	"fmt"
-	"crypto"
 	"errors"
 	"sort"
+	"github.com/mpiraux/pigotls"
+	"crypto/cipher"
 )
 
 type Connection struct {
 	ServerName    string
 	UdpConnection *net.UDPConn
-	tlsBuffer     *connBuffer
-	tls           *mint.Conn
+	Tls           *pigotls.Connection
 	TLSTPHandler  *TLSTransportParameterHandler
 
 	Cleartext        *CryptoState
-	protected        *CryptoState
-	cipherSuite		 *mint.CipherSuiteParams
+	Protected        *CryptoState
+	ZeroRTTprotected *CryptoState
 
 	ReceivedPacketHandler func([]byte)
 	SentPacketHandler     func([]byte)
@@ -70,7 +69,7 @@ func (c *Connection) nextPacketNumber() uint64 {
 func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split in smaller packets if needed
 	sort.Sort(frames)
 	for _, f := range frames {
-		if c.protected != nil {
+		if c.Protected != nil {
 			packet := NewProtectedPacket(c)
 			packet.Frames = f.Frames
 			c.SendProtectedPacket(packet)
@@ -105,6 +104,12 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	c.UdpConnection.Write(finalPacket)
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
+	c.sendProtectedPacket(packet, c.Protected.Write)
+}
+func (c *Connection) SendZeroRTTProtectedPacket(packet Packet) {
+	c.sendProtectedPacket(packet, c.ZeroRTTprotected.Write)
+}
+func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
@@ -114,15 +119,25 @@ func (c *Connection) SendProtectedPacket(packet Packet) {
 	}
 
 	header := packet.EncodeHeader()
-	protectedPayload := c.protected.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
+	protectedPayload := cipher.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
 	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
 	finalPacket = append(finalPacket, header...)
 	finalPacket = append(finalPacket, protectedPayload...)
 	c.UdpConnection.Write(finalPacket)
 }
 func (c *Connection) GetInitialPacket() *InitialPacket {
-	c.tls.Handshake()
-	handshakeResult := c.tlsBuffer.getOutput()
+	extensionData, err := c.TLSTPHandler.GetExtensionData()
+	if err != nil {
+		println(err)
+		return nil
+	}
+	c.Tls.SetQUICTransportParameters(extensionData)
+
+	handshakeResult, notComplete, err := c.Tls.InitiateHandshake()
+	if err != nil || !notComplete {
+		println(err.Error())
+		return nil
+	}
 	c.ClientRandom = make([]byte, 32, 32)
 	copy(c.ClientRandom, handshakeResult[11:11+32])
 	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
@@ -143,8 +158,11 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	return initialPacket
 }
+
 func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *HandshakePacket, error) { // Returns whether or not the TLS Handshake should continue
-	c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+	if c.ZeroRTTprotected == nil {
+		c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+	}
 
 	var serverData []byte
 	for _, frame := range packet.Frames {
@@ -153,43 +171,34 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *Handsha
 		}
 	}
 
-	var clearTextPacket *HandshakePacket
-	ackFrame := c.GetAckFrame()
+	handshakePacket := NewHandshakePacket(c)
+	handshakePacket.Frames = append(handshakePacket.Frames, c.GetAckFrame())
 
-	c.tlsBuffer.input(serverData)
+	if len(serverData) > 0 {
+		tlsData, notCompleted, err := c.Tls.Input(serverData)
 
-	for {
-		alert := c.tls.Handshake()
-		switch alert {
-		case mint.AlertNoAlert:
-			tlsOutput := c.tlsBuffer.getOutput()
-
-			state := c.tls.ConnectionState()
-			if c.tls.StateConnected().ExporterSecret() != nil {
-				c.ExporterSecret = c.tls.StateConnected().ExporterSecret()
-			}
-			if state.HandshakeState == mint.StateClientConnected {
-				// TODO: Check negotiated ALPN ?
-				c.cipherSuite = &state.CipherSuite
-				c.protected = NewProtectedCryptoState(c)
-
-				outputFrame := NewStreamFrame(0, c.Streams[0], tlsOutput, false)
-
-				clearTextPacket = NewHandshakePacket(c)
-				clearTextPacket.Frames = append(clearTextPacket.Frames, outputFrame, ackFrame)
-				return false, clearTextPacket, nil
-			}
-		case mint.AlertWouldBlock:
-			if packet.ShouldBeAcknowledged() {
-				clearTextPacket = NewHandshakePacket(c)
-				clearTextPacket.Frames = append(clearTextPacket.Frames, ackFrame)
-				return true, clearTextPacket, nil
-			}
-			return true, nil, nil
-		default:
-			return false, nil, alert
+		if err != nil {
+			return notCompleted, handshakePacket, err
 		}
+
+		if tlsData != nil && len(tlsData) > 0 {
+			handshakePacket.Frames = append(handshakePacket.Frames, NewStreamFrame(0, c.Streams[0], tlsData, false))
+		}
+
+		if !notCompleted {
+			c.Protected = NewProtectedCryptoState(c.Tls)
+
+			// TODO: Export secret if completed
+			// TODO: Check negotiated ALPN ?
+
+			err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.GetReceivedQUICTransportParameters())
+			if err != nil {
+				return true, handshakePacket, err
+			}
+		}
+		return notCompleted, handshakePacket,  nil
 	}
+	return true, handshakePacket, nil
 }
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
 	var version uint32
@@ -202,7 +211,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 		return errors.New("no appropriate version found")
 	}
 	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
-	c.TransitionTo(QuicVersion, QuicALPNToken)
+	c.TransitionTo(QuicVersion, QuicALPNToken, nil)
 	return nil
 }
 func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
@@ -244,11 +253,11 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 			saveCleartext(append(rec[:headerLen], payload...))
 			packet = ReadHandshakePacket(buffer, c)
 		case ZeroRTTProtected, OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:  // Packets with a short header always include a 1-RTT protected payload.
-			if c.protected == nil {
+			if c.Protected == nil {
 				//println("Crypto state is not ready to decrypt protected packets")
 				return c.ReadNextPacket()  // Packet may have been reordered, TODO: Implement a proper packet queue instead of triggering retransmissions
 			}
-			payload, err := c.protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
+			payload, err := c.Protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
 			if err != nil {
 				return nil, err, rec
 			}
@@ -345,15 +354,7 @@ func (c *Connection) ProcessAck(ack *AckFrame) RetransmitBatch {
 	}
 	return frames
 }
-func (c *Connection) TransitionTo(version uint32, ALPN string) {
-	c.tlsBuffer = newConnBuffer()
-	tlsConfig := mint.Config{
-		ServerName: c.ServerName,
-		NonBlocking: true,
-		NextProtos: []string{ALPN},
-		InsecureSkipVerify: true,  // See A First Look at QUIC in the Wild
-	}
-	tlsConfig.Init(true)
+func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionSecret []byte) {
 	var prevVersion uint32
 	if c.Version == 0 {
 		prevVersion = QuicVersion
@@ -362,20 +363,8 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	}
 	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	tlsConfig.ExtensionHandler = c.TLSTPHandler
-	c.tls = mint.Client(c.tlsBuffer, &tlsConfig)
-	if c.Version >= 0xff000007 {
-		params := mint.CipherSuiteParams {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-07#section-5.3
-			Suite:  mint.TLS_AES_128_GCM_SHA256,
-			Cipher: nil,
-			Hash:   crypto.SHA256,
-			KeyLen: 16,
-			IvLen:  12,
-		}
-		c.Cleartext = NewCleartextSaltedCryptoState(c, &params)
-	} else {
-		c.Cleartext = NewCleartextCryptoState()
-	}
+	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionSecret)
+	c.Cleartext = NewCleartextSaltedCryptoState(c)
 	c.Streams = make(map[uint64]*Stream)
 	c.Streams[0] = &Stream{}
 }
@@ -390,7 +379,7 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 }
 func (c *Connection) CloseStream(streamId uint64) {
 	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
-	if c.protected == nil {
+	if c.Protected == nil {
 		pkt := NewHandshakePacket(c)
 		pkt.Frames = append(pkt.Frames, frame)
 		c.SendHandshakeProtectedPacket(pkt)
@@ -409,6 +398,11 @@ func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
 	pp.Frames = append(pp.Frames, streamFrame)
 	c.SendProtectedPacket(pp)
 }
+func (c *Connection) Close() {
+	c.RetransmissionTicker.Stop()
+	c.Tls.Close()
+	c.UdpConnection.Close()
+}
 func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	udpConn, err := net.DialUDP(addr.Network(), nil, addr)
 	if err != nil {
@@ -417,7 +411,7 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
 	return udpConn, nil
 }
-func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Connection, error) {
+func NewDefaultConnection(address string, serverName string, resumptionSecret []byte, useIPv6 bool) (*Connection, error) {
 	cId := make([]byte, 8, 8)
 	rand.Read(cId)
 
@@ -437,13 +431,13 @@ func NewDefaultConnection(address string, serverName string, useIPv6 bool) (*Con
 		return nil, err
 	}
 
-	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn)
+	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn, resumptionSecret)
 	c.UseIPv6 = useIPv6
 	c.Host = udpAddr
 	return c, nil
 }
 
-func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn) *Connection {
+func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn, resumptionSecret []byte) *Connection {
 	c := new(Connection)
 	c.ServerName = serverName
 	c.UdpConnection = udpConn
@@ -467,7 +461,7 @@ func NewConnection(serverName string, version uint32, ALPN string, connectionId 
 		}
 	}()
 
-	c.TransitionTo(version, ALPN)
+	c.TransitionTo(version, ALPN, resumptionSecret)
 
 	return c
 }

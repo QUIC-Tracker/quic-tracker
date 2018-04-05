@@ -31,7 +31,7 @@ func main() {
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	url := flag.String("url", "/index.html", "The URL to request")
 	flag.Parse()
-	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], *useIPv6)
+	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6)
 	if err != nil {
 		panic(err)
 	}

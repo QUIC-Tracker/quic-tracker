@@ -243,3 +243,12 @@ func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p.header = NewShortHeader(FourBytesPacketNumber, KeyPhaseZero, conn)
 	return p
 }
+
+type ZeroRTTProtectedPacket struct {
+	FramePacket
+}
+func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
+	p := new(ZeroRTTProtectedPacket)
+	p.header = NewLongHeader(ZeroRTTProtected, conn)
+	return p
+}

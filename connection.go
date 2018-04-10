@@ -260,8 +260,7 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 			saveCleartext(append(rec[:headerLen], payload...))
 			packet = ReadInitialPacket(buffer, c)
 		default:
-			spew.Dump(header)
-			panic(header.PacketType())
+			return nil, errors.New(fmt.Sprintf("Unexpected packet type %x", header.PacketType())), rec
 		}
 
 		fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())

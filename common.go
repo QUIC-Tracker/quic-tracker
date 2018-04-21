@@ -20,16 +20,15 @@ import (
 	"encoding/binary"
 )
 
-var QuicVersion uint32 = 0xff00000a // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-10"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff00000b // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-11"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
-	LongHeaderSize         = 17
 	MaxUDPPayloadSize      = 65507
-	MinimumVersion         = 0xff00000a
-	MaximumVersion         = 0xff00000a
+	MinimumVersion         = 0xff00000b
+	MaximumVersion         = 0xff00000b
 )
 
 // errors
@@ -37,15 +36,6 @@ const (
 const (
 	ERR_PROTOCOL_VIOLATION = 0xA
 )
-
-func reverse(s []uint64) []uint64 {
-	rev := make([]uint64, 0, len(s))
-	last := len(s) - 1
-	for i := 0; i < len(s); i++ {
-		rev = append(rev, s[last-i])
-	}
-	return rev
-}
 
 func Uint32ToBEBytes(uint32 uint32) []byte {
 	b := make([]byte, 4, 4)
@@ -59,8 +49,18 @@ func Uint16ToBEBytes(uint16 uint16) []byte {
 	return b
 }
 
-type PacketNumberQueue []uint64
+func Max(a, b int) int { if a < b { return b }; return a}
 
+type PacketNumberQueue []uint64
 func (a PacketNumberQueue) Less(i, j int) bool { return a[i] > a[j] }
 func (a PacketNumberQueue) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PacketNumberQueue) Len() int           { return len(a) }
+
+type ConnectionID []byte
+
+func (c ConnectionID) CIDL() uint8 {
+	if len(c) == 0 {
+		return 0
+	}
+	return uint8(len(c) - 3)
+}

@@ -19,13 +19,15 @@ package masterthesis
 import (
 	"bytes"
 	"encoding/binary"
+	"math"
 )
 
 type Header interface {
-	PacketNumber() uint32
 	PacketType() PacketType
-	ConnectionId() uint64
-	encode() []byte
+	DestinationConnectionID() ConnectionID
+	PacketNumber() uint32
+	Encode() []byte
+	Length() int
 }
 func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 	var h Header
@@ -40,43 +42,51 @@ func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 }
 
 type LongHeader struct {
-	packetType   PacketType
-	connectionId uint64
-	Version      uint32
-	packetNumber uint32
+	packetType     PacketType
+	Version        uint32
+	DestinationCID ConnectionID
+	SourceCID      ConnectionID
+	PayloadLength  uint64
+	packetNumber   uint32
 }
-func (h LongHeader) encode() []byte {
+func (h *LongHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
 	typeByte := uint8(0x80)
 	typeByte |= uint8(h.packetType)
 	binary.Write(buffer, binary.BigEndian, typeByte)
-	binary.Write(buffer, binary.BigEndian, h.connectionId)
 	binary.Write(buffer, binary.BigEndian, h.Version)
+	buffer.WriteByte((h.DestinationCID.CIDL() << 4) | h.SourceCID.CIDL())
+	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
+	binary.Write(buffer, binary.BigEndian, h.SourceCID)
+	WriteVarInt(buffer, h.PayloadLength)
 	binary.Write(buffer, binary.BigEndian, h.packetNumber)
 	return buffer.Bytes()
 }
-func (h LongHeader) PacketNumber() uint32 {
-	return h.packetNumber
-}
-func (h LongHeader) PacketType() PacketType {
-	return h.packetType
-}
-func (h LongHeader) ConnectionId() uint64 {
-	return h.connectionId
-}
+func (h *LongHeader) PacketType() PacketType { return h.packetType }
+func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
+func (h *LongHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *LongHeader) Length() int { return 1 + 4 + 1 + len(h.DestinationCID) + len(h.SourceCID) + int(VarIntLen(h.PayloadLength)) + 4 }
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h := new(LongHeader)
 	typeByte, _ := buffer.ReadByte()
 	h.packetType = PacketType(typeByte - 0x80)
-	binary.Read(buffer, binary.BigEndian, &h.connectionId)
 	binary.Read(buffer, binary.BigEndian, &h.Version)
+	CIDL, _ := buffer.ReadByte()
+	DCIL := 3 + ((CIDL & 0xf0) >> 4)
+	SCIL := 3 + (CIDL & 0xf)
+	h.DestinationCID = make([]byte, DCIL, DCIL)
+	binary.Read(buffer, binary.BigEndian, &h.DestinationCID)
+	h.SourceCID = make([]byte, SCIL, SCIL)
+	binary.Read(buffer, binary.BigEndian, &h.SourceCID)
+	h.PayloadLength, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &h.packetNumber)
 	return h
 }
 func NewLongHeader(packetType PacketType, conn *Connection) *LongHeader {
 	h := new(LongHeader)
 	h.packetType = packetType
-	h.connectionId = conn.ConnectionId
+	h.SourceCID = conn.SourceCID
+	h.DestinationCID = conn.DestinationCID
 	h.packetNumber = uint32(conn.nextPacketNumber())
 	h.Version = conn.Version
 	return h
@@ -96,27 +106,21 @@ const (
 )
 
 type ShortHeader struct {
-	omitConnectionIdFlag bool
-	keyPhase             KeyPhaseBit
-	packetType           PacketType
-	connectionId         uint64
-	packetNumber         uint32
+	KeyPhase       KeyPhaseBit
+	packetType     PacketType
+	DestinationCID ConnectionID
+	packetNumber   uint32
 }
-func (h ShortHeader) encode() []byte {
+func (h *ShortHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
 	var typeByte uint8
-	if h.omitConnectionIdFlag {
+	if h.KeyPhase == KeyPhaseOne {
 		typeByte |= 0x40
 	}
-	if h.keyPhase == KeyPhaseOne {
-		typeByte |= 0x20
-	}
-	typeByte |= 0x10
+	typeByte |= 0x30
 	typeByte |= uint8(h.packetType)
 	binary.Write(buffer, binary.BigEndian, typeByte)
-	if !h.omitConnectionIdFlag {
-		binary.Write(buffer, binary.BigEndian, h.connectionId)
-	}
+
 	switch h.packetType {
 	case OneBytePacketNumber:
 		binary.Write(buffer, binary.BigEndian, uint8(h.packetNumber))
@@ -127,27 +131,23 @@ func (h ShortHeader) encode() []byte {
 	}
 	return buffer.Bytes()
 }
-func (h ShortHeader) PacketNumber() uint32 {
-	return h.packetNumber
-}
-func (h ShortHeader) PacketType() PacketType {
-	return h.packetType
-}
-func (h ShortHeader) ConnectionId() uint64 {
-	return h.connectionId
-}
+func (h *ShortHeader) PacketType() PacketType { return h.packetType }
+func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
+func (h *ShortHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *ShortHeader) Length() int { return 1 + len(h.DestinationCID) + int(math.Pow(2, float64(h.packetType))) }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()
-	h.omitConnectionIdFlag = (typeByte & 0x40) == 0x40
-	h.keyPhase = (typeByte & 0x20) == 0x20
-	if typeByte & 0x10 != 0x10 || typeByte & 0x8 != 0 {
+	h.KeyPhase = (typeByte & 0x40) == 0x40
+
+	if typeByte & 0x38 != 0x30 {
 		println("SH fixed bits not respected")
 	}
-	h.packetType = PacketType(typeByte & 0x7)
-	if !h.omitConnectionIdFlag {
-		binary.Read(buffer, binary.BigEndian, &h.connectionId)
-	}
+
+	h.packetType = PacketType(typeByte & 0x3)
+	h.DestinationCID = make([]byte, len(conn.SourceCID), len(conn.SourceCID))
+	buffer.Read(h.DestinationCID)
+
 	switch h.packetType {
 	case OneBytePacketNumber:
 		var number uint8
@@ -164,10 +164,9 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 }
 func NewShortHeader(packetType PacketType, keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
-	h.omitConnectionIdFlag = conn.omitConnectionId
-	h.keyPhase = keyPhase
+	h.KeyPhase = keyPhase
 	h.packetType = packetType
-	h.connectionId = conn.ConnectionId
+	h.DestinationCID = conn.DestinationCID
 	h.packetNumber = uint32(conn.nextPacketNumber())
 	return h
 }

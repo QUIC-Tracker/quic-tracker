@@ -45,35 +45,39 @@ func main() {
 			ioutil.WriteFile("/tmp/http_get.pcap", pcap, os.ModePerm)
 		}
 	}()
+
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	spew.Dump(conn.DestinationCID)
 
 	ongoingHandshake := true
 	for ongoingHandshake {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 		if err != nil {
 			spew.Dump(err)
 			return
 		}
-		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandshake, packet, err = conn.ProcessServerHello(scp)
-			if err != nil {
-				spew.Dump(err)
-				return
-			}
-			if packet != nil {
-				conn.SendHandshakeProtectedPacket(packet)
-			}
-		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			if err := conn.ProcessVersionNegotation(vn); err == nil {
-				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+		for _, packet := range packets {
+			if scp, ok := packet.(*m.HandshakePacket); ok {
+				ongoingHandshake, packet, err = conn.ProcessServerHello(scp)
+				if err != nil {
+					spew.Dump(err)
+					return
+				}
+				if packet != nil {
+					conn.SendHandshakeProtectedPacket(packet)
+				}
+			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				if err := conn.ProcessVersionNegotation(vn); err == nil {
+					conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+				} else {
+					println("No version in common with " + *address)
+					spew.Dump(vn)
+					return
+				}
 			} else {
-				println("No version in common with " + *address)
-				spew.Dump(vn)
+				spew.Dump(packet)
 				return
 			}
-		} else {
-			spew.Dump(packet)
-			return
 		}
 	}
 
@@ -89,21 +93,23 @@ func main() {
 	conn.SendProtectedPacket(protectedPacket)
 
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 		if err != nil {
 			spew.Dump(err)
 			break
 		}
 
-		spew.Dump("---> Received packet")
-		spew.Dump(packet)
+		spew.Dump("---> Received packets")
+		spew.Dump(packets)
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket = m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			spew.Dump("<--- Send ack packet")
-			spew.Dump(protectedPacket)
-			conn.SendProtectedPacket(protectedPacket)
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket = m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				spew.Dump("<--- Send ack packet")
+				spew.Dump(protectedPacket)
+				conn.SendProtectedPacket(protectedPacket)
+			}
 		}
 	}
 

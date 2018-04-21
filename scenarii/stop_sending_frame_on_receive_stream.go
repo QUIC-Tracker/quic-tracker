@@ -39,7 +39,8 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 }
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
+	packets, err := CompleteHandshake(conn)
+	if err != nil {
 		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -60,7 +61,9 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	conn.SendProtectedPacket(pp)
 
 	for i := 0; i < 30; i++ {
-		packet, err, _ := conn.ReadNextPacket()
+		if i >= 0 || packets == nil {
+			packets, err, _ = conn.ReadNextPackets()
+		}
 		if err != nil {
 			switch e := err.(type) {
 			case *net.OpError:
@@ -75,31 +78,33 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 			return
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
-		switch ppReadPacket := packet.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range ppReadPacket.Frames {
-				switch f2 := f.(type) {
-				case *m.ConnectionCloseFrame:
-					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
-						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "")
-						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
-						return
-					}
-					trace.ErrorCode = 0
-					return
-				default:
-				}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
 			}
-		default:
-			// TODO: Detect spurious retransmissions
-			// handshake packet: should not happen here
-			// trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", packet.Header().PacketType(), packet)
+
+			switch ppReadPacket := packet.(type) {
+			case *m.ProtectedPacket:
+				for _, f := range ppReadPacket.Frames {
+					switch f2 := f.(type) {
+					case *m.ConnectionCloseFrame:
+						if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
+							trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "")
+							trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
+							return
+						}
+						trace.ErrorCode = 0
+						return
+					default:
+					}
+				}
+			default:
+				// TODO: Detect spurious retransmissions
+				// handshake packet: should not happen here
+				// trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", packet.Header().PacketType(), packet)
+			}
 		}
 
 	}

@@ -48,7 +48,7 @@ func (p abstractPacket) Header() Header {
 	return p.header
 }
 func (p abstractPacket) EncodeHeader() []byte {
-	return p.header.encode()
+	return p.header.Encode()
 }
 func (p abstractPacket) Encode(payload []byte) []byte {
 	buffer := new(bytes.Buffer)
@@ -60,8 +60,9 @@ func (p abstractPacket) Encode(payload []byte) []byte {
 type VersionNegotationPacket struct {
 	abstractPacket
 	UnusedField uint8
-	ConnectionId uint64
-	Version SupportedVersion
+	Version        uint32
+	DestinationCID ConnectionID
+	SourceCID      ConnectionID
 	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
@@ -69,8 +70,10 @@ func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p VersionNegotationPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.WriteByte(p.UnusedField & 0x80)
-	binary.Write(buffer, binary.BigEndian, p.ConnectionId)
 	binary.Write(buffer, binary.BigEndian, p.Version)
+	buffer.WriteByte((p.DestinationCID.CIDL() << 4) | p.SourceCID.CIDL())
+	binary.Write(buffer, binary.BigEndian, p.DestinationCID)
+	binary.Write(buffer, binary.BigEndian, p.SourceCID)
 	for _, version := range p.SupportedVersions {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
@@ -83,8 +86,14 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 		panic(err)
 	}
 	p.UnusedField = b & 0x7f
-	binary.Read(buffer, binary.BigEndian, &p.ConnectionId)
 	binary.Read(buffer, binary.BigEndian, &p.Version)
+	CIDL, _ := buffer.ReadByte()
+	DCIL := 3 + ((CIDL & 0xf0) >> 4)
+	SCIL := 3 + (CIDL & 0xf)
+	p.DestinationCID = make([]byte, DCIL, DCIL)
+	binary.Read(buffer, binary.BigEndian, &p.DestinationCID)
+	p.SourceCID = make([]byte, SCIL, SCIL)
+	binary.Read(buffer, binary.BigEndian, &p.SourceCID)
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
@@ -97,9 +106,11 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	}
 	return p
 }
-func NewVersionNegotationPacket(unusedField uint8, version SupportedVersion, versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
+func NewVersionNegotationPacket(unusedField uint8, version uint32, versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
 	p.UnusedField = unusedField
+	p.DestinationCID = conn.DestinationCID
+	p.SourceCID = conn.SourceCID
 	p.Version = version
 	p.SupportedVersions = versions
 	return p

@@ -48,35 +48,37 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 
 	ongoingHandhake := true
 	for ongoingHandhake {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 			return
 		}
-		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
-			if err != nil {
+		for _, packet := range packets {
+			if scp, ok := packet.(*m.HandshakePacket); ok {
+				ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
+				if err != nil {
+					trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+					return
+				}
+				if packet != nil {
+					conn.SendHandshakeProtectedPacket(packet)
+				}
+			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				err = conn.ProcessVersionNegotation(vn)
+				if err != nil {
+					trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+					return
+				}
+				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+			} else {
+				trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
 				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+				if debug {
+					spew.Dump(packet)
+				}
 				return
 			}
-			if packet != nil {
-				conn.SendHandshakeProtectedPacket(packet)
-			}
-		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			err = conn.ProcessVersionNegotation(vn)
-			if err != nil {
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
-				return
-			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-		} else {
-			trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
-			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
-			if debug {
-				spew.Dump(packet)
-			}
-			return
 		}
 	}
 

@@ -46,8 +46,10 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 	receivedPathChallenge := false
 	handshakePacketReceived := 0
 	handshakePacketReceivedBeforePC := 0
+
+outerLoop:
 	for {
-		packet, err, rec := conn.ReadNextPacket()
+		packets, err, rec := conn.ReadNextPackets()
 
 		if err != nil {
 			break
@@ -55,48 +57,50 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 
 		totalDataReceived += len(rec)
 
-		if handshake, ok := packet.(*m.HandshakePacket); ok {
-			var isRetransmit bool
-			for _, frame := range handshake.Frames {  // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
-				if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
-					isRetransmit = true
-					break
+		for _, packet := range packets {
+			if handshake, ok := packet.(*m.HandshakePacket); ok {
+				var isRetransmit bool
+				for _, frame := range handshake.Frames { // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
+					if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
+						isRetransmit = true
+						break outerLoop
+					}
 				}
-			}
 
-			if isRetransmit {
-				if start.IsZero() {
-					start = time.Now()
+				if isRetransmit {
+					if start.IsZero() {
+						start = time.Now()
+					}
+					arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
 				}
-				arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
-			}
 
-			if ongoingHandshake {
-				ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
-				if err != nil {
-					trace.MarkError(HR_TLSHandshakeFailed, err.Error())
-					break
+				if ongoingHandshake {
+					ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+					if err != nil {
+						trace.MarkError(HR_TLSHandshakeFailed, err.Error())
+						break outerLoop
+					}
 				}
-			}
 
-			handshakePacketReceived++
-			if !receivedPathChallenge {
-				handshakePacketReceivedBeforePC++
-			}
+				handshakePacketReceived++
+				if !receivedPathChallenge {
+					handshakePacketReceivedBeforePC++
+				}
 
-			if handshake.Contains(m.PathChallengeType) {
-				receivedPathChallenge = true
+				if handshake.Contains(m.PathChallengeType) {
+					receivedPathChallenge = true
+				}
+			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				if err := conn.ProcessVersionNegotation(vn); err != nil {
+					trace.MarkError(HR_VNDidNotComplete, err.Error())
+					break outerLoop
+				}
+				initial = conn.GetInitialPacket()
+				conn.SendHandshakeProtectedPacket(initial)
+				totalDataReceived = 0
+			} else {
+				continue
 			}
-		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.MarkError(HR_VNDidNotComplete, err.Error())
-				break
-			}
-			initial = conn.GetInitialPacket()
-			conn.SendHandshakeProtectedPacket(initial)
-			totalDataReceived = 0
-		} else {
-			continue
 		}
 	}
 

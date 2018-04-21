@@ -50,7 +50,7 @@ type CryptoState struct {
 }
 func NewCleartextSaltedCryptoState(conn *Connection) *CryptoState {
 	s := new(CryptoState)
-	handshakeSecret := saltSecret(conn.Tls, EncodeArgs(conn.ConnectionId))
+	handshakeSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
 	s.Read = newProtectedAead(conn.Tls, qhkdfExpand(conn.Tls, handshakeSecret, serverHSecretLabel, conn.Tls.HashDigestSize()))
 	s.Write = newProtectedAead(conn.Tls, qhkdfExpand(conn.Tls, handshakeSecret, clientHSecretLabel, conn.Tls.HashDigestSize()))
 	return s
@@ -88,9 +88,6 @@ func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
 		panic(err)
 	}
 	return aead
-}
-func saltSecret(tls *pigotls.Connection, secret []byte) []byte {
-	return tls.HkdfExtract(quicVersionSalt, secret)
 }
 func qhkdfExpand(tls *pigotls.Connection, secret []byte, label string, length int) []byte {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.3
 	label = "QUIC " + label

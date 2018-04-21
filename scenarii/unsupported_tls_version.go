@@ -40,37 +40,39 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 
 	var connectionClosed bool
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			break
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			handshakePacket := m.NewHandshakePacket(conn)
-			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
-			conn.SendHandshakeProtectedPacket(handshakePacket)
-		}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				handshakePacket := m.NewHandshakePacket(conn)
+				handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
+				conn.SendHandshakeProtectedPacket(handshakePacket)
+			}
 
-		if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.MarkError(UTS_VNDidNotComplete, err.Error())
-				return
-			}
-			sendUnsupportedInitial(conn)
-		} else if fPacket, ok := packet.(m.Framer); ok {
-			for _, frame := range fPacket.GetFrames() {
-				if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
-					if cc.ErrorCode != 0x201 {
-						trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
-					}
-					trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
-					connectionClosed = true
+			if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				if err := conn.ProcessVersionNegotation(vn); err != nil {
+					trace.MarkError(UTS_VNDidNotComplete, err.Error())
+					return
 				}
+				sendUnsupportedInitial(conn)
+			} else if fPacket, ok := packet.(m.Framer); ok {
+				for _, frame := range fPacket.GetFrames() {
+					if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
+						if cc.ErrorCode != 0x201 {
+							trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
+						}
+						trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
+						connectionClosed = true
+					}
+				}
+			} else {
+				trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
 			}
-		} else {
-			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
 		}
 	}
 

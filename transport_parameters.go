@@ -27,7 +27,7 @@ const (
 	InitialMaxData         TransportParametersType = 0x0001
 	InitialMaxStreamIdBidi TransportParametersType = 0x0002
 	IdleTimeout            TransportParametersType = 0x0003
-	OmitConnectionId       TransportParametersType = 0x0004 // TODO: Support the following parameters
+	OmitConnectionId       TransportParametersType = 0x0004 // Unused since draft-11
 	MaxPacketSize          TransportParametersType = 0x0005
 	StatelessResetToken    TransportParametersType = 0x0006
 	AckDelayExponent       TransportParametersType = 0x0007
@@ -37,8 +37,8 @@ const (
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
 	MaxStreamData        uint32
 	MaxData              uint32
-	MaxStreamIdBidi      uint32
-	MaxStreamIdUni       uint32
+	MaxStreamIdBidi      uint16
+	MaxStreamIdUni       uint16
 	IdleTimeout          uint16
 	OmitConnectionId     bool
 	MaxPacketSize        uint16
@@ -88,7 +88,8 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters: QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxStreamIdBidi: 17, MaxStreamIdUni: 19, IdleTimeout: 10}}
+	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters:
+		QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxStreamIdBidi: 17, MaxStreamIdUni: 19, IdleTimeout: 10}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter
@@ -151,7 +152,7 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 			receivedParameters.MaxData = binary.BigEndian.Uint32(p.Value)
 			receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
 		case InitialMaxStreamIdBidi:
-			receivedParameters.MaxStreamIdBidi = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.MaxStreamIdBidi = binary.BigEndian.Uint16(p.Value)
 			receivedParameters.ToJSON["initial_max_stream_id_bidi"] = receivedParameters.MaxStreamIdBidi
 		case IdleTimeout:
 			receivedParameters.IdleTimeout = binary.BigEndian.Uint16(p.Value)
@@ -169,7 +170,7 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 			receivedParameters.AckDelayExponent = p.Value[0]
 			receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
 		case InitialMaxStreamIdUni:
-			receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint16(p.Value)
 			receivedParameters.ToJSON["initial_max_stream_id_uni"] = receivedParameters.MaxStreamIdUni
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)

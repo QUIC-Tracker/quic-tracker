@@ -38,7 +38,8 @@ func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false}}
 }
 func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
+	_, err := CompleteHandshake(conn)
+	if err != nil {
 		trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -47,17 +48,19 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	conn.CloseConnection(false, 0, "")
 	conn.RetransmissionTicker.Stop()
 	for { // Acks and restransmits if needed
-		packet, err, _ := conn.ReadNextPacket()
-		if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
-			break
-		} else if err != nil {
-			trace.Results["error"] = err.Error()
-		}
+		packet, err, _ := conn.ReadNextPackets()
+		for _, packet := range packet {
+			if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
+				break
+			} else if err != nil {
+				trace.Results["error"] = err.Error()
+			}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+			}
 		}
 	}
 
@@ -70,7 +73,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	conn.Close()
 	rh, sh := conn.ReceivedPacketHandler, conn.SentPacketHandler
-	conn, err := m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionSecret, s.ipv6)
+	conn, err = m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionSecret, s.ipv6)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	if err != nil {
@@ -90,48 +93,54 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	ongoingHandhake := true
 	for ongoingHandhake {
-		packet, err, _ := conn.ReadNextPacket()
+		packet, err, _ := conn.ReadNextPackets()
 		if err != nil {
 			break
 		}
-		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
-			if err != nil {
-				trace.MarkError(ZR_ZeroRTTFailed, err.Error())
+
+		for _, packet := range packet {
+			if scp, ok := packet.(*m.HandshakePacket); ok {
+				ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
+				if err != nil {
+					trace.MarkError(ZR_ZeroRTTFailed, err.Error())
+					break
+				}
+				conn.SendHandshakeProtectedPacket(packet)
+			} else {
+				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake")
 				break
 			}
-			conn.SendHandshakeProtectedPacket(packet)
-		} else {
-			trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake")
-			break
 		}
 	}
 
+
 	streamClosed := false
-	for {
-		packet, err, _ := conn.ReadNextPacket()
+	for !streamClosed {
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			break
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+			}
 
-		for streamId, stream := range conn.Streams {
-			if streamId == 4 && stream.ReadClosed {
-				streamClosed = true
+			for streamId, stream := range conn.Streams {
+				if streamId == 4 && stream.ReadClosed {
+					streamClosed = true
+					break
+				}
+			}
+
+			if streamClosed {
+				conn.CloseConnection(false, 0, "")
 				break
 			}
-		}
-
-		if streamClosed {
-			conn.CloseConnection(false, 0, "")
-			break
 		}
 	}
 

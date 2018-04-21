@@ -33,7 +33,7 @@ func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
 func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(AO_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -44,26 +44,28 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 testCase:
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			return
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
-		}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+				ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
+			}
 
-		if pp, ok := packet.(*m.ProtectedPacket); ok && !packet.ShouldBeAcknowledged() {
-			for _, frame := range pp.Frames {
-				if ack, ok := frame.(*m.AckFrame); ok {
-					if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
-						trace.MarkError(AO_SentAOInResponseOfAO, "")
-						break testCase
+			if pp, ok := packet.(*m.ProtectedPacket); ok && !packet.ShouldBeAcknowledged() {
+				for _, frame := range pp.Frames {
+					if ack, ok := frame.(*m.AckFrame); ok {
+						if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
+							trace.MarkError(AO_SentAOInResponseOfAO, "")
+							break testCase
+						}
 					}
 				}
 			}

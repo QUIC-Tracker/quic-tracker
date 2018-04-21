@@ -45,7 +45,8 @@ type Connection struct {
 	SentPacketHandler     func([]byte)
 
 	Streams              map[uint64]*Stream
-	ConnectionId         uint64
+	SourceCID		     ConnectionID
+	DestinationCID       ConnectionID
 	PacketNumber         uint64
 	ExpectedPacketNumber uint64
 	Version              uint32
@@ -96,12 +97,13 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 		c.retransmissionBuffer[fullPacketNumber] = *batch
 	}
 
+	payload := packet.EncodePayload()
+	lHeader := packet.Header().(*LongHeader)
+	lHeader.PayloadLength = uint64(len(payload) + c.Cleartext.Write.Overhead())
+
 	header := packet.EncodeHeader()
-	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
-	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
-	finalPacket = append(finalPacket, header...)
-	finalPacket = append(finalPacket, protectedPayload...)
-	c.UdpConnection.Write(finalPacket)
+	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
+	c.UdpConnection.Write(append(header, protectedPayload...))
 }
 func (c *Connection) SendProtectedPacket(packet Packet) {
 	c.sendProtectedPacket(packet, c.Protected.Write)
@@ -118,12 +120,14 @@ func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
 		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
 	}
 
+	payload := packet.EncodePayload()
+	if lHeader, ok := packet.Header().(*LongHeader); ok {
+		lHeader.PayloadLength = uint64(len(payload) + cipher.Overhead())
+	}
+
 	header := packet.EncodeHeader()
-	protectedPayload := cipher.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), packet.EncodePayload(), header)
-	finalPacket := make([]byte, 0, 1500)  // TODO Find a proper upper bound on total packet size
-	finalPacket = append(finalPacket, header...)
-	finalPacket = append(finalPacket, protectedPayload...)
-	c.UdpConnection.Write(finalPacket)
+	protectedPayload := cipher.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
+	c.UdpConnection.Write(append(header, protectedPayload...))
 }
 func (c *Connection) GetInitialPacket() *InitialPacket {
 	extensionData, err := c.TLSTPHandler.GetExtensionData()
@@ -151,7 +155,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	initialPacket := NewInitialPacket(c)
 	initialPacket.Frames = append(initialPacket.Frames, handshakeFrame)
-	paddingLength := initialLength - (LongHeaderSize + len(initialPacket.EncodePayload()) + c.Cleartext.Write.Overhead())
+	paddingLength := initialLength - (initialPacket.header.Length() + len(initialPacket.EncodePayload()) + c.Cleartext.Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		initialPacket.Frames = append(initialPacket.Frames, new(PaddingFrame))
 	}
@@ -161,7 +165,8 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *HandshakePacket, error) { // Returns whether or not the TLS Handshake should continue
 	if c.ZeroRTTprotected == nil {
-		c.ConnectionId = packet.header.ConnectionId() // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+		lHeader := packet.Header().(*LongHeader)
+		c.DestinationCID = lHeader.SourceCID  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
 	}
 
 	var serverData []byte
@@ -214,7 +219,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	c.TransitionTo(QuicVersion, QuicALPNToken, nil)
 	return nil
 }
-func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
+func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 	saveCleartext := func (ct []byte) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct)}}
 
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
@@ -224,88 +229,95 @@ func (c *Connection) ReadNextPacket() (Packet, error, []byte) {
 	}
 	rec = rec[:i]
 
-	var headerLen uint8
-	var header Header
-	if rec[0] & 0x80 == 0x80 {  // Is there a long header ?
-		headerLen = LongHeaderSize
-		header = ReadLongHeader(bytes.NewReader(rec[:headerLen]))
-	} else {
-		buf := bytes.NewReader(rec[:LongHeaderSize])
-		header = ReadShortHeader(buf, c)  // TODO: Find a better upper bound
-		headerLen = uint8(int(buf.Size()) - buf.Len())
-	}
+	var packets []Packet
+	var off int
 
-	var packet Packet
-	if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
-		packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
-		for k := range c.retransmissionBuffer {
-			delete(c.retransmissionBuffer, k)
-		}
-		saveCleartext(rec)
-	} else {
-		switch header.PacketType() {
-		case Handshake:
-			payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
-			if err != nil {
-				return nil, err, rec
-			}
-			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-			saveCleartext(append(rec[:headerLen], payload...))
-			packet = ReadHandshakePacket(buffer, c)
-		case ZeroRTTProtected, OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:  // Packets with a short header always include a 1-RTT protected payload.
-			if c.Protected == nil {
-				//println("Crypto state is not ready to decrypt protected packets")
-				return c.ReadNextPacket()  // Packet may have been reordered, TODO: Implement a proper packet queue instead of triggering retransmissions
-			}
-			payload, err := c.Protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
-			if err != nil {
-				return nil, err, rec
-			}
-			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-			saveCleartext(append(rec[:headerLen], payload...))
-			packet = ReadProtectedPacket(buffer, c)
-		case Initial:
-			payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[headerLen:], rec[:headerLen])
-			if err != nil {
-				return nil, err, rec
-			}
-			buffer := bytes.NewReader(append(rec[:headerLen], payload...))
-			saveCleartext(append(rec[:headerLen], payload...))
-			packet = ReadInitialPacket(buffer, c)
-		default:
-			spew.Dump(header)
-			panic(header.PacketType())
-		}
+	for len(rec) > off {
+		header := ReadHeader(bytes.NewReader(rec[off:]), c)
 
-		fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+		var packet Packet
 
-		for _, number := range c.ackQueue {
-			if number == fullPacketNumber  {
-				fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
-				spew.Dump(packet)
-				return c.ReadNextPacket()
-				// TODO: Should it be acked again ?
+		if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
+			packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+			for k := range c.retransmissionBuffer {
+				delete(c.retransmissionBuffer, k)
 			}
-		}
-		c.ackQueue = append(c.ackQueue, fullPacketNumber)
-		c.ExpectedPacketNumber = fullPacketNumber + 1
+			saveCleartext(rec)
+			off = len(rec)
+		} else {
+			hLen := header.Length()
+			var data []byte
+			switch header.PacketType() {
+			case Handshake, Initial:
+				longHeader := header.(*LongHeader)
+				pLen := int(longHeader.PayloadLength)
 
-		if framePacket, ok := packet.(Framer); ok {
-			for _, f := range framePacket.GetFrames() {
-				if ack, ok := f.(*AckFrame); ok {
-					c.RetransmitFrames(c.ProcessAck(ack))
+				payload, err := c.Cleartext.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[off+hLen:off+hLen+pLen], rec[off:off+hLen])
+				if err != nil {
+					return packets, err, rec
+				}
+				data = append(append(data, rec[off:off+hLen]...), payload...)
+				off += hLen + pLen
+			case OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:  // Packets with a short header always include a 1-RTT protected payload.
+				if c.Protected == nil {
+					println("Crypto state is not ready to decrypt protected packets")
+					return c.ReadNextPackets() // Packet may have been reordered, TODO: Implement a proper packet queue instead of triggering retransmissions
+				}
+				payload, err := c.Protected.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[off+hLen:], rec[off:off+hLen])
+				if err != nil {
+					return packets, err, rec
+				}
+				data = append(append(data, rec[off:off+hLen]...), payload...)
+				off = len(rec)
+			default:
+				spew.Dump(header)
+				return packets, errors.New("unknown packet type"), rec
+			}
+
+			saveCleartext(data)
+			buffer := bytes.NewReader(data)
+
+			switch header.PacketType() {
+			case Handshake:
+				packet = ReadHandshakePacket(buffer, c)
+			case OneBytePacketNumber, TwoBytesPacketNumber, FourBytesPacketNumber:
+				packet = ReadProtectedPacket(buffer, c)
+			case Initial:
+				packet = ReadInitialPacket(buffer, c)
+			}
+
+			fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
+
+			for _, number := range c.ackQueue {
+				if number == fullPacketNumber  {
+					fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
+					spew.Dump(packet)
+					return c.ReadNextPackets()
+					// TODO: Should it be acked again ?
+				}
+			}
+			c.ackQueue = append(c.ackQueue, fullPacketNumber)
+			c.ExpectedPacketNumber = fullPacketNumber + 1
+
+			if framePacket, ok := packet.(Framer); ok {
+				for _, f := range framePacket.GetFrames() {
+					if ack, ok := f.(*AckFrame); ok {
+						c.RetransmitFrames(c.ProcessAck(ack))
+					}
+				}
+
+				if pathChallenge := framePacket.GetFirst(PathChallengeType); pathChallenge != nil {
+					handshakeResponse := NewHandshakePacket(c)
+					handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).data})
+					c.SendHandshakeProtectedPacket(handshakeResponse)
 				}
 			}
 
-			if pathChallenge := framePacket.GetFirst(PathChallengeType); pathChallenge != nil {
-				handshakeResponse := NewHandshakePacket(c)
-				handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).data})
-				c.SendHandshakeProtectedPacket(handshakeResponse)
-			}
+			packets = append(packets, packet)
 		}
 	}
 
-	return packet, nil, rec
+	return packets, nil, rec
 }
 func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on the packet numbers received
 	sort.Sort(PacketNumberQueue(c.ackQueue))
@@ -412,8 +424,10 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	return udpConn, nil
 }
 func NewDefaultConnection(address string, serverName string, resumptionSecret []byte, useIPv6 bool) (*Connection, error) {
-	cId := make([]byte, 8, 8)
-	rand.Read(cId)
+	scid := make([]byte, 8, 8)
+	dcid := make([]byte, 8, 8)
+	rand.Read(scid)
+	rand.Read(dcid)
 
 	var network string
 	if useIPv6 {
@@ -431,18 +445,19 @@ func NewDefaultConnection(address string, serverName string, resumptionSecret []
 		return nil, err
 	}
 
-	c := NewConnection(serverName, QuicVersion, QuicALPNToken, uint64(binary.BigEndian.Uint64(cId)), udpConn, resumptionSecret)
+	c := NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionSecret)
 	c.UseIPv6 = useIPv6
 	c.Host = udpAddr
 	return c, nil
 }
 
-func NewConnection(serverName string, version uint32, ALPN string, connectionId uint64, udpConn *net.UDPConn, resumptionSecret []byte) *Connection {
+func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, DCID[]byte , udpConn *net.UDPConn, resumptionSecret []byte) *Connection {
 	c := new(Connection)
 	c.ServerName = serverName
 	c.UdpConnection = udpConn
-	c.ConnectionId = connectionId
-	c.PacketNumber = c.ConnectionId & 0x7fffffff
+	c.SourceCID = SCID
+	c.DestinationCID = DCID
+	c.PacketNumber = binary.BigEndian.Uint64(c.SourceCID) & 0x7fffffff
 	c.omitConnectionId = false
 	c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
 
@@ -464,10 +479,4 @@ func NewConnection(serverName string, version uint32, ALPN string, connectionId 
 	c.TransitionTo(version, ALPN, resumptionSecret)
 
 	return c
-}
-
-func assert(value bool) {
-	if !value {
-		panic("")
-	}
 }

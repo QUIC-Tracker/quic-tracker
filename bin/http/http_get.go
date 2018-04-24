@@ -118,6 +118,10 @@ func main() {
 	}
 
 	trace.Complete(conn)
+	err = trace.AddPcap(pcap)
+	if err != nil {
+		trace.Results["pcap_error"] = err.Error()
+	}
 
 	var t []m.Trace
 	t = append(t, *trace)

@@ -65,7 +65,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		}
 	}
 
-	resumptionSecret := conn.Tls.GetResumptionTicket()
+	resumptionSecret := conn.Tls.ResumptionTicket()
 
 	if len(resumptionSecret) == 0 {
 		trace.ErrorCode = ZR_NoResumptionSecret

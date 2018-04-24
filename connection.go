@@ -192,13 +192,14 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *Handsha
 
 		if !notCompleted {
 			c.Protected = NewProtectedCryptoState(c.Tls)
+			c.ExporterSecret = c.Tls.ExporterSecret()
 
 			// TODO: Export secret if completed
 			// TODO: Check negotiated ALPN ?
 
-			err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.GetReceivedQUICTransportParameters())
+			err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.ReceivedQUICTransportParameters())
 			if err != nil {
-				return true, handshakePacket, err
+				return false, handshakePacket, err
 			}
 		}
 		return notCompleted, handshakePacket,  nil

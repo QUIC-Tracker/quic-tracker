@@ -78,6 +78,11 @@ func (t *Trace) AttachTo(conn *Connection) {
 	}
 }
 
+func (t *Trace) Complete(conn *Connection) {
+	t.ClientRandom = conn.ClientRandom
+	t.ExporterSecret = conn.ExporterSecret
+}
+
 type Direction string
 
 const ToServer Direction = "to_server"

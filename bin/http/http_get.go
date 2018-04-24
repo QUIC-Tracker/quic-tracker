@@ -117,6 +117,8 @@ func main() {
 		}
 	}
 
+	trace.Complete(conn)
+
 	var t []m.Trace
 	t = append(t, *trace)
 	out, err := json.Marshal(t)

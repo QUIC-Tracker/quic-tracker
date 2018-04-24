@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"github.com/davecgh/go-spew/spew"
 	"errors"
 )
 
@@ -44,31 +43,38 @@ func (s *AbstractScenario) IPv6() bool {
 	return s.ipv6
 }
 
-func CompleteHandshake(conn *m.Connection) error {
+func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	for ongoingHandhake {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if scp, ok := packet.(*m.HandshakePacket); ok {
-			ongoingHandhake, err = conn.ProcessServerHello(scp)
-			if err != nil {
-				return err
+		for i, packet := range packets {
+			if !ongoingHandhake {
+				return packets[i:], nil
 			}
-		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			err := conn.ProcessVersionNegotation(vn)
-			if err != nil {
-				return err
+			if scp, ok := packet.(*m.HandshakePacket); ok {
+				ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
+				if err != nil {
+					return nil, err
+				}
+				if packet != nil {
+					conn.SendHandshakeProtectedPacket(packet)
+				}
+			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				err := conn.ProcessVersionNegotation(vn)
+				if err != nil {
+					return nil, err
+				}
+				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+			} else if ongoingHandhake {
+				return nil, errors.New("Received incorrect packet type during handshake")
 			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-		} else {
-			defer spew.Dump(packet)
-			return errors.New("Received incorrect packet type during handshake")
 		}
 	}
 
-	return nil
+	return nil, nil
 }

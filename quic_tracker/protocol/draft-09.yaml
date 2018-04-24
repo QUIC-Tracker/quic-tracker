@@ -25,13 +25,16 @@ Long Header:
   - Long Packet Type:
       length: 7
       values: [0x7f, 0x7e, 0x7d, 0x7c]
+      format: hex
   - Connection ID:
       length: 64
+      format: hex
   - Version:
       length: 32
       values:
         neq: 0
-  - Packet number:
+      format: hex
+  - Packet Number:
       length: 32
   - Payload:
       parse: Frame
@@ -59,6 +62,7 @@ Short Header:
       conditions:
         - Omit Connection ID Flag:
             eq: 0
+      format: hex
   - Packet Number:
       length: [8, 16, 32]
   - Protected Payload:
@@ -77,27 +81,32 @@ Version Negotiation Packet:
   - Supported Version:
       length: 32
       repeated:
+      format: hex
 Stateless Reset Packet:
   - Random Octets:
       length: '*'
   - Stateless Reset Token:
       length: 128
+      format: hex
 PADDING:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x00
       repeated:
+      format: hex
   - next: Frame
 RST_STREAM:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x01
+      format: hex
   - Stream ID:
       length: varint
   - Application Error Code:
       length: 16
+      format: hex
   - Final Offset:
       length: varint
   - next: Frame
@@ -106,8 +115,10 @@ CONNECTION_CLOSE:
   - Frame Type:
       length: 8
       values: 0x02
+      format: hex
   - Error Code:
       length: 16
+      format: hex
   - Reason Phrase Length:
       length: varint
       triggers:
@@ -121,8 +132,10 @@ APPLICATION_CLOSE:
   - Frame Type:
       length: 8
       values: 0x03
+      format: hex
   - Error Code:
       length: 16
+      format: hex
   - Reason Phrase Length:
       length: varint
       triggers:
@@ -134,6 +147,7 @@ MAX_DATA:
   - Frame Type:
       length: 8
       values: 0x04
+      format: hex
   - Maximum Data:
       length: varint
   - next: Frame
@@ -142,6 +156,7 @@ MAX_STREAM_DATA:
   - Frame Type:
       length: 8
       values: 0x05
+      format: hex
   - Stream ID:
       length: varint
   - Maximum Stream Data:
@@ -152,6 +167,7 @@ MAX_STREAM_ID:
   - Frame Type:
       length: 8
       values: 0x06
+      format: hex
   - Maximum Stream ID:
       length: varint
   - next: Frame
@@ -160,6 +176,7 @@ PING:
   - Frame Type:
       length: 8
       values: 0x07
+      format: hex
   - Length:
       length: 8
       triggers:
@@ -167,12 +184,14 @@ PING:
             length: set
   - Data:
       length: 0
+      format: hex
   - next: Frame
 BLOCKED:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x08
+      format: hex
   - Offset:
       length: varint
   - next: Frame
@@ -181,6 +200,7 @@ STREAM_BLOCKED:
   - Frame Type:
       length: 8
       values: 0x09
+      format: hex
   - Stream ID:
       length: varint
   - Offset:
@@ -191,6 +211,7 @@ STREAM_ID_BLOCKED:
   - Frame Type:
       length: 8
       values: 0x0a
+      format: hex
   - Stream ID:
       length: varint
   - next: Frame
@@ -199,40 +220,48 @@ NEW_CONNECTION_ID:
   - Frame Type:
       length: 8
       values: 0x0b
+      format: hex
   - Sequence:
       length: varint
   - Connection ID:
       length: 64
+      format: hex
   - Stateless Reset Token:
       length: 128
+      format: hex
   - next: Frame
 STOP_SENDING:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x0c
+      format: hex
   - Stream ID:
       length: varint
   - Application Error Code:
       length: 16
+      format: hex
   - next: Frame
 PONG:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x0d
+      format: hex
   - Length:
       length: 8
       triggers:
         - Data:
             length: set
-  - Data
+  - Data:
+      format: hex
   - next: Frame
 ACK:
   - type: Frame
   - Frame Type:
       length: 8
       values: 0x0e
+      format: hex
   - Largest Acknowledged:
       length: varint
   - ACK Delay:
@@ -257,6 +286,7 @@ STREAM:
   - Frame Type:
       length: 5
       values: 0x02
+      format: hex
   - OFF bit:
       length: 1
   - LEN bit:
@@ -280,4 +310,5 @@ STREAM:
             length: set
   - Stream Data:
       length: '*'
+      format: bytes
   - next: Frame

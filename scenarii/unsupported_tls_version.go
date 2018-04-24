@@ -18,6 +18,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+	"bytes"
 )
 
 const (
@@ -39,37 +40,39 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 
 	var connectionClosed bool
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			break
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			handshakePacket := m.NewHandshakePacket(conn)
-			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
-			conn.SendHandshakeProtectedPacket(handshakePacket)
-		}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				handshakePacket := m.NewHandshakePacket(conn)
+				handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
+				conn.SendHandshakeProtectedPacket(handshakePacket)
+			}
 
-		if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.MarkError(UTS_VNDidNotComplete, err.Error())
-				return
-			}
-			sendUnsupportedInitial(conn)
-		} else if fPacket, ok := packet.(m.Framer); ok {
-			for _, frame := range fPacket.GetFrames() {
-				if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
-					if cc.ErrorCode != 0x201 {
-						trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
-					}
-					trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
-					connectionClosed = true
+			if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				if err := conn.ProcessVersionNegotation(vn); err != nil {
+					trace.MarkError(UTS_VNDidNotComplete, err.Error())
+					return
 				}
+				sendUnsupportedInitial(conn)
+			} else if fPacket, ok := packet.(m.Framer); ok {
+				for _, frame := range fPacket.GetFrames() {
+					if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
+						if cc.ErrorCode != 0x201 {
+							trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
+						}
+						trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
+						connectionClosed = true
+					}
+				}
+			} else {
+				trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
 			}
-		} else {
-			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
 		}
 	}
 
@@ -81,6 +84,10 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 
 func sendUnsupportedInitial(conn *m.Connection) {
 	initialPacket := conn.GetInitialPacket()
-	initialPacket.Frames[0].(*m.StreamFrame).StreamData[60] = 0x00 // Advertise support of TLS 1.3 draft-00
+	for _, f := range initialPacket.Frames {  // Advertise support of TLS 1.3 draft-00 only
+		if streamFrame, ok := f.(*m.StreamFrame); ok {
+			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x7f, 0x1c, 0x7f, 0x1b, 0x7f, 0x1a}, []byte{0x7f, 0x00, 0x7f, 0x00, 0x7f, 0x00}, 1)
+		}
+	}
 	conn.SendHandshakeProtectedPacket(initialPacket)
 }

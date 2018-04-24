@@ -42,7 +42,7 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
 
 	allClosed := true
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(MS_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -66,28 +66,32 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.SendProtectedPacket(protectedPacket)
 
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			return
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
+		for _, packet := range packets {
 
-		for streamId, stream := range conn.Streams {
-			if streamId != 0 && !stream.ReadClosed {
-				allClosed = false
-				break
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
 			}
-		}
 
-		if allClosed {
-			conn.CloseConnection(false, 0, "")
+			for streamId, stream := range conn.Streams {
+				if streamId != 0 && !stream.ReadClosed {
+					allClosed = false
+					break
+				}
+			}
+
+			if allClosed {
+				conn.CloseConnection(false, 0, "")
+				return
+			}
 		}
 	}
 

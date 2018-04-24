@@ -44,7 +44,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
 	conn.TLSTPHandler.MaxStreamIdUni = 3
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(GS2_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -57,7 +57,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 
 outerLoop:
 	for i := 0 ; i < 50 ; i++ {
-		readPacket, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 		if err != nil {
 			switch e := err.(type) {
 			case *net.OpError:
@@ -72,38 +72,40 @@ outerLoop:
 			return
 		}
 
-		switch pp := readPacket.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range pp.Frames {
-				switch f2 := f.(type) {
-				case *m.StreamFrame:
-					if f2.StreamId == 2 {
-						trace.MarkError(GS2_ReceivedDataOnStream2, "")
+		for _, packet := range packets {
+			switch pp := packet.(type) {
+			case *m.ProtectedPacket:
+				for _, f := range pp.Frames {
+					switch f2 := f.(type) {
+					case *m.StreamFrame:
+						if f2.StreamId == 2 {
+							trace.MarkError(GS2_ReceivedDataOnStream2, "")
+							break outerLoop
+						} else if f2.StreamId > 3 {
+							trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
+						} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
+							// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
+							// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
+							// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
+						}
+					case *m.ConnectionCloseFrame:
+						if trace.ErrorCode == GS2_TooLowStreamIdUniToSendRequest {
+							trace.ErrorCode = 0
+						}
 						break outerLoop
-					} else if f2.StreamId > 3 {
-						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
-					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
-						// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
-						// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
-						// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
 					}
-				case *m.ConnectionCloseFrame:
-					if trace.ErrorCode == GS2_TooLowStreamIdUniToSendRequest {
-						trace.ErrorCode = 0
-					}
-					break outerLoop
 				}
-			}
-			if pp.ShouldBeAcknowledged() {
-				toSend := m.NewProtectedPacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(toSend)
-			}
+				if pp.ShouldBeAcknowledged() {
+					toSend := m.NewProtectedPacket(conn)
+					toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+					conn.SendProtectedPacket(toSend)
+				}
 
-		default:
-			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-			conn.SendHandshakeProtectedPacket(toSend)
+			default:
+				toSend := m.NewHandshakePacket(conn)
+				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+				conn.SendHandshakeProtectedPacket(toSend)
+			}
 		}
 
 	}

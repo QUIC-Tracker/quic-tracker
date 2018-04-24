@@ -58,21 +58,27 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 	conn.Version = ForceVersionNegotiation
 	initial := conn.GetInitialPacket()
 	conn.SendHandshakeProtectedPacket(initial)
-	packet, err, _ := conn.ReadNextPacket()
+	packets, err, _ := conn.ReadNextPackets()
 
-	vn1 := handlePacket(packet, err)
-	if vn1 != nil {
-		conn.SendHandshakeProtectedPacket(initial)
-		packet, err, _ = conn.ReadNextPacket()
-		vn2 := handlePacket(packet, err)
-		if vn2 != nil && vn1.UnusedField == vn2.UnusedField {
+	for _, packet := range packets {
+		vn1 := handlePacket(packet, err)
+		if vn1 != nil {
 			conn.SendHandshakeProtectedPacket(initial)
-			packet, err, _ = conn.ReadNextPacket()
-			vn3 := handlePacket(packet, err)
-			if vn3 != nil && vn3.UnusedField != vn2.UnusedField {
-				trace.ErrorCode = 0
-			} else {
-				trace.ErrorCode = VN_UnusedFieldIsIdentical
+			packets, err, _ = conn.ReadNextPackets()
+			for _, packet := range packets {
+				vn2 := handlePacket(packet, err)
+				if vn2 != nil && vn1.UnusedField == vn2.UnusedField {
+					conn.SendHandshakeProtectedPacket(initial)
+					packets, err, _ = conn.ReadNextPackets()
+					for _, packet := range packets {
+						vn3 := handlePacket(packet, err)
+						if vn3 != nil && vn3.UnusedField != vn2.UnusedField {
+							trace.ErrorCode = 0
+						} else {
+							trace.ErrorCode = VN_UnusedFieldIsIdentical
+						}
+					}
+				}
 			}
 		}
 	}

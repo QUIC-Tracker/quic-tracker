@@ -38,7 +38,7 @@ func NewFlowControlScenario() *FlowControlScenario {
 func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
 
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(FC_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -48,7 +48,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	var shouldResume bool
 
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
@@ -59,33 +59,36 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 			trace.MarkError(FC_HostSentMoreThanLimit, "")
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
-		if pp, ok := packet.(*m.ProtectedPacket); ok {
-			for _, frame := range pp.Frames {
-				_, isGloballyBlocked := frame.(*m.BlockedFrame)
-				_, isStreamBlocked := frame.(*m.StreamBlockedFrame)
-				if isGloballyBlocked || isStreamBlocked {
-					break
-				}
-			}
-			readOffset := conn.Streams[4].ReadOffset
-			if conn.Streams[4].ReadClosed {
-				continue
-			}
-			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
-				maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
-				conn.TLSTPHandler.MaxData *= 2
-				maxStreamData := m.MaxStreamDataFrame{4,uint64(conn.TLSTPHandler.MaxStreamData * 2)}
-				conn.TLSTPHandler.MaxStreamData *= 2
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
 				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, maxData, maxStreamData)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 				conn.SendProtectedPacket(protectedPacket)
-				shouldResume = true
+			}
+
+			if pp, ok := packet.(*m.ProtectedPacket); ok {
+				for _, frame := range pp.Frames {
+					_, isGloballyBlocked := frame.(*m.BlockedFrame)
+					_, isStreamBlocked := frame.(*m.StreamBlockedFrame)
+					if isGloballyBlocked || isStreamBlocked {
+						break
+					}
+				}
+				if conn.Streams[4].ReadClosed {
+					continue
+				}
+
+				readOffset := conn.Streams[4].ReadOffset
+				if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
+					maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
+					conn.TLSTPHandler.MaxData *= 2
+					maxStreamData := m.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamData * 2)}
+					conn.TLSTPHandler.MaxStreamData *= 2
+					protectedPacket := m.NewProtectedPacket(conn)
+					protectedPacket.Frames = append(protectedPacket.Frames, maxData, maxStreamData)
+					conn.SendProtectedPacket(protectedPacket)
+					shouldResume = true
+				}
 			}
 		}
 	}

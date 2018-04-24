@@ -75,7 +75,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 0
 	conn.TLSTPHandler.MaxStreamIdUni = 0
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
 		trace.MarkError(SGW_TLSHandshakeFailed, err.Error())
 		return
@@ -96,7 +96,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 	var receivedAckBlocks [][]m.AckBlock
 
 	for i := 0; i < 50; i++ {
-		readPacket, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 		if err != nil {
 			switch e := err.(type) {
 			case *net.OpError:
@@ -123,76 +123,78 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 			return
 		}
 
-		switch pp := readPacket.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range pp.Frames {
-				switch f2 := f.(type) {
-				case *m.StreamFrame:
-					if f2.StreamId == 4 {
-						receivedRequestedData = true
-					}
-					if _, ok := receivedStreamOffsets[f2.StreamId]; !ok {
-						// We received a frame on a forbidden stream
-						if _, ok := errors[SGW_WrongStreamIDReceived]; !ok {
-							errors[SGW_WrongStreamIDReceived] = true
-							message := fmt.Sprintf("received StreamID %d", f2.StreamId)
-							errorMessages = append(errorMessages, message)
-							trace.MarkError(SGW_WrongStreamIDReceived, "")
+		for _, packet := range packets {
+			switch pp := packet.(type) {
+			case *m.ProtectedPacket:
+				for _, f := range pp.Frames {
+					switch f2 := f.(type) {
+					case *m.StreamFrame:
+						if f2.StreamId == 4 {
+							receivedRequestedData = true
 						}
-					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
-						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
-					}
-					if f2.Length == 0 && !f2.FinBit {
-						if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
-							errors[SGW_EmptyStreamFrameNoFinBit] = true
-							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
-							errorMessages = append(errorMessages, message)
-							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message)
-						}
-					}
-				case *m.AckFrame:
-					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber & 0xffffffff00000000) | uint64(requestPacketNumber) {
-						duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
-
-						// check if we already receive these ack blocks
-						for _, blocks := range receivedAckBlocks {
-							if reflect.DeepEqual(blocks, f2.AckBlocks) {
-								// in this case, the ack blocks are the same and the largest acknowledged is the same
-								duplicated = true
-								break
-							}
-						}
-
-						if duplicated {
-							if _, ok := errors[SGW_RetransmittedAck]; !ok {
-								errors[SGW_RetransmittedAck] = true
-								message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
+						if _, ok := receivedStreamOffsets[f2.StreamId]; !ok {
+							// We received a frame on a forbidden stream
+							if _, ok := errors[SGW_WrongStreamIDReceived]; !ok {
+								errors[SGW_WrongStreamIDReceived] = true
+								message := fmt.Sprintf("received StreamID %d", f2.StreamId)
 								errorMessages = append(errorMessages, message)
-								trace.MarkError(SGW_RetransmittedAck, message)
+								trace.MarkError(SGW_WrongStreamIDReceived, "")
 							}
-						} else {
-							// record the received ack blocks
-							receivedAckBlocks = append(receivedAckBlocks, f2.AckBlocks)
+						} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
+							receivedStreamOffsets[f2.StreamId][f2.Offset] = true
 						}
+						if f2.Length == 0 && !f2.FinBit {
+							if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
+								errors[SGW_EmptyStreamFrameNoFinBit] = true
+								message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
+								errorMessages = append(errorMessages, message)
+								trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message)
+							}
+						}
+					case *m.AckFrame:
+						if f2.LargestAcknowledged == (conn.ExpectedPacketNumber&0xffffffff00000000)|uint64(requestPacketNumber) {
+							duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
+
+							// check if we already receive these ack blocks
+							for _, blocks := range receivedAckBlocks {
+								if reflect.DeepEqual(blocks, f2.AckBlocks) {
+									// in this case, the ack blocks are the same and the largest acknowledged is the same
+									duplicated = true
+									break
+								}
+							}
+
+							if duplicated {
+								if _, ok := errors[SGW_RetransmittedAck]; !ok {
+									errors[SGW_RetransmittedAck] = true
+									message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
+									errorMessages = append(errorMessages, message)
+									trace.MarkError(SGW_RetransmittedAck, message)
+								}
+							} else {
+								// record the received ack blocks
+								receivedAckBlocks = append(receivedAckBlocks, f2.AckBlocks)
+							}
+						}
+					case *m.ConnectionCloseFrame:
+						return
 					}
-				case *m.ConnectionCloseFrame:
-					return
+
+				}
+				if pp.ShouldBeAcknowledged() {
+					toSend := m.NewProtectedPacket(conn)
+					toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+					conn.SendProtectedPacket(toSend)
 				}
 
-			}
-			if pp.ShouldBeAcknowledged() {
-				toSend := m.NewProtectedPacket(conn)
+			default:
+				toSend := m.NewHandshakePacket(conn)
 				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(toSend)
+				conn.SendHandshakeProtectedPacket(toSend)
 			}
-
-		default:
-			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-			conn.SendHandshakeProtectedPacket(toSend)
 		}
-
 	}
+
 	if conn.TLSTPHandler.ReceivedParameters.IdleTimeout <= 10 {
 		// FIXME: accurate timeout measurement
 		// the peer did not close the connection

@@ -57,6 +57,8 @@ handshake_retransmission:
   error_codes:
     1: The host did not retransmit any Handshake packet
     2: No version advertised by the host matched the versions of the test
+    3: The TLS handshake failed
+    4: The host sent more than 3 Handshake packets but did not include a <code>PATH_CHALLENGE</code>
 handshake_v6:
   name: Handshake IPv6
   description: |
@@ -155,6 +157,14 @@ version_negotiation:
     3: VN_LastTwoVersionsAreActuallySeal  # Not used anymore
     4: The host timed out before responding to version negotiation
     5: The host sent Version Negotiation packets with identical Unused field.
+zero_rtt:
+  name: 0-RTT
+  description: This test performs a regular 1-RTT connection then close it and uses the resumption secret to establish a 0-RTT connection. A HTTP GET request is performed during 0-RTT connection establishment and the host is checked to answer the request.
+  error_codes:
+    1: The 1-RTT TLS handshake failed
+    2: No resumption secret was provided by the host
+    3: The 0-RTT TLS handshake failed
+    4: The host didn't send the requested data on stream 4
 stream_opening_reordering:
   name: Stream opening reordering
   description: |
@@ -162,3 +172,6 @@ stream_opening_reordering:
   error_codes:
     1: The TLS handshake failed
     2: The host did not answer to the <code>GET</code> request
+http_get:
+  name: CLI HTTP GET
+  description: ~

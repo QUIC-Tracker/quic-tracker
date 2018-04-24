@@ -34,7 +34,8 @@ func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
+	packets, err := CompleteHandshake(conn)
+	if err != nil {
 		trace.MarkError(SOR_TLSHandshakeFailed, "")
 		return
 	}
@@ -51,21 +52,24 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 	conn.SendProtectedPacket(pp1)
 
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ = conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
 			break
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
+		for _, packet := range packets {
 
-		if conn.Streams[4].ReadClosed {
-			break
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+			}
+
+			if conn.Streams[4].ReadClosed {
+				break
+			}
 		}
 	}
 

@@ -18,6 +18,8 @@ package masterthesis
 
 import (
 	"os/exec"
+	"time"
+	"strings"
 )
 
 type Trace struct {
@@ -37,6 +39,19 @@ type Trace struct {
 	ExporterSecret  []byte				   `json:"exporter_secret"`
 }
 
+func NewTrace(scenarioName string, scenarioVersion int, host string) *Trace {
+	trace := Trace{
+		Scenario:        scenarioName,
+		ScenarioVersion: scenarioVersion,
+		Commit:          GitCommit(),
+		Host:            host,
+		StartedAt:       time.Now().Unix(),
+		Results:         make(map[string]interface{}),
+	}
+
+	return &trace
+}
+
 func (t *Trace) AddPcap(c *exec.Cmd) error {
 	content, err := StopPcapCapture(c)
 	if err != nil {
@@ -54,6 +69,20 @@ func (t *Trace) MarkError(error uint8, message string) {
 	}
 }
 
+func (t *Trace) AttachTo(conn *Connection) {
+	conn.ReceivedPacketHandler = func(data []byte) {
+		t.Stream = append(t.Stream, TracePacket{Direction: ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
+	}
+	conn.SentPacketHandler = func(data []byte) {
+		t.Stream = append(t.Stream, TracePacket{Direction: ToServer, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
+	}
+}
+
+func (t *Trace) Complete(conn *Connection) {
+	t.ClientRandom = conn.ClientRandom
+	t.ExporterSecret = conn.ExporterSecret
+}
+
 type Direction string
 
 const ToServer Direction = "to_server"
@@ -64,4 +93,17 @@ type TracePacket struct {
 	Timestamp    int64     `json:"timestamp"`
 	Data         []byte    `json:"data"`
 	IsOfInterest bool	   `json:"is_of_interest"`
+}
+
+func GitCommit() string {
+	var (
+		cmdOut []byte
+		err    error
+	)
+	cmdName := "git"
+	cmdArgs := []string{"rev-parse", "--verify", "HEAD"}
+	if cmdOut, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
+		panic(err)
+	}
+	return strings.TrimSpace(string(cmdOut))
 }

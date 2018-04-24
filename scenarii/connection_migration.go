@@ -36,7 +36,7 @@ func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
+	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(CM_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -44,17 +44,21 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 
 	for {  // Acks and restransmits if needed
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
+
 		if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
 			break
 		} else if err != nil {
 			trace.Results["error"] = err.Error()
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
+		for _, packet := range packets {
+
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+			}
 		}
 	}
 
@@ -71,7 +75,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	trace.ErrorCode = CM_HostDidNotMigrate  // Assume it until proven wrong
 
 	for {
-		packet, err, _ := conn.ReadNextPacket()
+		packets, err, _ := conn.ReadNextPackets()
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
@@ -82,15 +86,17 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 			trace.ErrorCode = 0
 		}
 
-		if packet.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
+		for _, packet := range packets {
+			if packet.ShouldBeAcknowledged() {
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(protectedPacket)
+			}
 
-		if conn.Streams[4].ReadClosed {
-			conn.CloseConnection(false, 0, "")
-			break
+			if conn.Streams[4].ReadClosed {
+				conn.CloseConnection(false, 0, "")
+				return
+			}
 		}
 	}
 }

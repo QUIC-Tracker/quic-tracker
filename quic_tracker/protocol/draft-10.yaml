@@ -1,0 +1,316 @@
+#
+#   Maxime Piraux's master's thesis
+#   Copyright (C) 2017-2018  Maxime Piraux
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License version 3
+#   as published by the Free Software Foundation.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+top:
+  - Long Header
+  - Short Header
+  - Version Negotiation Packet
+Long Header:
+  - Header Form:
+      length: 1
+      values: 1
+  - Long Packet Type:
+      length: 7
+      values: [0x7f, 0x7e, 0x7d, 0x7c]
+      format: hex
+  - Connection ID:
+      length: 64
+      format: hex
+  - Version:
+      length: 32
+      values:
+        neq: 0
+      format: hex
+  - Packet Number:
+      length: 32
+  - Payload:
+      parse: Frame
+Short Header:
+  - Header Form:
+      length: 1
+      values: 0
+  - Omit Connection ID Flag:
+      length: 1
+  - Key Phase Bit:
+      length: 1
+  - Fourth bit:
+      length: 1
+  - Google QUIC Demultipexing Bit:
+      length: 1
+  - Short Packet Type:
+      length: 3
+      values: [0x0, 0x1, 0x2]
+      triggers:
+        - Packet Number:
+            length:
+              0x2: 32
+              0x1: 16
+              0x0: 8
+      format: hex
+  - Connection ID:
+      length: 64
+      conditions:
+        - Omit Connection ID Flag:
+            eq: 0
+      format: hex
+  - Packet Number:
+      length: [8, 16, 32]
+  - Protected Payload:
+      parse: Frame
+Version Negotiation Packet:
+  - Header Form:
+      length: 1
+      values: 1
+  - Unused:
+      length: 7
+  - Connection ID:
+      length: 64
+      format: hex
+  - Version:
+      length: 32
+      values: 0
+  - Supported Version:
+      length: 32
+      repeated:
+      format: hex
+Stateless Reset Packet:
+  - Random Octets:
+      length: '*'
+  - Stateless Reset Token:
+      length: 128
+      format: hex
+PADDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x00
+      repeated:
+      format: hex
+  - next: Frame
+RST_STREAM:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x01
+      format: hex
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+      format: hex
+  - Final Offset:
+      length: varint
+  - next: Frame
+CONNECTION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x02
+      format: hex
+  - Error Code:
+      length: 16
+      format: hex
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - Reason Phrase:
+      length: 0
+  - next: Frame
+APPLICATION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x03
+      format: hex
+  - Error Code:
+      length: 16
+      format: hex
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - next: Frame
+MAX_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x04
+      format: hex
+  - Maximum Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x05
+      format: hex
+  - Stream ID:
+      length: varint
+  - Maximum Stream Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x06
+      format: hex
+  - Maximum Stream ID:
+      length: varint
+  - next: Frame
+PING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x07
+      format: hex
+  - next: Frame
+BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x08
+      format: hex
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x09
+      format: hex
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_ID_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0a
+      format: hex
+  - Stream ID:
+      length: varint
+  - next: Frame
+NEW_CONNECTION_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0b
+      format: hex
+  - Sequence:
+      length: varint
+  - Connection ID:
+      length: 64
+      format: hex
+  - Stateless Reset Token:
+      length: 128
+      format: hex
+  - next: Frame
+STOP_SENDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0c
+      format: hex
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+      format: hex
+  - next: Frame
+ACK:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0d
+      format: hex
+  - Largest Acknowledged:
+      length: varint
+  - ACK Delay:
+      length: varint
+  - ACK Block Count:
+      length: varint
+      triggers:
+        - ACK Blocks:
+            length: set
+  - First ACK Block:
+      length: varint
+  - ACK Blocks:
+      parse: ACK Block
+  - next: Frame
+ACK Block:
+  - Gap:
+      length: varint
+  - ACK Block:
+      length: varint
+PATH_CHALLENGE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0e
+      format: hex
+  - Data:
+      length: 64
+      format: hex
+  - next: Frame
+PATH_RESPONSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0f
+      format: hex
+  - Data:
+      length: 64
+      format: hex
+  - next: Frame
+STREAM:
+  - type: Frame
+  - Frame Type:
+      length: 5
+      values: 0x02
+      format: hex
+  - OFF bit:
+      length: 1
+  - LEN bit:
+      length: 1
+  - FIN bit:
+      length: 1
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+      conditions:
+        - OFF bit:
+            eq: 1
+  - Length:
+      length: varint
+      conditions:
+        - LEN bit:
+            eq: 1
+      triggers:
+        - Stream Data:
+            length: set
+  - Stream Data:
+      length: '*'
+      format: bytes
+  - next: Frame

@@ -17,12 +17,9 @@
 package masterthesis
 
 import (
-	"github.com/bifurcation/mint"
-	"github.com/bifurcation/mint/syntax"
 	"encoding/binary"
+	"github.com/bifurcation/mint/syntax"
 )
-
-const QuicTPExtensionType = mint.ExtensionType(26)  // https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-9.2
 
 type TransportParametersType uint16
 const (
@@ -30,7 +27,7 @@ const (
 	InitialMaxData         TransportParametersType = 0x0001
 	InitialMaxStreamIdBidi TransportParametersType = 0x0002
 	IdleTimeout            TransportParametersType = 0x0003
-	OmitConnectionId       TransportParametersType = 0x0004 // TODO: Support the following parameters
+	OmitConnectionId       TransportParametersType = 0x0004 // Unused since draft-11
 	MaxPacketSize          TransportParametersType = 0x0005
 	StatelessResetToken    TransportParametersType = 0x0006
 	AckDelayExponent       TransportParametersType = 0x0007
@@ -40,8 +37,8 @@ const (
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
 	MaxStreamData        uint32
 	MaxData              uint32
-	MaxStreamIdBidi      uint32
-	MaxStreamIdUni       uint32
+	MaxStreamIdBidi      uint16
+	MaxStreamIdUni       uint16
 	IdleTimeout          uint16
 	OmitConnectionId     bool
 	MaxPacketSize        uint16
@@ -82,23 +79,6 @@ type EncryptedExtensionsTransportParameters struct {
 	Parameters        TransportParameterList  `tls:"head=2"`
 }
 
-type TPExtensionBody struct {
-	body []byte
-}
-
-func (t TPExtensionBody) Type() mint.ExtensionType {
-	return QuicTPExtensionType
-}
-
-func (t TPExtensionBody) Marshal() ([]byte, error) {
-	return t.body, nil
-}
-
-func (t *TPExtensionBody) Unmarshal(data []byte) (int, error) {
-	t.body = data
-	return len(t.body), nil
-}
-
 type TLSTransportParameterHandler struct {
 	NegotiatedVersion uint32
 	InitialVersion    uint32
@@ -108,14 +88,10 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters: QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxStreamIdBidi: 17, MaxStreamIdUni: 19, IdleTimeout: 10}}
+	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters:
+		QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxStreamIdBidi: 17, MaxStreamIdUni: 19, IdleTimeout: 10}}
 }
-
-func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.ExtensionList) error {
-	if hs != mint.HandshakeTypeClientHello {
-		panic(hs)
-	}
-
+func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter
 	addParameter := func(parametersType TransportParametersType, value interface{}){
 		switch val := value.(type) {
@@ -152,74 +128,57 @@ func (h *TLSTransportParameterHandler) Send(hs mint.HandshakeType, el *mint.Exte
 	for _, p := range h.QuicTransportParameters.AdditionalParameters {
 		parameters = append(parameters, p)
 	}
-	body, err := syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion,
-																TransportParameterList(parameters)})
+	return syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion, TransportParameterList(parameters)})
+}
 
+func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
+	if h.EncryptedExtensionsTransportParameters == nil {
+		h.EncryptedExtensionsTransportParameters = &EncryptedExtensionsTransportParameters{}
+	}
+	_, err := syntax.Unmarshal(data, h.EncryptedExtensionsTransportParameters)
 	if err != nil {
 		return err
 	}
 
-	el.Add(&TPExtensionBody{body})
-	return nil
-}
+	receivedParameters := QuicTransportParameters{}
+	receivedParameters.ToJSON = make(map[string]interface{})
 
-func (h *TLSTransportParameterHandler) Receive(hs mint.HandshakeType, el *mint.ExtensionList) error {
-	var body TPExtensionBody
-	ok, err := el.Find(&body)
-
-	if !ok {
-		return err
+	for _, p := range h.EncryptedExtensionsTransportParameters.Parameters {
+		switch p.ParameterType {
+		case InitialMaxStreamData:
+			receivedParameters.MaxStreamData = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_data"] = receivedParameters.MaxStreamData
+		case InitialMaxData:
+			receivedParameters.MaxData = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
+		case InitialMaxStreamIdBidi:
+			receivedParameters.MaxStreamIdBidi = binary.BigEndian.Uint16(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_id_bidi"] = receivedParameters.MaxStreamIdBidi
+		case IdleTimeout:
+			receivedParameters.IdleTimeout = binary.BigEndian.Uint16(p.Value)
+			receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
+		case OmitConnectionId:
+			receivedParameters.OmitConnectionId = true
+			receivedParameters.ToJSON["omit_connection_id"] = receivedParameters.OmitConnectionId
+		case MaxPacketSize:
+			receivedParameters.MaxPacketSize = binary.BigEndian.Uint16(p.Value)
+			receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
+		case StatelessResetToken:
+			receivedParameters.StatelessResetToken = p.Value
+			receivedParameters.ToJSON["stateless_reset_token"] = receivedParameters.StatelessResetToken
+		case AckDelayExponent:
+			receivedParameters.AckDelayExponent = p.Value[0]
+			receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
+		case InitialMaxStreamIdUni:
+			receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint16(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_id_uni"] = receivedParameters.MaxStreamIdUni
+		default:
+			receivedParameters.AdditionalParameters.AddParameter(p)
+			receivedParameters.ToJSON[string(p.ParameterType)] = p.Value
+		}
 	}
 
-	if hs == mint.HandshakeTypeEncryptedExtensions {
-		if h.EncryptedExtensionsTransportParameters == nil {
-			h.EncryptedExtensionsTransportParameters = &EncryptedExtensionsTransportParameters{}
-		}
-		_, err := syntax.Unmarshal(body.body, h.EncryptedExtensionsTransportParameters)
-		if err != nil {
-			panic(err)
-		}
-		receivedParameters := QuicTransportParameters{}
-		receivedParameters.ToJSON = make(map[string]interface{})
-
-		for _, p := range h.EncryptedExtensionsTransportParameters.Parameters {
-			switch p.ParameterType {
-			case InitialMaxStreamData:
-				receivedParameters.MaxStreamData = binary.BigEndian.Uint32(p.Value)
-				receivedParameters.ToJSON["initial_max_stream_data"] = receivedParameters.MaxStreamData
-			case InitialMaxData:
-				receivedParameters.MaxData = binary.BigEndian.Uint32(p.Value)
-				receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
-			case InitialMaxStreamIdBidi:
-				receivedParameters.MaxStreamIdBidi = binary.BigEndian.Uint32(p.Value)
-				receivedParameters.ToJSON["initial_max_stream_id_bidi"] = receivedParameters.MaxStreamIdBidi
-			case IdleTimeout:
-				receivedParameters.IdleTimeout = binary.BigEndian.Uint16(p.Value)
-				receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
-			case OmitConnectionId:
-				receivedParameters.OmitConnectionId = true
-				receivedParameters.ToJSON["omit_connection_id"] = receivedParameters.OmitConnectionId
-			case MaxPacketSize:
-				receivedParameters.MaxPacketSize = binary.BigEndian.Uint16(p.Value)
-				receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
-			case StatelessResetToken:
-				receivedParameters.StatelessResetToken = p.Value
-				receivedParameters.ToJSON["stateless_reset_token"] = receivedParameters.StatelessResetToken
-			case AckDelayExponent:
-				receivedParameters.AckDelayExponent = p.Value[0]
-				receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
-			case InitialMaxStreamIdUni:
-				receivedParameters.MaxStreamIdUni = binary.BigEndian.Uint32(p.Value)
-				receivedParameters.ToJSON["initial_max_stream_id_uni"] = receivedParameters.MaxStreamIdUni
-			default:
-				receivedParameters.AdditionalParameters.AddParameter(p)
-				receivedParameters.ToJSON[string(p.ParameterType)] = p.Value
-			}
-		}
-
-		h.ReceivedParameters = &receivedParameters
-
-	}
+	h.ReceivedParameters = &receivedParameters
 
 	return nil
 }

@@ -19,63 +19,99 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"time"
-	"github.com/davecgh/go-spew/spew"
 )
 
 const (
 	HR_DidNotRetransmitHandshake = 1
 	HR_VNDidNotComplete          = 2
+	HR_TLSHandshakeFailed        = 3
+	HR_NoPathChallengeReceived   = 4
 )
 
 type HandshakeRetransmissionScenario struct {
 	AbstractScenario
 }
 func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
-	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 1, false}}
+	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 2, false}}
 }
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	initial := conn.GetInitialPacket()
+	conn.SendHandshakeProtectedPacket(initial)
 
-	arrivals := make([]uint64, 0, 10)
+	var arrivals []uint64
+	totalDataReceived := 0
 
 	var start time.Time
-	for  i := 0; i < 20; i++ {
-		packet, err, _ := conn.ReadNextPacket()
+	ongoingHandshake := true
+	receivedPathChallenge := false
+	handshakePacketReceived := 0
+	handshakePacketReceivedBeforePC := 0
+
+outerLoop:
+	for {
+		packets, err, rec := conn.ReadNextPackets()
 
 		if err != nil {
 			break
 		}
 
-		if handshake, ok := packet.(*m.HandshakePacket); ok {
-			var isRetransmit bool
-			for _, frame := range handshake.Frames {  // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
-				if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
-					isRetransmit = true
-					break
+		totalDataReceived += len(rec)
+
+		for _, packet := range packets {
+			if handshake, ok := packet.(*m.HandshakePacket); ok {
+				var isRetransmit bool
+				for _, frame := range handshake.Frames { // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
+					if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
+						isRetransmit = true
+						break
+					}
 				}
-			}
-			if !isRetransmit {
+
+				if isRetransmit {
+					if start.IsZero() {
+						start = time.Now()
+					}
+					arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
+				}
+
+				if ongoingHandshake {
+					ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+					if err != nil {
+						trace.MarkError(HR_TLSHandshakeFailed, err.Error())
+						break outerLoop
+					}
+				}
+
+				handshakePacketReceived++
+				if !receivedPathChallenge {
+					handshakePacketReceivedBeforePC++
+				}
+
+				if handshake.Contains(m.PathChallengeType) {
+					receivedPathChallenge = true
+				}
+			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+				if err := conn.ProcessVersionNegotation(vn); err != nil {
+					trace.MarkError(HR_VNDidNotComplete, err.Error())
+					break outerLoop
+				}
+				initial = conn.GetInitialPacket()
+				conn.SendHandshakeProtectedPacket(initial)
+				totalDataReceived = 0
+			} else {
 				continue
 			}
-			if start.IsZero() {
-				start = time.Now()
-			}
-			arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
-		} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.MarkError(HR_VNDidNotComplete, err.Error())
-				return
-			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-		} else {
-			spew.Dump(packet)
-			return
 		}
 	}
 
 	if len(arrivals) == 1 {
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
 	}
-	trace.Results["arrival_times"] = arrivals
+	if handshakePacketReceived > 3 && !receivedPathChallenge {
+		trace.ErrorCode = HR_NoPathChallengeReceived
+	}
 
+	trace.Results["arrival_times"] = arrivals
+	trace.Results["total_data_received"] = totalDataReceived
+	trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 }

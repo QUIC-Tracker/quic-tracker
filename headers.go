@@ -120,6 +120,7 @@ func (h *ShortHeader) Encode() []byte {
 	typeByte |= 0x30
 	typeByte |= uint8(h.packetType)
 	binary.Write(buffer, binary.BigEndian, typeByte)
+	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
 
 	switch h.packetType {
 	case OneBytePacketNumber:

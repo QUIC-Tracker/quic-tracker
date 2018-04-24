@@ -63,7 +63,7 @@ outerLoop:
 				for _, frame := range handshake.Frames { // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
 					if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
 						isRetransmit = true
-						break outerLoop
+						break
 					}
 				}
 

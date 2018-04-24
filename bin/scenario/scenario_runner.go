@@ -90,6 +90,7 @@ func main() {
 				trace.Ip = ip[:strings.LastIndex(ip, ":")]
 				trace.StartedAt = start.Unix()
 
+				conn.Close()
 				trace.Complete(conn)
 				err = trace.AddPcap(pcap)
 				if err != nil {
@@ -104,9 +105,6 @@ func main() {
 				trace.Results["udp_error"] = err.Error()
 			}
 
-			if conn != nil {
-				conn.Close()
-			}
 			results = append(results, *trace)
 			if debug {
 				println(" ", trace.ErrorCode)

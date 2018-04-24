@@ -47,15 +47,16 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 	conn.CloseConnection(false, 0, "")
 	conn.RetransmissionTicker.Stop()
+
 	for { // Acks and restransmits if needed
 		packet, err, _ := conn.ReadNextPackets()
-		for _, packet := range packet {
-			if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
-				break
-			} else if err != nil {
-				trace.Results["error"] = err.Error()
-			}
 
+		if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
+			break
+		} else if err != nil {
+			trace.Results["error"] = err.Error()
+		}
+		for _, packet := range packet {
 			if packet.ShouldBeAcknowledged() {
 				protectedPacket := m.NewProtectedPacket(conn)
 				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())

@@ -420,7 +420,7 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	udpConn.SetDeadline(time.Now().Add(10*(1e+9)))
+	udpConn.SetDeadline(time.Now().Add(10 * time.Second))
 	return udpConn, nil
 }
 func NewDefaultConnection(address string, serverName string, resumptionSecret []byte, useIPv6 bool) (*Connection, error) {

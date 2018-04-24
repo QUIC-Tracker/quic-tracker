@@ -13,6 +13,7 @@
 #
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import builtins
 import os
 import struct
 from base64 import b64decode
@@ -36,24 +37,24 @@ class ParseError(ValueError):
     pass
 
 
-def parse_packet(buffer):
+def parse_packet(buffer, context):
     last_e = None
     for p in sorted(os.listdir('protocol')):
         with open(os.path.join('protocol', p)) as f:
             try:
-                return p, parse_packet_with(buffer[:], protocol=yaml.load(f))
+                return p, parse_packet_with(buffer[:], protocol=yaml.load(f), context=context)
             except Exception as e:
                 last_e = e
                 continue
     raise last_e
 
 
-def parse_packet_with(buffer, protocol):
+def parse_packet_with(buffer, protocol, context):
     top_level = protocol.pop('top')
     last_e = None
     for top_struct in top_level:
         try:
-            ret, inc, _ = parse_structure(buffer[:], protocol[top_struct], protocol, 0)
+            ret, inc, _ = parse_structure(buffer[:], protocol[top_struct], protocol, 0, context)
             return [(top_struct, ('', ret, 0, inc), 0, inc)]
         except ParseError as e:
             last_e = e
@@ -63,20 +64,20 @@ def parse_packet_with(buffer, protocol):
     return []
 
 
-def yield_structures(buffer, struct_name, protocol, start_idx):
+def yield_structures(buffer, struct_name, protocol, start_idx, context):
     next_struct = struct_name
-    while next_struct and len(buffer) > 0 and buffer:
+    while next_struct and buffer:
         if next_struct not in protocol:
-            ret, inc, next_struct = parse_structure_type(buffer, next_struct, protocol, start_idx)
+            ret, inc, next_struct = parse_structure_type(buffer, next_struct, protocol, start_idx, context)
             yield ret, inc
         else:
-            ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx)
+            ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx, context)
             yield (struct_name, ret), inc
         buffer = buffer[inc:]
         start_idx += inc
 
 
-def parse_structure_type(buffer, type_name, protocol, start_idx):
+def parse_structure_type(buffer, type_name, protocol, start_idx, context):
     def get_struct_type(structure_description):
         for field, args in (list(d.items())[0] for d in structure_description):
             if field == 'type':
@@ -86,7 +87,7 @@ def parse_structure_type(buffer, type_name, protocol, start_idx):
 
     for struct_name, struct_description in structures:
         try:
-            struct, inc, next_struct = parse_structure(buffer, struct_description, protocol, start_idx)
+            struct, inc, next_struct = parse_structure(buffer, struct_description, protocol, start_idx, context)
             return (struct_name, struct, start_idx, start_idx + inc), inc, next_struct
         except ParseError as e:
             #print('%s: %s' % (struct_name, e))
@@ -94,7 +95,7 @@ def parse_structure_type(buffer, type_name, protocol, start_idx):
     raise ParseError('No structure could be parsed for type {}'.format(type_name))
 
 
-def parse_structure(buffer, structure_description, protocol, start_idx):
+def parse_structure(buffer, structure_description, protocol, start_idx, context):
     structure = []
     struct_triggers = {}
     i = 0
@@ -106,21 +107,29 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
     structure_description = list(reversed(structure_description))
     while structure_description and buffer:
         field, args = list(structure_description.pop().items())[0]
+        field_ctx = context.get(field, {})
+
         if field == 'next':
             next_struct = args
             continue
         elif field == 'type':
             continue
 
-        length = struct_triggers.get(field, {}).get('length')
+        length = struct_triggers.get(field, {}).get('length', field_ctx.get('length'))
         if length is not None and 'parse' in args:
             length //= 8
         if length is None:
             length = args.get('length')
-        values = struct_triggers.get(field, {}).get('values', args.get('values'))
-        parse = struct_triggers.get(field, {}).get('parse', args.get('parse'))
-        conditions = struct_triggers.get(field, {}).get('conditions', args.get('conditions'))
-        triggers = struct_triggers.get(field, {}).get('triggers', args.get('triggers'))
+        byte_length = struct_triggers.get(field, {}).get('byte_length', args.get('byte_length', field_ctx.get('byte_length')))
+        format = struct_triggers.get(field, {}).get('format', args.get('format', field_ctx.get('format')))
+        if format in vars(builtins):
+            format = vars(builtins)[format]
+        else:
+            format = lambda x: x
+        values = struct_triggers.get(field, {}).get('values', args.get('values', field_ctx.get('values')))
+        parse = struct_triggers.get(field, {}).get('parse', args.get('parse', field_ctx.get('parse')))
+        conditions = struct_triggers.get(field, {}).get('conditions', args.get('conditions', field_ctx.get('conditions')))
+        triggers = struct_triggers.get(field, {}).get('triggers', args.get('triggers', field_ctx.get('triggers')))
 
         if 'repeated' in args and len(buffer) >= length//4:
             repeating = True
@@ -130,8 +139,11 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
                 continue
 
         if parse:
+            parse_buf = buffer
+            if byte_length:
+                parse_buf = buffer[:start_idx + i + byte_length]
             for _ in range(length if length is not None else 1):
-                for ret, inc in yield_structures(buffer, parse, protocol, start_idx + i):
+                for ret, inc in yield_structures(parse_buf, parse, protocol, start_idx + i, context):
                     structure.append((field, ret, start_idx + i, start_idx + i + inc))
                     i += inc
                     buffer = buffer[inc:]
@@ -171,7 +183,7 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
                     raise
                 continue
 
-            structure.append((field, val, start_idx + i, start_idx + i + (length//8 or 1)))
+            structure.append((field, format(val), start_idx + i, start_idx + i + (length//8 or 1)))
 
             if length >= 8:
                 buffer = buffer[length//8:]
@@ -179,6 +191,10 @@ def parse_structure(buffer, structure_description, protocol, start_idx):
 
         if triggers:
             for trigger_field, actions in itertools.chain.from_iterable(t.items() for t in triggers):
+                if trigger_field == 'save_to_context':
+                    context.update(struct_triggers)
+                    continue
+
                 for attribute, action in actions.items():
                     d = struct_triggers.get(trigger_field, {})
                     if action == 'set':

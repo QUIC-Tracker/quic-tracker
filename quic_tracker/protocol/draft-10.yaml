@@ -27,10 +27,12 @@ Long Header:
       values: [0x7f, 0x7e, 0x7d, 0x7c]
   - Connection ID:
       length: 64
+      format: hex
   - Version:
       length: 32
       values:
         neq: 0
+      format: hex
   - Packet Number:
       length: 32
   - Payload:
@@ -61,6 +63,7 @@ Short Header:
       conditions:
         - Omit Connection ID Flag:
             eq: 0
+      format: hex
   - Packet Number:
       length: [8, 16, 32]
   - Protected Payload:
@@ -79,6 +82,7 @@ Version Negotiation Packet:
   - Supported Version:
       length: 32
       repeated:
+      format: hex
 Stateless Reset Packet:
   - Random Octets:
       length: '*'
@@ -198,6 +202,7 @@ NEW_CONNECTION_ID:
       length: varint
   - Connection ID:
       length: 64
+      format: hex
   - Stateless Reset Token:
       length: 128
   - next: Frame
@@ -279,4 +284,5 @@ STREAM:
             length: set
   - Stream Data:
       length: '*'
+      format: bytes
   - next: Frame

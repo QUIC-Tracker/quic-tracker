@@ -45,6 +45,7 @@ def get_type(packet):  # TODO: Modularise this on a per version basis
         if field == 'Short Packet Type':
             return '1-RTT Protected Payload'
         elif field == 'Long Packet Type':
+            value = int(value, base=0)
             if value == 0x7f:
                 return 'Initial'
             elif value == 0x7e:

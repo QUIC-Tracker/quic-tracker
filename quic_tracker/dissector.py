@@ -123,7 +123,10 @@ def parse_structure(buffer, structure_description, protocol, start_idx, context)
         byte_length = struct_triggers.get(field, {}).get('byte_length', args.get('byte_length', field_ctx.get('byte_length')))
         format = struct_triggers.get(field, {}).get('format', args.get('format', field_ctx.get('format')))
         if format in vars(builtins):
-            format = vars(builtins)[format]
+            if format == 'hex':
+                format = lambda x: hex(x) if type(x) is int else '0x' + x.hex()
+            else:
+                format = vars(builtins)[format]
         else:
             format = lambda x: x
         values = struct_triggers.get(field, {}).get('values', args.get('values', field_ctx.get('values')))

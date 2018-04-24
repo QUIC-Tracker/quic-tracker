@@ -18,7 +18,7 @@ You should have Go 1.9, tcpdump, libpcap libraries and header installed before s
 
 ```
 go get github.com/mpiraux/master-thesis
-cd $GOPATH/github.com/mpiraux/pigotls
+cd $GOPATH/src/github.com/mpiraux/pigotls
 make
 ```
 

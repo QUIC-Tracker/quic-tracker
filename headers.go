@@ -48,6 +48,7 @@ type LongHeader struct {
 	SourceCID      ConnectionID
 	PayloadLength  uint64
 	packetNumber   uint32
+	length         int
 }
 func (h *LongHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
@@ -65,9 +66,10 @@ func (h *LongHeader) Encode() []byte {
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
 func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *LongHeader) PacketNumber() uint32 { return h.packetNumber }
-func (h *LongHeader) Length() int { return 1 + 4 + 1 + len(h.DestinationCID) + len(h.SourceCID) + int(VarIntLen(h.PayloadLength)) + 4 }
+func (h *LongHeader) Length() int { return h.length }
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h := new(LongHeader)
+	h.length = buffer.Len()
 	typeByte, _ := buffer.ReadByte()
 	h.packetType = PacketType(typeByte - 0x80)
 	binary.Read(buffer, binary.BigEndian, &h.Version)
@@ -80,6 +82,7 @@ func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	binary.Read(buffer, binary.BigEndian, &h.SourceCID)
 	h.PayloadLength, _ = ReadVarInt(buffer)
 	binary.Read(buffer, binary.BigEndian, &h.packetNumber)
+	h.length -= buffer.Len()
 	return h
 }
 func NewLongHeader(packetType PacketType, conn *Connection) *LongHeader {

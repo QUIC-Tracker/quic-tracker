@@ -172,3 +172,6 @@ stream_opening_reordering:
   error_codes:
     1: The TLS handshake failed
     2: The host did not answer to the <code>GET</code> request
+http_get:
+  name: CLI HTTP GET
+  description: ~

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"encoding/json"
 )
 
 func main() {
@@ -45,6 +46,9 @@ func main() {
 			ioutil.WriteFile("/tmp/http_get.pcap", pcap, os.ModePerm)
 		}
 	}()
+
+	trace := m.NewTrace("http_get", 1, *address)
+	trace.AttachTo(conn)
 
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 	spew.Dump(conn.DestinationCID)
@@ -113,4 +117,11 @@ func main() {
 		}
 	}
 
+	var t []m.Trace
+	t = append(t, *trace)
+	out, err := json.Marshal(t)
+	if err != nil {
+		println(err)
+	}
+	println(string(out))
 }

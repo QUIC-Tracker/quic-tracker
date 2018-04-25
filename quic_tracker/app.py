@@ -229,7 +229,11 @@ def trace_secrets(traces_id, trace_idx):
         abort(404)
 
     trace = traces[trace_idx]
-    secret_log_file = 'EXPORTER_SECRET {} {}'.format(b64decode(trace['client_random']).hex(), b64decode(trace['exporter_secret']).hex())
+    secret_log_file = ''
+    if trace.get('exporter_secret'):
+        secret_log_file += 'EXPORTER_SECRET {} {}'.format(b64decode(trace['client_random']).hex(), b64decode(trace['exporter_secret']).hex())
+    if trace.get('early_exporter_secret'):
+        secret_log_file += 'EARLY_EXPORTER_SECRET {} {}'.format(b64decode(trace['client_random']).hex(), b64decode(trace['early_exporter_secret']).hex())
     response = make_response(secret_log_file)
     response.headers.set('Content-type', 'text/plain')
     response.headers.set('Content-Disposition', 'attachment', filename='{}_{}_{}.keys'.format(traces_id, trace['scenario'], trace['host'][:trace['host'].rfind(':')]))

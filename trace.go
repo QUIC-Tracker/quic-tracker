@@ -23,20 +23,21 @@ import (
 )
 
 type Trace struct {
-	Commit          string                 `json:"commit"`
-	Scenario        string                 `json:"scenario"`
-	ScenarioVersion int                    `json:"scenario_version"`
-	Host            string                 `json:"host"`
-	Ip              string                 `json:"ip"`
-	Results         map[string]interface{} `json:"results"`
-	StartedAt       int64                  `json:"started_at"`
-	Duration        uint64                 `json:"duration"`
-	ErrorCode       uint8                  `json:"error_code"`
-	Stream          []TracePacket          `json:"stream"`
-	Pcap 			[]byte				   `json:"pcap"`
-	DecryptedPcap 	[]byte				   `json:"decrypted_pcap"`
-	ClientRandom    []byte				   `json:"client_random"`
-	ExporterSecret  []byte				   `json:"exporter_secret"`
+	Commit              string                 `json:"commit"`
+	Scenario            string                 `json:"scenario"`
+	ScenarioVersion     int                    `json:"scenario_version"`
+	Host                string                 `json:"host"`
+	Ip                  string                 `json:"ip"`
+	Results             map[string]interface{} `json:"results"`
+	StartedAt           int64                  `json:"started_at"`
+	Duration            uint64                 `json:"duration"`
+	ErrorCode           uint8                  `json:"error_code"`
+	Stream              []TracePacket          `json:"stream"`
+	Pcap                []byte                 `json:"pcap"`
+	DecryptedPcap       []byte                 `json:"decrypted_pcap"`
+	ClientRandom        []byte                 `json:"client_random"`
+	ExporterSecret      []byte                 `json:"exporter_secret"`
+	EarlyExporterSecret []byte                 `json:"early_exporter_secret"`
 }
 
 func NewTrace(scenarioName string, scenarioVersion int, host string) *Trace {
@@ -81,6 +82,7 @@ func (t *Trace) AttachTo(conn *Connection) {
 func (t *Trace) Complete(conn *Connection) {
 	t.ClientRandom = conn.ClientRandom
 	t.ExporterSecret = conn.ExporterSecret
+	t.EarlyExporterSecret = conn.Tls.EarlyExporterSecret()
 }
 
 type Direction string

@@ -426,39 +426,39 @@ func NewAckFrame(largestAcknowledged uint64, ackBlockCount uint64) *AckFrame {
 }
 
 type PathChallenge struct {
-	data [8]byte
+	Data [8]byte
 }
 func (frame PathChallenge) FrameType() FrameType { return PathChallengeType }
 func (frame PathChallenge) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	buffer.Write(frame.data[:])
+	buffer.Write(frame.Data[:])
 }
 func (frame PathChallenge) shouldBeRetransmitted() bool { return true }
 func ReadPathChallenge(buffer *bytes.Reader) *PathChallenge {
 	frame := new(PathChallenge)
 	buffer.ReadByte()  // Discard frame byte
-	buffer.Read(frame.data[:])
+	buffer.Read(frame.Data[:])
 	return frame
 }
 
 type PathResponse struct {
-	data [8]byte
+	Data [8]byte
 }
 func (frame PathResponse) FrameType() FrameType { return PathResponseType }
 func (frame PathResponse) writeTo(buffer *bytes.Buffer) {
 	binary.Write(buffer, binary.BigEndian, frame.FrameType())
-	buffer.Write(frame.data[:])
+	buffer.Write(frame.Data[:])
 }
 func (frame PathResponse) shouldBeRetransmitted() bool { return false }
 func ReadPathResponse(buffer *bytes.Reader) *PathResponse {
 	frame := new(PathResponse)
 	buffer.ReadByte()  // Discard frame byte
-	buffer.Read(frame.data[:])
+	buffer.Read(frame.Data[:])
 	return frame
 }
 func NewPathResponse(data [8]byte) *PathResponse {
 	frame := new(PathResponse)
-	frame.data = data
+	frame.Data = data
 	return frame
 }
 

@@ -59,6 +59,8 @@ handshake_retransmission:
     2: No version advertised by the host matched the versions of the test
     3: The TLS handshake failed
     4: The host sent more than 3 Handshake packets but did not include a <code>PATH_CHALLENGE</code>
+    5: More than 3 Handshake packets were received but not all of them included a <code>PATH_CHALLENGE</code>
+    6: After completing the <code>PATH_CHALLENGE</code>, the server did not respond to the request
 handshake_v6:
   name: Handshake IPv6
   description: |

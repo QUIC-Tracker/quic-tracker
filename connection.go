@@ -45,15 +45,17 @@ type Connection struct {
 	SentPacketHandler     func([]byte)
 
 	Streams              map[uint64]*Stream
-	SourceCID		     ConnectionID
+	SourceCID            ConnectionID
 	DestinationCID       ConnectionID
 	PacketNumber         uint64
 	ExpectedPacketNumber uint64
 	Version              uint32
 	omitConnectionId     bool
-	ackQueue             []uint64  // Stores the packet numbers to be acked
+	ackQueue             []uint64 // Stores the packet numbers to be acked
 	retransmissionBuffer map[uint64]RetransmittableFrames
 	RetransmissionTicker *time.Ticker
+	IgnorePathChallenge   bool
+	DisableRetransmits    bool
 
 	UseIPv6        bool
 	Host           *net.UDPAddr
@@ -307,9 +309,9 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 					}
 				}
 
-				if pathChallenge := framePacket.GetFirst(PathChallengeType); pathChallenge != nil {
+				if pathChallenge := framePacket.GetFirst(PathChallengeType); !c.IgnorePathChallenge && pathChallenge != nil {
 					handshakeResponse := NewHandshakePacket(c)
-					handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).data})
+					handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).Data})
 					c.SendHandshakeProtectedPacket(handshakeResponse)
 				}
 			}
@@ -466,6 +468,9 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 
 	go func() {
 		for range c.RetransmissionTicker.C {
+			if c.DisableRetransmits {
+				continue
+			}
 			var frames RetransmitBatch
 			for k, v := range c.retransmissionBuffer {
 				if time.Now().Sub(v.Timestamp).Nanoseconds() > 500e6 {

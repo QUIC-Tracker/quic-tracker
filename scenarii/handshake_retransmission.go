@@ -104,7 +104,7 @@ outerLoop:
 		}
 	}
 
-	if len(arrivals) == 1 {
+	if len(arrivals) <= 1 {
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
 	}
 	if handshakePacketReceived > 3 && !receivedPathChallenge {

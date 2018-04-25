@@ -16,6 +16,7 @@
 import builtins
 import os
 import struct
+import sys
 from base64 import b64decode
 
 import itertools
@@ -34,6 +35,7 @@ packet8 = "Hr4eek/c1Pohxs0CAAAnZmFpbGVkIHRyYW5zcG9ydCBwYXJhbWV0ZXIgdmVyaWZpY2F0a
 packet9 = "HZ72POB/B/2SOoB3JQ7AAAAAU3u0IwABAAECAQQAAAA="
 packet10 = '/YpfQ+hj7g3m/wAACivxmnEAAAAAAAAAABAAFgMDAHsCAAB3AwPymi36tGsMkZl8TH9thewJs3V8bVPzomNRctrs2GPX1QATAQAATwArAAJ/FwAzAEUAFwBBBIZDv8iyIaTS9Q4NHtvjXPmzA7KSFZlCU7Wx/Eabsp7nBkVYAvUgzjnbz2xridAbset6UGgqXR4uFOMc/DtOjYAXAwMAet4kHjX6ymXF61TT9CkDxvoHjG8GzgBM+i4l5oVzxI93QwbD9sHgI8Jc5NXdBuc/s+SqYtyXrsVQfs6EFUAP5be60nzQfjzl4NdFBIVG0atanozdWLFQmmYP6FXFr2OY+k2Pd34rBIgD5EmugMFcTPG52R7relGEn7wrFwMDA1LzbQ8s1KMXfSOAOwy+SAOo+qyuBsFM5uJjTxiCWBkuz+o04RIgeuIlwH0v0NFKNwX1REPtxLaf1VO8rAJDjyyFF0atuHTVPFVA0vYGuyEL3z75Nf06fKUJAeYxSyC1RfiyTqtA9jPmF8B6O/FBSuRM9dIS6L2+6zj7EvpuXtZQS8FE4SWTROQZyf+mK2ioM5Of88uSQBvE1Y2vr7WngabdvDAQyUqRcZiHgpH0PmsGqs1I2ld1PvmdFr5uzJ5B987CoTWWnXOjdE9JlO58PZMPXkuscn83uw1tw1kmeE4JreqXuRsiOxa5H/3j5Bi6wJol9djvCSoOgYGGYV/KV95BPfAYy7xJQ3MO9F3nqmdopEZ+X8CWjsnbIS9KQrrC/n8GVqpAROwW1bSzDoJ3cHqwMnVLD+n6kTp061L/ayj8Dw3d+ausNOKeww6ODY4m1pUb9aObiVflQs4b73beOZa3T1ndn7JybUDebnoSeONfgBI3kft3s2qyMgCG5hVFYPRE0cyADiF90aQzuyVDSzR1aOUKgxJACrPFHnVzUAIU3UE0+b/q6FwD1myad84hzELl0qhqhvsQVk5fou7ttR9cjI8TzTiuVmih7Vihxq1FPKChKyuk/cSLSC7Uzg5rqtNt3pCSbnUMrxhxpzQDk5meQ62L7/bPWjUvH8/GF2WfY1DKnHpctwCct7zUV6uL5fjQ56YlfFw/YVbAvd6XLJqgk0pEJ/boowVzTtvujzZTazaob9gIizzJo2SHHc+TW46C31HJQO9+ktqhxb61V21ikLracSFqso/gIS9Cpq9rYuirMLlnIT2KAWEPKos7E6GVfxz0YUSUnzHilv5eGINgkHy2IxIoH14t6Cr2MHW1Q7H4OoNvrpaqSKKTxxKKOzrAaKY7+s09tRptMT//q0lLFQDos/TKTO/crsb7bRezI9AmPWCEuPJ1L1JWc+zCfAP6o669QzS80mNriSXLcqdBXDSdtXjfz8A5iI1Y7UNxLyXBrLlT5CsRJoEF/aSykHPO8RyufrFLzB7q+IlJpEYR/n8oY+5v7ri+cVHV88+IxLxAJquZaFf16NBcICBcwaOKz9TbBEz5cl9+eLn/c062pRywbFCXWEcRNQrb8yFVboiwFwMDARlUZFQTxFRMl0rfoWBbbuRsX9LaVyD/GnXOYSd2fI4Ojb2pO+Tp8ggXL0EZP1Ryq6QxKOXzjzxvTbO8iIFQ8/D+Y8lxruJoDK6OZtc3XcnehtQt5qOIHAhB2AATFhXr'
 packet11 = '/f8AAAtfmtkLu2fPXWHFAx7TWDsVvaxD/323JV8DH6xEs5GITwgNwAAAAGfPXWIAAAAOMzjSozxLMv0SAESKFgMDAIsCAACHAwOc6xp0QmL1gk2CUayoTO1fYxdhyUBP5Uellw1SyZ+IQBBSAvQ4NV2hwx/odz5DqZRqEwIAAE8AKwACfxwAMwBFABcAQQTyT2LQcKvpTLGp88ZNxfoSpJHLY9ZE3x1NGh1Ka5pB5KmMqagWkulg/7z7Eu2pMCuzuAlZMyuwnTPjdpemYrs4FAMDAAEBFwMDAGjz+KXwaJIiIBp6iNamGKZxN2FkefXaOwqC5HscjLmGqPnkPo0txImSTDUnYglfFmwfSaPSfvJQ2Z0k0OMLBFgW9Q269jy2wrsnoSdaKvi9BEedNemjwazymIWiZbTHzixQT0eMUUz9oxcDAwOrPfokGhZd6W1il+E+HmEybAykwRcbSFkwGgKGCSaZoDP+4vH93L6aiCm1/jxHiKKApefSR8VQFdOBsOKor8030twN20Z2IwIClobIjVzwGKrtz11EH3sPDSAAKN3h7IneWD5R1aZXsvcXRvRYtXICpWaiGLy8RV9bdkF49N8+XZ3bwy9wQLvEgLyNGG3FsHOJjpTnw6CFnNQ08Cx5uDVlPeJ5JEh1L3w9D47iWf9Taq247JRpcvDHCPygH37Er/xHq1D2cCzRGTNxOhlpjJ7XaAsx52HtHOorvTjWyjcXCce1GRXYSOdp8MXTIok1x42FZbW9EGkySdsbxCgCqUi2wHYDmxAjQ1YuVUSHX1SK+z3SDYSXqZpuWkAJxUvorphPAmOzEnjgz2AS+9QGiHW5fOnSdVHiWikhJwPoS5EX6NSfdsuhJ3qkBeJV2zLqia+J9s5hOkG4HAqouUxnklD9d5ZiaQo+24DMq5xwoki2PwRjEEvkz+DfkHCaZwjKeCHK+cOlR+TuQNs6yDuNkMV2IhwLOYiqLCofLbLGzH7NriZBZZfEGzfXGQBSkHsXdjXeohevk8KK33F9VztzCAO/eh5yW2TkvELIKFeFpujfHwnBlDF4hp7NSW+piMuYXmH8rnwcQsQIoZ/YgD18LN45qjqmUHAu6/D6Iw9SGTXOCzhrM0J4+dP/IOFF+eCcKPbBeYGiUBwDUoRdr3wBVu2c3iyhOwUSfIEV7Zbr/dSGneebLicvk9tgZYTrWTig1+BSTUJXs2vkugk1/o9ZqJcg1xuXeC+He1BRve5i38/JffRIk9HQL9MGOkAEb8TfLpbDVQVLajKYfMlcJBEryve5Y5i9K0DZRzVPzBg5KbbiAEc18PBIerZkp5EP3japGw35NK85MahuW9ZTyKWOH/u+WmkL8GhFlyRbpo3T0Xp5PabOzUZRgG7V5cvx7LUvOD8crc9/vmTPvvDJXTELWqw/Plwwuj2xCRRTqVr5LsAvAZ/barc7HtkcIBgNgHC/IR7v/RUg+0lh6FZh/4amhxr3HXnhCXAW8JY+Axx066mKXZNmznBlzqPd8tGUeos9GHZ5gyQB4xUJhU7Y7TJLvdMBdYwqb18I6HkhmSWKku7DnV4xz9sJf8KV7X8fv2Wwoz6DY9EvJb5XmRScMfjSKlAUpDZeHpBzzUo3eK+7LQJd1Oo0sQ=='
+packet12 = '/f8AAAtVjRrkGuVhDoIqrkZJBfISlQAF8hKcDcAAAABwdS6BAAIArgcK9wCUoQARAA=='
 
 class ParseError(ValueError):
     pass
@@ -62,6 +64,10 @@ def parse_packet_with(buffer, protocol, context):
             last_e = e
             pass
     if last_e:
+        from hexdump import hexdump
+        hexdump(buffer)
+        print(buffer)
+        print(context)
         raise last_e
     return []
 
@@ -73,7 +79,14 @@ def yield_structures(buffer, struct_name, protocol, start_idx, context):
             ret, inc, next_struct = parse_structure_type(buffer, next_struct, protocol, start_idx, context)
             yield ret, inc
         else:
-            ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx, context)
+            try:
+                ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx, context)
+                if ret == [('Gap', 772213495, 39, 43), ('ACK Block', 0, 43, 44)]:
+                    print()
+                print(ret, inc)
+            except Exception as e:
+                print(e)
+                raise e
             yield (struct_name, ret), inc
         buffer = buffer[inc:]
         start_idx += inc
@@ -152,6 +165,7 @@ def parse_structure(buffer, structure_description, protocol, start_idx, context)
                     structure.append((field, ret, start_idx + i, start_idx + i + inc))
                     i += inc
                     buffer = buffer[inc:]
+                    parse_buf = parse_buf[inc:]
             continue
         elif length:
             if length == 'varint':
@@ -234,8 +248,9 @@ def read(buffer, length):
 
 def read_varint(buffer):
     length = 2 ** ((buffer[0] & 0xc0) >> 6)
-    buffer[0] &= 0x3f
-    return read(buffer, length), length * 8
+    varint_buf = buffer[:length]
+    varint_buf[0] &= 0x3f
+    return read(varint_buf, length), length * 8
 
 
 def verify_condition(structure, field, formula):
@@ -251,6 +266,6 @@ def verify_condition(structure, field, formula):
 if __name__ == "__main__":
     with open('protocol/draft-11.yaml') as f:
         protocol = yaml.load(f)
-    for _ in range(100000):
-        pass
-    print(parse_packet_with(bytearray(b64decode(packet11)), protocol, {'Destination Connection ID': {'length': 144}}))
+
+    print(parse_packet_with(bytearray(b'\xfd\xff\x00\x00\x0bU\x8d\x1a\xe4\x1a\xe5a\x0e\x82*\xaeFI\x05\xf2\x12\x95\x00\x05\xf2\x12\x9c\r\xc0\x00\x00\x00pu.\x81\x00\x02\x00\xae\x07\n\xf7\x00\x94\xa1\x00\x11\x00')
+          , protocol, {'Destination Connection ID': {'length': 64}}))

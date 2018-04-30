@@ -49,6 +49,21 @@ func main() {
 
 	trace := m.NewTrace("http_get", 1, *address)
 	trace.AttachTo(conn)
+	defer func() {
+		trace.Complete(conn)
+		err = trace.AddPcap(pcap)
+		if err != nil {
+			trace.Results["pcap_error"] = err.Error()
+		}
+
+		var t []m.Trace
+		t = append(t, *trace)
+		out, err := json.Marshal(t)
+		if err != nil {
+			println(err)
+		}
+		println(string(out))
+	}()
 
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 	spew.Dump(conn.DestinationCID)
@@ -116,18 +131,4 @@ func main() {
 			}
 		}
 	}
-
-	trace.Complete(conn)
-	err = trace.AddPcap(pcap)
-	if err != nil {
-		trace.Results["pcap_error"] = err.Error()
-	}
-
-	var t []m.Trace
-	t = append(t, *trace)
-	out, err := json.Marshal(t)
-	if err != nil {
-		println(err)
-	}
-	println(string(out))
 }

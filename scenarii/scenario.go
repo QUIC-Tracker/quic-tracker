@@ -19,7 +19,6 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Scenario interface {
@@ -57,8 +56,6 @@ func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
 			if !ongoingHandhake {
 				return packets[i:], nil
 			}
-
-			spew.Dump(packet)
 
 			switch packet.(type) {
 			case *m.HandshakePacket, *m.RetryPacket:

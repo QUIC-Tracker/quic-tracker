@@ -184,6 +184,8 @@ func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { /
 			c.Streams = make(map[uint64]*Stream)
 			c.Streams[0] = new(Stream)
 			c.Cleartext = NewCleartextSaltedCryptoState(c)
+			c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
+			c.ackQueue = nil
 		}
 	}
 
@@ -195,7 +197,7 @@ func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { /
 	}
 
 	var responsePacket Framer
-	defer func() {responsePacket.AddFrame(c.GetAckFrame())}()
+	defer func() {if c.ackQueue != nil {responsePacket.AddFrame(c.GetAckFrame())}}()
 
 	if len(serverData) > 0 {
 		switch packet.(type) {

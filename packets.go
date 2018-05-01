@@ -119,6 +119,7 @@ func NewVersionNegotationPacket(unusedField uint8, version uint32, versions []Su
 type Framer interface {
 	Packet
 	GetFrames() []Frame
+	AddFrame(frame Frame)
 	GetRetransmittableFrames() []Frame
 	Contains(frameType FrameType) bool
 	GetFirst(frameType FrameType) Frame
@@ -127,10 +128,13 @@ type FramePacket struct {
 	abstractPacket
 	Frames []Frame
 }
-func (p FramePacket) GetFrames() []Frame {
+func (p *FramePacket) GetFrames() []Frame {
 	return p.Frames
 }
-func (p FramePacket) GetRetransmittableFrames() []Frame {
+func (p *FramePacket) AddFrame(frame Frame) {
+	p.Frames = append(p.Frames, frame)
+}
+func (p *FramePacket) GetRetransmittableFrames() []Frame {
 	var frames []Frame
 	for _, frame := range p.Frames {
 		if frame.shouldBeRetransmitted() {
@@ -139,7 +143,7 @@ func (p FramePacket) GetRetransmittableFrames() []Frame {
 	}
 	return frames
 }
-func (p FramePacket) Contains(frameType FrameType) bool {
+func (p *FramePacket) Contains(frameType FrameType) bool {
 	for _, f := range p.Frames {
 		if f.FrameType() == frameType {
 			return true
@@ -147,7 +151,7 @@ func (p FramePacket) Contains(frameType FrameType) bool {
 	}
 	return false
 }
-func (p FramePacket) GetFirst(frameType FrameType) Frame {
+func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 	for _, f := range p.Frames {
 		if f.FrameType() == frameType {
 			return f
@@ -155,7 +159,7 @@ func (p FramePacket) GetFirst(frameType FrameType) Frame {
 	}
 	return nil
 }
-func (p FramePacket) ShouldBeAcknowledged() bool {
+func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		switch frame.(type) {
 		case *AckFrame, *PaddingFrame:
@@ -165,7 +169,7 @@ func (p FramePacket) ShouldBeAcknowledged() bool {
 	}
 	return false
 }
-func (p FramePacket) EncodePayload() []byte {
+func (p *FramePacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.Frames {
 		frame.writeTo(buffer)
@@ -202,7 +206,23 @@ func NewInitialPacket(conn *Connection) *InitialPacket {
 }
 
 type RetryPacket struct {
-	// TODO: https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-5.4.2
+	FramePacket
+}
+func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
+	p := new(RetryPacket)
+	p.header = ReadLongHeader(buffer)
+	for {
+		frame, err := NewFrame(buffer, conn)
+		if err != nil {
+			spew.Dump(p)
+			panic(err)
+		}
+		if frame == nil {
+			break
+		}
+		p.Frames = append(p.Frames, frame)
+	}
+	return p
 }
 
 type HandshakePacket struct {

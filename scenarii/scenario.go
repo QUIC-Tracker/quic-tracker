@@ -19,6 +19,7 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Scenario interface {
@@ -56,22 +57,29 @@ func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
 			if !ongoingHandhake {
 				return packets[i:], nil
 			}
-			if scp, ok := packet.(*m.HandshakePacket); ok {
-				ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
+
+			spew.Dump(packet)
+
+			switch packet.(type) {
+			case *m.HandshakePacket, *m.RetryPacket:
+				ongoingHandhake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
 				if err != nil {
 					return nil, err
 				}
 				if packet != nil {
 					conn.SendHandshakeProtectedPacket(packet)
 				}
-			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-				err := conn.ProcessVersionNegotation(vn)
+			case *m.VersionNegotationPacket: {
+				err := conn.ProcessVersionNegotation(packet.(*m.VersionNegotationPacket))
 				if err != nil {
 					return nil, err
 				}
 				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-			} else if ongoingHandhake {
-				return nil, errors.New("Received incorrect packet type during handshake")
+			}
+			default:
+				if ongoingHandhake {
+					return nil, errors.New("Received incorrect packet type during handshake")
+				}
 			}
 		}
 	}

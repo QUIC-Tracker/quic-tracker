@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"encoding/json"
+	"github.com/mpiraux/master-thesis/scenarii"
 )
 
 func main() {
@@ -65,39 +66,11 @@ func main() {
 		println(string(out))
 	}()
 
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 	spew.Dump(conn.DestinationCID)
 
-	ongoingHandshake := true
-	for ongoingHandshake {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			spew.Dump(err)
-			return
-		}
-		for _, packet := range packets {
-			if scp, ok := packet.(*m.HandshakePacket); ok {
-				ongoingHandshake, packet, err = conn.ProcessServerHello(scp)
-				if err != nil {
-					spew.Dump(err)
-					return
-				}
-				if packet != nil {
-					conn.SendHandshakeProtectedPacket(packet)
-				}
-			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-				if err := conn.ProcessVersionNegotation(vn); err == nil {
-					conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-				} else {
-					println("No version in common with " + *address)
-					spew.Dump(vn)
-					return
-				}
-			} else {
-				spew.Dump(packet)
-				return
-			}
-		}
+	packets, err := scenarii.CompleteHandshake(conn)
+	if err != nil {
+		spew.Dump(packets, err)
 	}
 
 	spew.Dump(conn.ClientRandom)

@@ -87,6 +87,17 @@ func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split 
 		}
 	}
 }
+func (c *Connection) SendFrames(frames []Frame) {
+	if c.Protected != nil {
+		packet := NewProtectedPacket(c)
+		packet.Frames = frames
+		c.SendProtectedPacket(packet)
+	} else {
+		packet := NewHandshakePacket(c)
+		packet.Frames = frames
+		c.SendHandshakeProtectedPacket(packet)
+	}
+}
 func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	if c.SentPacketHandler != nil {
 		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
@@ -165,31 +176,55 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	return initialPacket
 }
 
-func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *HandshakePacket, error) { // Returns whether or not the TLS Handshake should continue
+func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { // Returns whether or not the TLS Handshake should continue
 	if c.ZeroRTTprotected == nil {
 		lHeader := packet.Header().(*LongHeader)
 		c.DestinationCID = lHeader.SourceCID  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
+		if packet.Header().PacketType() == Retry {
+			c.Streams = make(map[uint64]*Stream)
+			c.Streams[0] = new(Stream)
+			c.Cleartext = NewCleartextSaltedCryptoState(c)
+		}
 	}
 
 	var serverData []byte
-	for _, frame := range packet.Frames {
+	for _, frame := range packet.GetFrames() {
 		if streamFrame, ok := frame.(*StreamFrame); ok {
 			serverData = append(serverData, streamFrame.StreamData...)
 		}
 	}
 
-	handshakePacket := NewHandshakePacket(c)
-	handshakePacket.Frames = append(handshakePacket.Frames, c.GetAckFrame())
+	var responsePacket Framer
+	defer func() {responsePacket.AddFrame(c.GetAckFrame())}()
 
 	if len(serverData) > 0 {
+		switch packet.(type) {
+		case *HandshakePacket:
+			responsePacket = NewHandshakePacket(c)
+		case *RetryPacket:
+			responsePacket = NewInitialPacket(c)
+			defer func() {
+				var initialLength int
+				if c.UseIPv6 {
+					initialLength = MinimumInitialLengthv6
+				} else {
+					initialLength = MinimumInitialLength
+				}
+				paddingLength := initialLength - (responsePacket.Header().Length() + len(responsePacket.EncodePayload()) + c.Cleartext.Write.Overhead())
+				for i := 0; i < paddingLength; i++  {
+					responsePacket.AddFrame(new(PaddingFrame))
+				}
+			}()
+		}
+
 		tlsData, notCompleted, err := c.Tls.Input(serverData)
 
 		if err != nil {
-			return notCompleted, handshakePacket, err
+			return notCompleted, responsePacket, err
 		}
 
 		if tlsData != nil && len(tlsData) > 0 {
-			handshakePacket.Frames = append(handshakePacket.Frames, NewStreamFrame(0, c.Streams[0], tlsData, false))
+			responsePacket.AddFrame(NewStreamFrame(0, c.Streams[0], tlsData, false))
 		}
 
 		if !notCompleted {
@@ -201,12 +236,14 @@ func (c *Connection) ProcessServerHello(packet *HandshakePacket) (bool, *Handsha
 
 			err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.ReceivedQUICTransportParameters())
 			if err != nil {
-				return false, handshakePacket, err
+				return false, responsePacket, err
 			}
 		}
-		return notCompleted, handshakePacket,  nil
+		return notCompleted, responsePacket,  nil
+	} else {
+		responsePacket = NewHandshakePacket(c)
 	}
-	return true, handshakePacket, nil
+	return true, responsePacket, nil
 }
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
 	var version uint32
@@ -251,7 +288,7 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			hLen := header.Length()
 			var data []byte
 			switch header.PacketType() {
-			case Handshake, Initial:
+			case Handshake, Initial, Retry:
 				longHeader := header.(*LongHeader)
 				pLen := int(longHeader.PayloadLength)
 
@@ -287,6 +324,8 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 				packet = ReadProtectedPacket(buffer, c)
 			case Initial:
 				packet = ReadInitialPacket(buffer, c)
+			case Retry:
+				packet = ReadRetryPacket(buffer, c)
 			}
 
 			fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
@@ -310,9 +349,7 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 				}
 
 				if pathChallenge := framePacket.GetFirst(PathChallengeType); !c.IgnorePathChallenge && pathChallenge != nil {
-					handshakeResponse := NewHandshakePacket(c)
-					handshakeResponse.Frames = append(handshakeResponse.Frames, PathResponse{pathChallenge.(*PathChallenge).Data})
-					c.SendHandshakeProtectedPacket(handshakeResponse)
+					c.SendFrames([]Frame{PathResponse{pathChallenge.(*PathChallenge).Data}})
 				}
 			}
 

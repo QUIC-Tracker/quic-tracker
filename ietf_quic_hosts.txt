@@ -11,3 +11,4 @@ quic.tech:4433	/index.html
 208.85.208.226:4433	/t1.html
 test.privateoctopus.com:4433	/index.html
 quicker.edm.uhasselt.be:4433	/index.html
+ralith.com:4433	/index.html

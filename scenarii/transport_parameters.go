@@ -73,7 +73,7 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 			} else {
 				trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+				trace.MarkError(TP_HandshakeDidNotComplete, "")
 				if debug {
 					spew.Dump(packet)
 				}

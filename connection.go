@@ -286,6 +286,8 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			}
 			saveCleartext(rec)
 			off = len(rec)
+
+			packets = append(packets, packet)
 		} else {
 			hLen := header.Length()
 			var data []byte

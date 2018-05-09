@@ -99,10 +99,6 @@ func (c *Connection) SendFrames(frames []Frame) {
 	}
 }
 func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
-	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
-	}
-
 	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
 		fullPacketNumber := (c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 		batch := NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
@@ -113,6 +109,10 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	payload := packet.EncodePayload()
 	lHeader := packet.Header().(*LongHeader)
 	lHeader.PayloadLength = uint64(len(payload) + c.Cleartext.Write.Overhead())
+
+	if c.SentPacketHandler != nil {
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
+	}
 
 	header := packet.EncodeHeader()
 	protectedPayload := c.Cleartext.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
@@ -125,10 +125,6 @@ func (c *Connection) SendZeroRTTProtectedPacket(packet Packet) {
 	c.sendProtectedPacket(packet, c.ZeroRTTprotected.Write)
 }
 func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
-	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
-	}
-
 	if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
 		c.retransmissionBuffer[(c.PacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames())
 	}
@@ -136,6 +132,10 @@ func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
 	payload := packet.EncodePayload()
 	if lHeader, ok := packet.Header().(*LongHeader); ok {
 		lHeader.PayloadLength = uint64(len(payload) + cipher.Overhead())
+	}
+
+	if c.SentPacketHandler != nil {
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
 	}
 
 	header := packet.EncodeHeader()

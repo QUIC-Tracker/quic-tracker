@@ -86,7 +86,7 @@ func sendUnsupportedInitial(conn *m.Connection) {
 	initialPacket := conn.GetInitialPacket()
 	for _, f := range initialPacket.Frames {  // Advertise support of TLS 1.3 draft-00 only
 		if streamFrame, ok := f.(*m.StreamFrame); ok {
-			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x7f, 0x1c, 0x7f, 0x1b, 0x7f, 0x1a}, []byte{0x7f, 0x00, 0x7f, 0x00, 0x7f, 0x00}, 1)
+			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x7f, 0x1c}, []byte{0x7f, 0x00}, 1)
 		}
 	}
 	conn.SendHandshakeProtectedPacket(initialPacket)

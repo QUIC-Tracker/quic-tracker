@@ -68,14 +68,13 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			for _, packet := range packets {
 				vn2 := handlePacket(packet, err)
 				if vn2 != nil && vn1.UnusedField == vn2.UnusedField {
+					trace.ErrorCode = VN_UnusedFieldIsIdentical  // Assume true until proven otherwise
 					conn.SendHandshakeProtectedPacket(initial)
 					packets, err, _ = conn.ReadNextPackets()
 					for _, packet := range packets {
 						vn3 := handlePacket(packet, err)
 						if vn3 != nil && vn3.UnusedField != vn2.UnusedField {
 							trace.ErrorCode = 0
-						} else {
-							trace.ErrorCode = VN_UnusedFieldIsIdentical
 						}
 					}
 				}

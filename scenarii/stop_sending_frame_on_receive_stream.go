@@ -45,9 +45,9 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
+	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
 		trace.MarkError(SSRS_MaxStreamUniTooLow, "")
-		trace.Results["expected_max_stream_uni"] = ">= 2"
+		trace.Results["expected_max_stream_uni"] = ">= 1"
 		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni
 		return
 	}

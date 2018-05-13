@@ -59,7 +59,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 			trace.ErrorCode = SGW_DidntReceiveTheRequestedData
 			trace.Results["error"] = message
 		}
-		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 4 {
+		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
 			errors[SGW_AnsweredOnUnannouncedStream] = true
 			message := fmt.Sprintf("the host sent data on stream 4 despite setting initial_max_stream_bidi to %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi)
 			errorMessages = append(errorMessages, message)
@@ -81,7 +81,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 4 {
+	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
 		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi))
 	}
 

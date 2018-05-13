@@ -43,14 +43,16 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 	conn.Streams[3] = new(m.Stream)
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
-	conn.TLSTPHandler.MaxStreamIdUni = 3
+	conn.TLSTPHandler.MaxStreamIdUni = 1
 	if _, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(GS2_TLSHandshakeFailed, err.Error())
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
+	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
+	} else {
+		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received")
 	}
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
@@ -62,7 +64,7 @@ outerLoop:
 			switch e := err.(type) {
 			case *net.OpError:
 				// the peer timed out without closing the connection
-				if e.Timeout() && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
+				if e.Timeout() && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
 					trace.ErrorCode = GS2_DidNotCloseTheConnection
 					trace.Results["error"] = fmt.Sprintf("the peer did not close the connection after waiting %d seconds", conn.TLSTPHandler.ReceivedParameters.IdleTimeout)
 				}
@@ -83,7 +85,7 @@ outerLoop:
 							break outerLoop
 						} else if f2.StreamId > 3 {
 							trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
-						} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 2 {
+						} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
 							// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
 							// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
 							// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft

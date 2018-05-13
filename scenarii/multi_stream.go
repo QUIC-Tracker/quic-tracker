@@ -55,11 +55,12 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	protectedPacket := m.NewProtectedPacket(conn)
-	for i := uint64(8); i <= uint64(conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi - 4) && len(protectedPacket.Frames) < 4; i += 4 {
-		if _, ok := conn.Streams[i]; !ok {
-			conn.Streams[i] = new(m.Stream)
+	for i := uint16(1); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
+		streamId := uint64(i * 4)
+		if _, ok := conn.Streams[streamId]; !ok {
+			conn.Streams[streamId] = new(m.Stream)
 		}
-		streamFrame := m.NewStreamFrame(i, conn.Streams[i], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
+		streamFrame := m.NewStreamFrame(streamId, conn.Streams[streamId], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
 	}
 

@@ -36,6 +36,7 @@ func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 	return &UnsupportedTLSVersionScenario{AbstractScenario{"unsupported_tls_version", 1, false}}
 }
 func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	conn.DisableRetransmits = true
 	sendUnsupportedInitial(conn)
 
 	var connectionClosed bool
@@ -86,7 +87,7 @@ func sendUnsupportedInitial(conn *m.Connection) {
 	initialPacket := conn.GetInitialPacket()
 	for _, f := range initialPacket.Frames {  // Advertise support of TLS 1.3 draft-00 only
 		if streamFrame, ok := f.(*m.StreamFrame); ok {
-			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x7f, 0x1c}, []byte{0x7f, 0x00}, 1)
+			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
 	conn.SendHandshakeProtectedPacket(initialPacket)

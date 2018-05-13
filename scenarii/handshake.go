@@ -57,8 +57,9 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 			return
 		}
 		for _, packet := range packets {
-			if handshake, ok := packet.(*m.HandshakePacket); ok {
-				ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+			switch packet.(type) {
+			case *m.HandshakePacket, *m.RetryPacket:
+				ongoingHandshake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
 				if err == nil && !ongoingHandshake {
 					trace.Results["negotiated_version"] = conn.Version
 					conn.CloseConnection(false, 42, "")
@@ -69,7 +70,8 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 				if packet != nil {
 					conn.SendHandshakeProtectedPacket(packet)
 				}
-			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+			case *m.VersionNegotationPacket:
+				vn := packet.(*m.VersionNegotationPacket)
 				var version uint32
 				for _, v := range vn.SupportedVersions {
 					if v >= m.MinimumVersion && v <= m.MaximumVersion {
@@ -87,7 +89,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 				s.Run(conn, trace, preferredUrl, debug)
 				m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
 				return
-			} else {
+			default:
 				trace.MarkError(H_ReceivedUnexpectedPacketType, "")
 				trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
 				return

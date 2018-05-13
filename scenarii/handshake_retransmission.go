@@ -46,6 +46,7 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 
 	var start time.Time
 	ongoingHandshake := true
+	isStateless := false
 	pathChallengeReceived := 0
 	handshakePacketReceived := 0
 	handshakePacketReceivedBeforePC := 0
@@ -121,13 +122,16 @@ outerLoop:
 					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 					conn.SendProtectedPacket(protectedPacket)
 				}
+			} else if _, ok := packet.(*m.RetryPacket); ok {
+				isStateless = true
+				break outerLoop
 			} else {
 				continue
 			}
 		}
 	}
 
-	if handshakePacketReceived <= 1 {
+	if !isStateless && handshakePacketReceived <= 1 {
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
 	} else if handshakePacketReceived > 3 && pathChallengeReceived == 0 {
 		trace.ErrorCode = HR_NoPathChallengeReceived

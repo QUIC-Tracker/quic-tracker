@@ -177,16 +177,15 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 }
 
 func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { // Returns whether or not the TLS Handshake should continue
-	if c.ZeroRTTprotected == nil {
-		lHeader := packet.Header().(*LongHeader)
-		c.DestinationCID = lHeader.SourceCID  // see https://tools.ietf.org/html/draft-ietf-quic-transport-05#section-5.6
-		if packet.Header().PacketType() == Retry {
-			c.Streams = make(map[uint64]*Stream)
-			c.Streams[0] = new(Stream)
-			c.Cleartext = NewCleartextSaltedCryptoState(c)
-			c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
-			c.ackQueue = nil
-		}
+	lHeader := packet.Header().(*LongHeader)
+	c.DestinationCID = lHeader.SourceCID  // TODO: see https://tools.ietf.org/html/draft-ietf-quic-transport-11#section-4.7
+
+	if packet.Header().PacketType() == Retry {
+		c.Streams = make(map[uint64]*Stream)
+		c.Streams[0] = new(Stream)
+		c.Cleartext = NewCleartextSaltedCryptoState(c)
+		c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
+		c.ackQueue = nil
 	}
 
 	var serverData []byte

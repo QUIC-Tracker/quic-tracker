@@ -25,4 +25,7 @@ type Stream struct {
 
 	ReadClosed bool
 	WriteClosed bool
+
+	ReadClosing bool
+	MissingReadData uint64
 }

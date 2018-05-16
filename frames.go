@@ -522,9 +522,28 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	if frame.Offset == stream.ReadOffset {
 		stream.ReadOffset += uint64(frame.Length)
 		stream.ReadData = append(stream.ReadData, frame.StreamData...)
-		if frame.FinBit {
-			stream.ReadClosed = frame.FinBit
+	} else if int(frame.Offset + frame.Length) > len(stream.ReadData) {
+		newSlice := make([]byte, frame.Offset + frame.Length, frame.Offset + frame.Length)
+		copy(newSlice, stream.ReadData)
+		copy(newSlice[frame.Offset:frame.Offset+frame.Length], frame.StreamData)
+		stream.MissingReadData += uint64(frame.Offset - uint64(len(stream.ReadData)))
+		stream.ReadData = newSlice
+		stream.ReadOffset = frame.Offset + frame.Length
+	} else {
+		copy(stream.ReadData[frame.Offset:], frame.StreamData)
+		stream.MissingReadData -= frame.Length
+	}
+
+	if frame.FinBit {
+		if stream.MissingReadData == 0 {
+			stream.ReadClosed = true
+		} else {
+			stream.ReadClosing = true
 		}
+	}
+
+	if stream.ReadClosing && stream.MissingReadData == 0 {
+		stream.ReadClosed = true
 	}
 
 	return frame

@@ -29,6 +29,7 @@ connection_migration:
     1: The TLS handshake failed
     2: Another UDP connection could not be established
     3: The host did not respond through the new connection
+    4: The host did respond on the new path but it did not validate it using <code>PATH_CHALLENGE</code> frames
 flow_control:
   name: Flow control
   description: |

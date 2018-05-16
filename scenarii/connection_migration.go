@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	CM_TLSHandshakeFailed		= 1
-	CM_UDPConnectionFailed		= 2
-	CM_HostDidNotMigrate		= 3
+	CM_TLSHandshakeFailed        = 1
+	CM_UDPConnectionFailed       = 2
+	CM_HostDidNotMigrate         = 3
+	CM_HostDidNotValidateNewPath = 4
 )
 
 type ConnectionMigrationScenario struct {
@@ -83,7 +84,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 		}
 
 		if trace.ErrorCode == CM_HostDidNotMigrate {
-			trace.ErrorCode = 0
+			trace.ErrorCode = CM_HostDidNotValidateNewPath
 		}
 
 		for _, packet := range packets {
@@ -91,6 +92,10 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 				protectedPacket := m.NewProtectedPacket(conn)
 				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 				conn.SendProtectedPacket(protectedPacket)
+			}
+
+			if fp, ok := packet.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
+				trace.ErrorCode = 0
 			}
 
 			if conn.Streams[4].ReadClosed {

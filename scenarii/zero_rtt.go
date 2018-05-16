@@ -45,8 +45,6 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	}
 
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
-	conn.CloseConnection(false, 0, "")
-	conn.RetransmissionTicker.Stop()
 
 	for { // Acks and restransmits if needed
 		packet, err, _ := conn.ReadNextPackets()
@@ -62,6 +60,29 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
 				conn.SendProtectedPacket(protectedPacket)
 			}
+
+			if fp, ok := packet.(m.Framer); ok && fp.Contains(m.StreamType) {
+				for _, f := range fp.GetFrames() {
+					if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 {
+						tlsOutput, _, err := conn.Tls.Input(sf.StreamData)
+						if err != nil {
+							trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
+							return
+						}
+
+						if len(tlsOutput) > 0 {
+							protectedPacket := m.NewProtectedPacket(conn)
+							protectedPacket.Frames = append(protectedPacket.Frames, m.NewStreamFrame(0, conn.Streams[0], tlsOutput, false))
+							conn.SendProtectedPacket(protectedPacket)
+						}
+					}
+				}
+			}
+		}
+
+		if len(conn.Tls.ResumptionTicket()) > 0 {
+			conn.CloseConnection(false, 0, "")
+			conn.RetransmissionTicker.Stop()
 		}
 	}
 
@@ -100,8 +121,8 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		}
 
 		for _, packet := range packet {
-			if scp, ok := packet.(*m.HandshakePacket); ok {
-				ongoingHandhake, packet, err = conn.ProcessServerHello(scp)
+			if fp, ok := packet.(m.Framer); ok {
+				ongoingHandhake, packet, err = conn.ProcessServerHello(fp)
 				if err != nil {
 					trace.MarkError(ZR_ZeroRTTFailed, err.Error())
 					break

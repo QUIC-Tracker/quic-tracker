@@ -26,8 +26,6 @@ const (
 	MS_TLSHandshakeFailed      = 1
 	MS_NoTPReceived		       = 2
 	MS_NotAllStreamsWereClosed = 3
-
-
 )
 
 type MultiStreamScenario struct {
@@ -55,7 +53,7 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	protectedPacket := m.NewProtectedPacket(conn)
-	for i := uint16(1); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
+	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
 		streamId := uint64(i * 4)
 		if _, ok := conn.Streams[streamId]; !ok {
 			conn.Streams[streamId] = new(m.Stream)
@@ -71,6 +69,11 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 
 		if err != nil {
 			trace.Results["error"] = err.Error()
+			for streamId, stream := range conn.Streams {
+				if streamId != 0 && !stream.ReadClosed {
+					allClosed = false
+				}
+			}
 			return
 		}
 

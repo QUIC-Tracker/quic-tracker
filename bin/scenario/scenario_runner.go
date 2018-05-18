@@ -117,6 +117,7 @@ func main() {
 
 	out, _ := json.Marshal(results)
 	if *outputFile != "" {
+		os.Remove(*outputFile)
 		outFile, err := os.OpenFile(*outputFile, os.O_CREATE | os.O_WRONLY, 0755)
 		defer outFile.Close()
 		if err == nil {

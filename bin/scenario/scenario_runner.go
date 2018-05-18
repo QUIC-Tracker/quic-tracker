@@ -24,17 +24,19 @@ import (
 	"time"
 	"encoding/json"
 	"strings"
+	"flag"
 )
 
 
 func main() {
-	file, err := os.Open(os.Args[1])
+	hostFilename := flag.String("hosts", "", "The file containing the hosts to test.")
+	scenarioName := flag.String("scenario", "", "The particular scenario to test. Tests all of them if not set.")
+	outputFile := flag.String("output", "", "The file to write the output to. Output to stdin if not set.")
+	flag.Parse()
+
+	file, err := os.Open(*hostFilename)
 	if err != nil {
 		panic(err)
-	}
-	var scenarioName string
-	if len(os.Args) > 2 {
-		scenarioName = os.Args[2]
 	}
 	defer file.Close()
 
@@ -63,7 +65,7 @@ func main() {
 	results := make([]m.Trace, 0, 0)
 
 	for _, scenario := range scenarii {
-		if scenarioName != "" && scenario.Name() != scenarioName {
+		if *scenarioName != "" && scenario.Name() != *scenarioName {
 			continue
 		}
 		scanner := bufio.NewScanner(file)
@@ -114,5 +116,16 @@ func main() {
 	}
 
 	out, _ := json.Marshal(results)
+	if *outputFile != "" {
+		outFile, err := os.OpenFile(*outputFile, os.O_CREATE | os.O_WRONLY, 0755)
+		defer outFile.Close()
+		if err == nil {
+			outFile.Write(out)
+			return
+		} else {
+			println(err.Error())
+		}
+	}
+
 	println(string(out))
 }

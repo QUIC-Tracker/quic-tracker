@@ -326,6 +326,7 @@ func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	buffer.ReadByte()  // Discard frame type
 	frame.Sequence, _ = ReadVarInt(buffer)
 	frame.Length, _ = buffer.ReadByte()
+	frame.ConnectionId = make([]byte, frame.Length, frame.Length)
 	buffer.Read(frame.ConnectionId)
 	binary.Read(buffer, binary.BigEndian, &frame.StatelessResetToken)
 	return frame

@@ -114,6 +114,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	conn.SendZeroRTTProtectedPacket(pp)
 
 	ongoingHandhake := true
+	wasStateless := false
 	for ongoingHandhake {
 		packet, err, _ := conn.ReadNextPackets()
 		if err != nil {
@@ -128,11 +129,21 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 					break
 				}
 				conn.SendHandshakeProtectedPacket(packet)
+
+				if _, ok := fp.(*m.RetryPacket); ok {
+					wasStateless = true
+				}
 			} else {
 				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake")
 				break
 			}
 		}
+	}
+
+	if wasStateless {
+		pp2 := m.NewProtectedPacket(conn)
+		pp2.Frames = pp.Frames
+		conn.SendProtectedPacket(pp2)
 	}
 
 

@@ -42,7 +42,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			trace.ErrorCode = VN_Timeout
 			return nil
 		} else {
-			if _, isVN := packet.(m.VersionNegotationPacket); !isVN {
+			if _, isVN := packet.(*m.VersionNegotationPacket); !isVN {
 				trace.MarkError(VN_NotAnsweringToVN, "")
 				trace.Results["received_packet_type"] = packet.Header().PacketType()
 				return nil

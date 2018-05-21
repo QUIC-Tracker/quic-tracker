@@ -46,6 +46,8 @@ func (s *AbstractScenario) IPv6() bool {
 func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
+	stream0Offset := uint64(0)
+
 	ongoingHandhake := true
 	for ongoingHandhake {
 		packets, err, _ := conn.ReadNextPackets()
@@ -59,13 +61,21 @@ func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
 
 			switch packet.(type) {
 			case *m.HandshakePacket, *m.RetryPacket:
-				ongoingHandhake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
-				if err != nil {
-					return nil, err
+				if fp, ok := packet.(m.Framer); ok && fp.Contains(m.StreamType) {
+					for _, f := range fp.GetFrames() {
+						if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 && sf.Offset == stream0Offset {
+							ongoingHandhake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
+							if err != nil {
+								return nil, err
+							}
+							stream0Offset += sf.Length
+							if packet != nil {
+								conn.SendHandshakeProtectedPacket(packet)
+							}
+						}
+					}
 				}
-				if packet != nil {
-					conn.SendHandshakeProtectedPacket(packet)
-				}
+
 			case *m.VersionNegotationPacket: {
 				err := conn.ProcessVersionNegotation(packet.(*m.VersionNegotationPacket))
 				if err != nil {

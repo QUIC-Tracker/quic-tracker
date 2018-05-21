@@ -44,6 +44,8 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		return
 	}
 
+	postHandshakeOffset := conn.Streams[0].ReadOffset
+
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 
 	for { // Acks and restransmits if needed
@@ -63,12 +65,13 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 			if fp, ok := packet.(m.Framer); ok && fp.Contains(m.StreamType) {
 				for _, f := range fp.GetFrames() {
-					if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 {
+					if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 && sf.Offset == postHandshakeOffset {
 						tlsOutput, _, err := conn.Tls.Input(sf.StreamData)
 						if err != nil {
 							trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
 							return
 						}
+						postHandshakeOffset += sf.Length
 
 						if len(tlsOutput) > 0 {
 							protectedPacket := m.NewProtectedPacket(conn)
@@ -106,12 +109,16 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	conn.RetransmissionTicker.Stop() // Stop retransmissions until fixed for 0-RTT
 
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-	conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
 
-	pp := m.NewZeroRTTProtectedPacket(conn)
-	conn.Streams[4] = new(m.Stream)
-	pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
-	conn.SendZeroRTTProtectedPacket(pp)
+	var pp *m.ZeroRTTProtectedPacket
+	for i := 0; i < 3; i++ {
+		conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
+
+		pp = m.NewZeroRTTProtectedPacket(conn)
+		conn.Streams[4] = new(m.Stream)
+		pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
+		conn.SendZeroRTTProtectedPacket(pp)
+	}
 
 	ongoingHandhake := true
 	wasStateless := false

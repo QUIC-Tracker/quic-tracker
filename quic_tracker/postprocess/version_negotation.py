@@ -18,6 +18,26 @@ def draft_versions(traces):
         yield (d.isoformat(), *(versions.get(v, 0) for v in unique_versions))
 
 
+@register('version_negotiation')
+def number_of_endpoints(traces):
+    marked = set()
+    results = {}
+
+    for t in traces:
+        date = datetime.fromtimestamp(t['started_at']).date()
+
+        if (date, t['host']) in marked:
+            continue
+
+        results[date] = results.get(date, 0) + 1
+        marked.add((date, t['host']))
+
+    yield ('Date', 'Endpoints')
+
+    for d, endpoints in sorted(results.items(), key=lambda x: x[0]):
+        yield (d.isoformat(), endpoints)
+
+
 def get_versions(traces):
     marked = set()
     results = {}

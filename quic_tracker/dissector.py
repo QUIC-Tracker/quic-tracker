@@ -37,6 +37,7 @@ packet10 = '/YpfQ+hj7g3m/wAACivxmnEAAAAAAAAAABAAFgMDAHsCAAB3AwPymi36tGsMkZl8TH9t
 packet11 = '/f8AAAtfmtkLu2fPXWHFAx7TWDsVvaxD/323JV8DH6xEs5GITwgNwAAAAGfPXWIAAAAOMzjSozxLMv0SAESKFgMDAIsCAACHAwOc6xp0QmL1gk2CUayoTO1fYxdhyUBP5Uellw1SyZ+IQBBSAvQ4NV2hwx/odz5DqZRqEwIAAE8AKwACfxwAMwBFABcAQQTyT2LQcKvpTLGp88ZNxfoSpJHLY9ZE3x1NGh1Ka5pB5KmMqagWkulg/7z7Eu2pMCuzuAlZMyuwnTPjdpemYrs4FAMDAAEBFwMDAGjz+KXwaJIiIBp6iNamGKZxN2FkefXaOwqC5HscjLmGqPnkPo0txImSTDUnYglfFmwfSaPSfvJQ2Z0k0OMLBFgW9Q269jy2wrsnoSdaKvi9BEedNemjwazymIWiZbTHzixQT0eMUUz9oxcDAwOrPfokGhZd6W1il+E+HmEybAykwRcbSFkwGgKGCSaZoDP+4vH93L6aiCm1/jxHiKKApefSR8VQFdOBsOKor8030twN20Z2IwIClobIjVzwGKrtz11EH3sPDSAAKN3h7IneWD5R1aZXsvcXRvRYtXICpWaiGLy8RV9bdkF49N8+XZ3bwy9wQLvEgLyNGG3FsHOJjpTnw6CFnNQ08Cx5uDVlPeJ5JEh1L3w9D47iWf9Taq247JRpcvDHCPygH37Er/xHq1D2cCzRGTNxOhlpjJ7XaAsx52HtHOorvTjWyjcXCce1GRXYSOdp8MXTIok1x42FZbW9EGkySdsbxCgCqUi2wHYDmxAjQ1YuVUSHX1SK+z3SDYSXqZpuWkAJxUvorphPAmOzEnjgz2AS+9QGiHW5fOnSdVHiWikhJwPoS5EX6NSfdsuhJ3qkBeJV2zLqia+J9s5hOkG4HAqouUxnklD9d5ZiaQo+24DMq5xwoki2PwRjEEvkz+DfkHCaZwjKeCHK+cOlR+TuQNs6yDuNkMV2IhwLOYiqLCofLbLGzH7NriZBZZfEGzfXGQBSkHsXdjXeohevk8KK33F9VztzCAO/eh5yW2TkvELIKFeFpujfHwnBlDF4hp7NSW+piMuYXmH8rnwcQsQIoZ/YgD18LN45qjqmUHAu6/D6Iw9SGTXOCzhrM0J4+dP/IOFF+eCcKPbBeYGiUBwDUoRdr3wBVu2c3iyhOwUSfIEV7Zbr/dSGneebLicvk9tgZYTrWTig1+BSTUJXs2vkugk1/o9ZqJcg1xuXeC+He1BRve5i38/JffRIk9HQL9MGOkAEb8TfLpbDVQVLajKYfMlcJBEryve5Y5i9K0DZRzVPzBg5KbbiAEc18PBIerZkp5EP3japGw35NK85MahuW9ZTyKWOH/u+WmkL8GhFlyRbpo3T0Xp5PabOzUZRgG7V5cvx7LUvOD8crc9/vmTPvvDJXTELWqw/Plwwuj2xCRRTqVr5LsAvAZ/barc7HtkcIBgNgHC/IR7v/RUg+0lh6FZh/4amhxr3HXnhCXAW8JY+Axx066mKXZNmznBlzqPd8tGUeos9GHZ5gyQB4xUJhU7Y7TJLvdMBdYwqb18I6HkhmSWKku7DnV4xz9sJf8KV7X8fv2Wwoz6DY9EvJb5XmRScMfjSKlAUpDZeHpBzzUo3eK+7LQJd1Oo0sQ=='
 packet12 = '/f8AAAtVjRrkGuVhDoIqrkZJBfISlQAF8hKcDcAAAABwdS6BAAIArgcK9wCUoQARAA=='
 
+
 class ParseError(ValueError):
     pass
 
@@ -81,11 +82,7 @@ def yield_structures(buffer, struct_name, protocol, start_idx, context):
         else:
             try:
                 ret, inc, next_struct = parse_structure(buffer, protocol[next_struct], protocol, start_idx, context)
-                if ret == [('Gap', 772213495, 39, 43), ('ACK Block', 0, 43, 44)]:
-                    print()
-                print(ret, inc)
             except Exception as e:
-                print(e)
                 raise e
             yield (struct_name, ret), inc
         buffer = buffer[inc:]
@@ -107,7 +104,7 @@ def parse_structure_type(buffer, type_name, protocol, start_idx, context):
         except ParseError as e:
             #print('%s: %s' % (struct_name, e))
             continue
-    raise ParseError('No structure could be parsed for type {}, first byte was {}'.format(type_name, buffer[start_idx]))
+    raise ParseError('No structure could be parsed for type {}, first byte was {}'.format(type_name, buffer[0]))
 
 
 def parse_structure(buffer, structure_description, protocol, start_idx, context):

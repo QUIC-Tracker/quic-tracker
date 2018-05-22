@@ -387,22 +387,23 @@ func (c *Connection) GetAckFrame() *AckFrame { // Returns an ack frame based on 
 	return frame
 }
 func (c *Connection) ProcessAck(ack *AckFrame) RetransmitBatch {
+	threshold := uint64(1000)
 	var frames RetransmitBatch
 	currentPacketNumber := ack.LargestAcknowledged
 	delete(c.retransmissionBuffer, currentPacketNumber)
-	for i := uint64(0); i < ack.AckBlocks[0].block; i++ {
+	for i := uint64(0); i < ack.AckBlocks[0].block && i < threshold; i++ {
 		currentPacketNumber--
 		delete(c.retransmissionBuffer, currentPacketNumber)
 	}
 	for _, ackBlock := range ack.AckBlocks[1:] {
-		for i := uint64(0); i <= ackBlock.gap; i++ {  // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
+		for i := uint64(0); i <= ackBlock.gap && i < threshold; i++ {  // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
 			if f, ok := c.retransmissionBuffer[currentPacketNumber]; ok {
 				frames = append(frames, f)
 			}
 			currentPacketNumber--
 			delete(c.retransmissionBuffer, currentPacketNumber)
 		}
-		for i := uint64(0); i < ackBlock.block; i++ {
+		for i := uint64(0); i < ackBlock.block && i < threshold; i++ {
 			currentPacketNumber--
 			delete(c.retransmissionBuffer, currentPacketNumber)
 		}

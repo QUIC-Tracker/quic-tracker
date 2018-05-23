@@ -23,9 +23,9 @@ make
 ```
 
 
-The test suite is run by `bin/scenario/scenario_runner.go`, e.g.:
+The test suite is run by `bin/scenario/scenario_runner.go`. For help about its usage see:
 ```
-go run bin/scenario/scenario_runner.go ietf_quic_hosts.txt [particular_scenario]
+go run bin/scenario/scenario_runner.go -h
 ```
 
 It takes as first parameter a tab-delimited CSV containing a list of hosts and particular URLs which will generate data when requested.

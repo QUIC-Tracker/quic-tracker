@@ -32,6 +32,7 @@ func main() {
 	hostFilename := flag.String("hosts", "", "The file containing the hosts to test.")
 	scenarioName := flag.String("scenario", "", "The particular scenario to test. Tests all of them if not set.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdin if not set.")
+	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
 	flag.Parse()
 
 	file, err := os.Open(*hostFilename)
@@ -81,7 +82,7 @@ func main() {
 			conn, err := m.NewDefaultConnection(host, strings.Split(host, ":")[0], nil, scenario.IPv6())
 
 			if err == nil {
-				pcap, err := m.StartPcapCapture(conn)
+				pcap, err := m.StartPcapCapture(conn, *netInterface)
 
 				trace.AttachTo(conn)
 

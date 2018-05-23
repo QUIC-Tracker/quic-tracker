@@ -18,9 +18,14 @@ import (
 const pcapTempPath = "/tmp/test.pcap"
 const pcapDecryptTempPath = "/tmp/decrypt.pcap"
 
-func StartPcapCapture(conn *Connection) (*exec.Cmd, error) {
+func StartPcapCapture(conn *Connection, netInterface string) (*exec.Cmd, error) {
 	bpfFilter := fmt.Sprintf("host %s and udp src or dst port %d", conn.Host.IP.String(), conn.Host.Port)
-	c := exec.Command("/usr/sbin/tcpdump", bpfFilter, "-w", pcapTempPath)
+	var c *exec.Cmd
+	if netInterface == "" {
+		c = exec.Command("/usr/sbin/tcpdump", bpfFilter, "-w", pcapTempPath)
+	} else {
+		c = exec.Command("/usr/sbin/tcpdump", bpfFilter, "-i", netInterface, "-w", pcapTempPath)
+	}
 	err := c.Start()
 	if err == nil {
 		time.Sleep(1 * time.Second)

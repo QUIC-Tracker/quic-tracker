@@ -32,12 +32,13 @@ func main() {
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	url := flag.String("url", "/index.html", "The URL to request")
+	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
 	flag.Parse()
 	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6)
 	if err != nil {
 		panic(err)
 	}
-	pcap, err := m.StartPcapCapture(conn)
+	pcap, err := m.StartPcapCapture(conn, *netInterface)
 	if err != nil {
 		panic(err)
 	}

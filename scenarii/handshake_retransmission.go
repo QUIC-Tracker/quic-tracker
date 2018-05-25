@@ -50,6 +50,7 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 	pathChallengeReceived := 0
 	handshakePacketReceived := 0
 	handshakePacketReceivedBeforePC := 0
+	var packetFinished m.Packet = nil
 
 outerLoop:
 	for {
@@ -84,6 +85,9 @@ outerLoop:
 						trace.MarkError(HR_TLSHandshakeFailed, err.Error())
 						break outerLoop
 					}
+					if !ongoingHandshake {
+						packetFinished = packet
+					}
 				}
 
 				handshakePacketReceived++
@@ -99,7 +103,10 @@ outerLoop:
 
 						trace.ErrorCode = HR_NoPathChallengeConfirmation  // Assume true unless proven otherwise
 						conn.IgnorePathChallenge = false
-						conn.SendHTTPGETRequest(preferredUrl, 4)
+						if packetFinished != nil {
+							conn.SendHandshakeProtectedPacket(packetFinished)
+							conn.SendHTTPGETRequest(preferredUrl, 4)
+						}
 					}
 				} else if pathChallengeReceived == 0 {
 					handshakePacketReceivedBeforePC++

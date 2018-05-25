@@ -8,6 +8,7 @@ import quic_tracker.postprocess.version_negotation
 import quic_tracker.postprocess.failures
 import quic_tracker.postprocess.transport_parameters
 import quic_tracker.postprocess.handshake_retransmission
+import quic_tracker.postprocess.handshake
 
 if __name__ == "__main__":
     traces_dir = sys.argv[1]

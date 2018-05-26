@@ -123,7 +123,7 @@ outerLoop:
 				initial = conn.GetInitialPacket()
 				conn.SendHandshakeProtectedPacket(initial)
 				totalDataReceived = 0
-			} else if pp, ok := packet.(*m.ProtectedPacket); ok {
+			} else if pp, ok := packet.(*m.ProtectedPacket); ok && (isStateless || pathChallengeReceived > 0){
 				if pp.ShouldBeAcknowledged() {
 					protectedPacket := m.NewProtectedPacket(conn)
 					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())

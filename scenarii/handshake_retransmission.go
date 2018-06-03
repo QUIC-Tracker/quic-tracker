@@ -105,15 +105,22 @@ outerLoop:
 						conn.IgnorePathChallenge = false
 						if packetFinished != nil {
 							conn.SendHandshakeProtectedPacket(packetFinished)
+							packetFinished = nil
 							conn.SendHTTPGETRequest(preferredUrl, 4)
 						}
 					}
-				} else if pathChallengeReceived == 0 {
+				} else if pathChallengeReceived == 0 || handshakePacketReceived <= 3 {
 					handshakePacketReceivedBeforePC++
-				} else if !ongoingHandshake && handshake.ShouldBeAcknowledged() {
-					protectedPacket := m.NewProtectedPacket(conn)
-					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-					conn.SendProtectedPacket(protectedPacket)
+					if !ongoingHandshake && handshake.ShouldBeAcknowledged() {
+						if packetFinished != nil {
+							conn.SendHandshakeProtectedPacket(packetFinished)
+							packetFinished = nil
+							conn.IgnorePathChallenge = false
+						}
+						protectedPacket := m.NewProtectedPacket(conn)
+						protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+						conn.SendProtectedPacket(protectedPacket)
+					}
 				}
 			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 				if err := conn.ProcessVersionNegotation(vn); err != nil {
@@ -142,7 +149,7 @@ outerLoop:
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
 	} else if handshakePacketReceived > 3 && pathChallengeReceived == 0 {
 		trace.ErrorCode = HR_NoPathChallengeReceived
-	} else if handshakePacketReceived > 3 && handshakePacketReceivedBeforePC >= 1 {
+	} else if handshakePacketReceived >= 3 && handshakePacketReceivedBeforePC > 0 {
 		trace.ErrorCode = HR_NoPathChallengeInAllPackets
 	} else if conn.Streams[4] != nil && conn.Streams[4].ReadClosed {
 		trace.ErrorCode = 0

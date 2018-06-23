@@ -110,7 +110,7 @@ func TestStreamAddToRead (t *testing.T) {
 	var dataRead []byte
 
 read:
-	for true {
+	for {
 		select {
 		case data := <- s.ReadChan:
 			dataRead = append(dataRead, data...)
@@ -138,7 +138,7 @@ read:
 	}
 
 read2:
-	for true {
+	for {
 		select {
 		case data := <- s.ReadChan:
 			dataRead = append(dataRead, data...)

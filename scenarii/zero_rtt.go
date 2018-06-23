@@ -38,8 +38,7 @@ func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false}}
 }
 func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	_, err := CompleteHandshake(conn)
-	if err != nil {
+	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
 		return
 	}
@@ -94,7 +93,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	conn.Close()
 	rh, sh := conn.ReceivedPacketHandler, conn.SentPacketHandler
-	conn, err = m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionSecret, s.ipv6)
+	conn, err := m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionSecret, s.ipv6)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	if err != nil {

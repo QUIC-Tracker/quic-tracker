@@ -67,9 +67,8 @@ func main() {
 		println(string(out))
 	}()
 
-	packets, err := scenarii.CompleteHandshake(conn)
-	if err != nil {
-		spew.Dump(packets, err)
+	if scenarii.CompleteHandshake(conn); err != nil {
+		spew.Dump(err)
 	}
 
 	streamFrame := m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
@@ -79,20 +78,8 @@ func main() {
 	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
 	conn.SendProtectedPacket(protectedPacket)
 
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			spew.Dump(err)
-			break
-		}
-
-		var shouldBeAcknowledged bool
-		for _, p := range packets {
-			if p.ShouldBeAcknowledged() {
-				shouldBeAcknowledged = true
-			}
-		}
-		if shouldBeAcknowledged {
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
 			pp := m.NewProtectedPacket(conn)
 			pp.Frames = append(pp.Frames, conn.GetAckFrame())
 			conn.SendProtectedPacket(pp)

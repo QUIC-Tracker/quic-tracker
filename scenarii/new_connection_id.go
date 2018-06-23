@@ -40,7 +40,7 @@ func NewNewConnectionIDScenario() *NewConnectionIDScenario {
 func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 
-	if _, err := CompleteHandshake(conn); err != nil {
+	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(NCI_TLSHandshakeFailed, err.Error())
 		return
 	}

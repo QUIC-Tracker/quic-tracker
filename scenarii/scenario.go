@@ -43,53 +43,41 @@ func (s *AbstractScenario) IPv6() bool {
 	return s.ipv6
 }
 
-func CompleteHandshake(conn *m.Connection) ([]m.Packet, error) {
+func CompleteHandshake(conn *m.Connection) error {
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
-	stream0Offset := uint64(0)
-
 	ongoingHandhake := true
-	for ongoingHandhake {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			return nil, err
+	var err error
+	for p := range conn.IncomingPackets {
+		if !ongoingHandhake {
+			return nil
 		}
-		for i, packet := range packets {
-			if !ongoingHandhake {
-				return packets[i:], nil
-			}
 
-			switch packet.(type) {
-			case *m.HandshakePacket, *m.RetryPacket:
-				if fp, ok := packet.(m.Framer); ok && fp.Contains(m.StreamType) {
-					for _, f := range fp.GetFrames() {
-						if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 && sf.Offset == stream0Offset {
-							ongoingHandhake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
-							if err != nil {
-								return nil, err
-							}
-							stream0Offset += sf.Length
-							if packet != nil {
-								conn.SendHandshakeProtectedPacket(packet)
-							}
-						}
-					}
-				}
-
-			case *m.VersionNegotationPacket: {
-				err := conn.ProcessVersionNegotation(packet.(*m.VersionNegotationPacket))
-				if err != nil {
-					return nil, err
-				}
-				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+		switch p.(type) {
+		case *m.HandshakePacket, *m.RetryPacket:
+			ongoingHandhake, p, err = conn.ProcessServerHello(p.(m.Framer))
+			if err != nil {
+				return err
 			}
-			default:
-				if ongoingHandhake {
-					return nil, errors.New("Received incorrect packet type during handshake")
-				}
+			if p != nil {
+				conn.SendHandshakeProtectedPacket(p)
+			}
+		case *m.VersionNegotationPacket:
+			err := conn.ProcessVersionNegotation(p.(*m.VersionNegotationPacket))
+			if err != nil {
+				return err
+			}
+			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+		default:
+			if ongoingHandhake {
+				return errors.New("received incorrect packet type during handshake")
 			}
 		}
 	}
 
-	return nil, nil
+	if ongoingHandhake {
+		return errors.New("could not complete handshake")
+	}
+
+	return nil
 }

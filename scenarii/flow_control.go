@@ -38,7 +38,7 @@ func NewFlowControlScenario() *FlowControlScenario {
 func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.TLSTPHandler.MaxStreamData = 80
 
-	if _, err := CompleteHandshake(conn); err != nil {
+	if err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(FC_TLSHandshakeFailed, err.Error())
 		return
 	}

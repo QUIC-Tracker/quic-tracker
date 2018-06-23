@@ -45,6 +45,7 @@ type Connection struct {
 	SentPacketHandler     func([]byte)
 
 	Streams              Streams
+	IncomingPackets		 chan Packet
 	SourceCID            ConnectionID
 	DestinationCID       ConnectionID
 	PacketNumber         uint64
@@ -504,6 +505,21 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
 
 	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
+
+	c.IncomingPackets = make(chan Packet)
+
+	go func() {
+		for {
+			packets, err, _ := c.ReadNextPackets()
+			if err != nil {
+				close(c.IncomingPackets)
+				break
+			}
+			for _, p := range packets {
+				c.IncomingPackets <- p
+			}
+		}
+	}()
 
 	go func() {
 		for range c.RetransmissionTicker.C {

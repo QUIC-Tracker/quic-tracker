@@ -75,7 +75,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 0
 	conn.TLSTPHandler.MaxStreamIdUni = 0
-	if _, err := CompleteHandshake(conn); err != nil {
+	if err := CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
 		trace.MarkError(SGW_TLSHandshakeFailed, err.Error())
 		return

@@ -40,8 +40,6 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 }
 
 func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.Streams[3] = new(m.Stream)
-
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
 	conn.TLSTPHandler.MaxStreamIdUni = 1
 	if _, err := CompleteHandshake(conn); err != nil {

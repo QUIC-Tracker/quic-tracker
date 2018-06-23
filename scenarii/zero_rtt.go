@@ -44,8 +44,6 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		return
 	}
 
-	postHandshakeOffset := conn.Streams[0].ReadOffset
-
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 
 	for { // Acks and restransmits if needed
@@ -63,23 +61,21 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 				conn.SendProtectedPacket(protectedPacket)
 			}
 
-			if fp, ok := packet.(m.Framer); ok && fp.Contains(m.StreamType) {
-				for _, f := range fp.GetFrames() {
-					if sf, ok := f.(*m.StreamFrame); ok && sf.StreamId == 0 && sf.Offset == postHandshakeOffset {
-						tlsOutput, _, err := conn.Tls.Input(sf.StreamData)
-						if err != nil {
-							trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
-							return
-						}
-						postHandshakeOffset += sf.Length
-
-						if len(tlsOutput) > 0 {
-							protectedPacket := m.NewProtectedPacket(conn)
-							protectedPacket.Frames = append(protectedPacket.Frames, m.NewStreamFrame(0, conn.Streams[0], tlsOutput, false))
-							conn.SendProtectedPacket(protectedPacket)
-						}
-					}
+			select {
+			case resumptionData := <- conn.Streams.Get(0).ReadChan:
+				tlsOutput, _, err := conn.Tls.Input(resumptionData)
+				if err != nil {
+					trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
+					return
 				}
+
+				if len(tlsOutput) > 0 {
+					protectedPacket := m.NewProtectedPacket(conn)
+					protectedPacket.Frames = append(protectedPacket.Frames, m.NewStreamFrame(0, conn.Streams.Get(0), tlsOutput, false))
+					conn.SendProtectedPacket(protectedPacket)
+				}
+			default:
+
 			}
 		}
 
@@ -110,15 +106,11 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
-	var pp *m.ZeroRTTProtectedPacket
-	for i := 0; i < 3; i++ {
-		conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
+	conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
 
-		pp = m.NewZeroRTTProtectedPacket(conn)
-		conn.Streams[4] = new(m.Stream)
-		pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
-		conn.SendZeroRTTProtectedPacket(pp)
-	}
+	pp := m.NewZeroRTTProtectedPacket(conn)
+	pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
+	conn.SendZeroRTTProtectedPacket(pp)
 
 	ongoingHandhake := true
 	wasStateless := false

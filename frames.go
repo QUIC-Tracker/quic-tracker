@@ -515,12 +515,6 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame.StreamData = make([]byte, frame.Length, frame.Length)
 	buffer.Read(frame.StreamData)
 
-	stream, ok := conn.Streams[frame.StreamId]
-	if !ok {
-		stream = &Stream{}
-		conn.Streams[frame.StreamId] = stream
-	}
-
 	conn.Streams.Get(frame.StreamId).addToRead(frame)
 
 	return frame

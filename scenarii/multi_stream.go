@@ -55,10 +55,7 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	protectedPacket := m.NewProtectedPacket(conn)
 	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
 		streamId := uint64(i * 4)
-		if _, ok := conn.Streams[streamId]; !ok {
-			conn.Streams[streamId] = new(m.Stream)
-		}
-		streamFrame := m.NewStreamFrame(streamId, conn.Streams[streamId], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
+		streamFrame := m.NewStreamFrame(streamId, conn.Streams.Get(streamId), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
 	}
 
@@ -72,9 +69,10 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 			for streamId, stream := range conn.Streams {
 				if streamId != 0 && !stream.ReadClosed {
 					allClosed = false
+					break
 				}
 			}
-			return
+			break
 		}
 
 		for _, packet := range packets {

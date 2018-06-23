@@ -98,7 +98,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 				trace.ErrorCode = 0
 			}
 
-			if conn.Streams[4].ReadClosed {
+			if conn.Streams.Get(4).ReadClosed {
 				conn.CloseConnection(false, 0, "")
 				return
 			}

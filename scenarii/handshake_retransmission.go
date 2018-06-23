@@ -144,7 +144,7 @@ outerLoop:
 		trace.ErrorCode = HR_NoPathChallengeReceived
 	} else if handshakePacketReceived > 3 && handshakePacketReceivedBeforePC >= 1 {
 		trace.ErrorCode = HR_NoPathChallengeInAllPackets
-	} else if conn.Streams[4] != nil && conn.Streams[4].ReadClosed {
+	} else if conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = 0
 	}
 

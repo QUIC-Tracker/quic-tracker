@@ -65,7 +65,7 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 					conn.CloseConnection(false, 42, "")
 				} else if err != nil {
 					trace.MarkError(H_TLSHandshakeFailed, err.Error())
-					conn.CloseStream(0)
+					conn.CloseConnection(true, 0, "")
 				}
 				if packet != nil {
 					conn.SendHandshakeProtectedPacket(packet)

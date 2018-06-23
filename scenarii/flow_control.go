@@ -55,7 +55,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 			break
 		}
 
-		if conn.Streams[4].ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
+		if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
 			trace.MarkError(FC_HostSentMoreThanLimit, "")
 		}
 
@@ -74,11 +74,11 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 						break
 					}
 				}
-				if conn.Streams[4].ReadClosed {
+				if conn.Streams.Get(4).ReadClosed {
 					continue
 				}
 
-				readOffset := conn.Streams[4].ReadOffset
+				readOffset := conn.Streams.Get(4).ReadOffset
 				if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
 					maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
 					conn.TLSTPHandler.MaxData *= 2
@@ -93,7 +93,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 		}
 	}
 
-	readOffset := conn.Streams[4].ReadOffset
+	readOffset := conn.Streams.Get(4).ReadOffset
 	if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
 		trace.ErrorCode = 0
 	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) / 2 {

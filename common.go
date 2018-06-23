@@ -64,3 +64,17 @@ func (c ConnectionID) CIDL() uint8 {
 	}
 	return uint8(len(c) - 3)
 }
+
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}

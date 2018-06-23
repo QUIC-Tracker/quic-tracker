@@ -44,7 +44,7 @@ type Connection struct {
 	ReceivedPacketHandler func([]byte)
 	SentPacketHandler     func([]byte)
 
-	Streams              map[uint64]*Stream
+	Streams              Streams
 	SourceCID            ConnectionID
 	DestinationCID       ConnectionID
 	PacketNumber         uint64

@@ -38,13 +38,14 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 }
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error())
+	var p m.Packet
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
-		trace.MarkError(SSRS_MaxStreamUniTooLow, "")
+		trace.MarkError(SSRS_MaxStreamUniTooLow, "", p)
 		trace.Results["expected_max_stream_uni"] = ">= 1"
 		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni
 		return
@@ -71,7 +72,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 				switch f2 := f.(type) {
 				case *m.ConnectionCloseFrame:
 					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
-						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "")
+						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "", packet)
 						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
 						return
 					}

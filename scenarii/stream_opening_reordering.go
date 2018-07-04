@@ -34,8 +34,8 @@ func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(SOR_TLSHandshakeFailed, "")
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(SOR_TLSHandshakeFailed, "", p)
 		return
 	}
 

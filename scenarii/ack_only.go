@@ -33,8 +33,8 @@ func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
 func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(AO_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(AO_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		if framer, ok := p.(m.Framer); ok && !p.ShouldBeAcknowledged() && framer.Contains(m.AckType){
 			ack := framer.GetFirst(m.AckType).(*m.AckFrame)
 			if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
-				trace.MarkError(AO_SentAOInResponseOfAO, "")
+				trace.MarkError(AO_SentAOInResponseOfAO, "", p)
 				break
 			}
 		}

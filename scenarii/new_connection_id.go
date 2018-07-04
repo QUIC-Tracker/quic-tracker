@@ -40,8 +40,8 @@ func NewNewConnectionIDScenario() *NewConnectionIDScenario {
 func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(NCI_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(NCI_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 	for p := range conn.IncomingPackets {
 		if expectingResponse {
 			if bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
-				trace.MarkError(NCI_HostDidNotAdaptCID, "")
+				trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
 			} else {
 				trace.ErrorCode = 0
 			}
@@ -71,7 +71,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 				if nci, ok := frame.(*m.NewConnectionIdFrame); ok {
 					if nci.Length < 4 || nci.Length > 18 {
 						err := fmt.Sprintf("Connection ID length must be comprised between 4 and 18, it was %d", nci.Length)
-						trace.MarkError(NCI_HostSentInvalidCIDLength, err)
+						trace.MarkError(NCI_HostSentInvalidCIDLength, err, pp)
 						conn.CloseConnection(true, m.ERR_PROTOCOL_VIOLATION, err)
 					}
 

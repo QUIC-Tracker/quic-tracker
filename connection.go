@@ -29,6 +29,7 @@ import (
 	"sort"
 	"github.com/mpiraux/pigotls"
 	"crypto/cipher"
+	"unsafe"
 )
 
 type Connection struct {
@@ -41,8 +42,8 @@ type Connection struct {
 	Protected        *CryptoState
 	ZeroRTTprotected *CryptoState
 
-	ReceivedPacketHandler func([]byte)
-	SentPacketHandler     func([]byte)
+	ReceivedPacketHandler func([]byte, unsafe.Pointer)
+	SentPacketHandler     func([]byte, unsafe.Pointer)
 
 	Streams              Streams
 	IncomingPackets		 chan Packet
@@ -114,7 +115,7 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	lHeader.PayloadLength = uint64(len(payload) + c.Cleartext.Write.Overhead())
 
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
 	}
 
 	header := packet.EncodeHeader()
@@ -138,7 +139,7 @@ func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
 	}
 
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
 	}
 
 	header := packet.EncodeHeader()
@@ -265,7 +266,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	return nil
 }
 func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
-	saveCleartext := func (ct []byte) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct)}}
+	saveCleartext := func (ct []byte, p unsafe.Pointer) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct, p)}}
 
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.UdpConnection.ReadFromUDP(rec)
@@ -287,7 +288,7 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			for k := range c.retransmissionBuffer {
 				delete(c.retransmissionBuffer, k)
 			}
-			saveCleartext(rec)
+			saveCleartext(rec, packet.Pointer())
 			off = len(rec)
 
 			packets = append(packets, packet)
@@ -321,7 +322,6 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 				return packets, errors.New("unknown packet type"), rec
 			}
 
-			saveCleartext(data)
 			buffer := bytes.NewReader(data)
 
 			switch header.PacketType() {
@@ -334,6 +334,8 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			case Retry:
 				packet = ReadRetryPacket(buffer, c)
 			}
+
+			saveCleartext(data, packet.Pointer())
 
 			fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 

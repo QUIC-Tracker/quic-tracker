@@ -40,13 +40,14 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
 
 	allClosed := true
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(MS_TLSHandshakeFailed, err.Error())
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
+		trace.MarkError(MS_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-		trace.MarkError(MS_NoTPReceived, "")
+		trace.MarkError(MS_NoTPReceived, "", p)
 		return
 	}
 

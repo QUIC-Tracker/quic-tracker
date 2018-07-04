@@ -44,7 +44,7 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 		switch p := p.(type) {
 		case *m.VersionNegotationPacket:
 			if err := conn.ProcessVersionNegotation(p); err != nil {
-				trace.MarkError(UTS_VNDidNotComplete, err.Error())
+				trace.MarkError(UTS_VNDidNotComplete, err.Error(), p)
 				return
 			}
 			sendUnsupportedInitial(conn)
@@ -52,14 +52,14 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 			for _, frame := range p.GetFrames() {
 				if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
 					if cc.ErrorCode != 0x201 {
-						trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
+						trace.MarkError(UTS_WrongErrorCodeIsUsed, "", p)
 					}
 					trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
 					connectionClosed = true
 				}
 			}
 		default:
-			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
+			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "", p)
 		}
 
 		if p.ShouldBeAcknowledged() {

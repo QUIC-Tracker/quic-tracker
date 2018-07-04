@@ -74,14 +74,15 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 0
 	conn.TLSTPHandler.MaxStreamIdUni = 0
-	if err := CompleteHandshake(conn); err != nil {
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
-		trace.MarkError(SGW_TLSHandshakeFailed, err.Error())
+		trace.MarkError(SGW_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
-		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi))
+		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi), p)
 	}
 
 	requestPacketNumber := conn.PacketNumber + 1
@@ -109,7 +110,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 							errors[SGW_WrongStreamIDReceived] = true
 							message := fmt.Sprintf("received StreamID %d", f2.StreamId)
 							errorMessages = append(errorMessages, message)
-							trace.MarkError(SGW_WrongStreamIDReceived, "")
+							trace.MarkError(SGW_WrongStreamIDReceived, "", p)
 						}
 					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
 						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
@@ -119,7 +120,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 							errors[SGW_EmptyStreamFrameNoFinBit] = true
 							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
 							errorMessages = append(errorMessages, message)
-							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message)
+							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message, p)
 						}
 					}
 				case *m.AckFrame:
@@ -140,7 +141,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 								errors[SGW_RetransmittedAck] = true
 								message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
 								errorMessages = append(errorMessages, message)
-								trace.MarkError(SGW_RetransmittedAck, message)
+								trace.MarkError(SGW_RetransmittedAck, message, p)
 							}
 						} else {
 							// record the received ack blocks

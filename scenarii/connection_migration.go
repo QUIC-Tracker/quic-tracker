@@ -36,8 +36,8 @@ func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(CM_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(CM_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 

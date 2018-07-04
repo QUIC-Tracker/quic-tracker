@@ -40,15 +40,16 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
 	conn.TLSTPHandler.MaxStreamIdUni = 1
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(GS2_TLSHandshakeFailed, err.Error())
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
+		trace.MarkError(GS2_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
 	} else {
-		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received")
+		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received", p)
 	}
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
@@ -60,10 +61,10 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 				switch f2 := f.(type) {
 				case *m.StreamFrame:
 					if f2.StreamId == 2 {
-						trace.MarkError(GS2_ReceivedDataOnStream2, "")
+						trace.MarkError(GS2_ReceivedDataOnStream2, "", p)
 						break
 					} else if f2.StreamId > 3 {
-						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
+						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "", p)
 					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
 						// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
 						// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")

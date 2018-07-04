@@ -60,7 +60,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			unusedField = p.UnusedField
 			trace.Results["supported_versions"] = p.SupportedVersions  // TODO: Compare versions announced ?
 		default:
-			trace.MarkError(VN_NotAnsweringToVN, "")
+			trace.MarkError(VN_NotAnsweringToVN, "", p)
 			trace.Results["received_packet_type"] = p.Header().PacketType()
 		}
 	}

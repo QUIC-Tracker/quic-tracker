@@ -81,9 +81,10 @@ outerLoop:
 				}
 
 				if ongoingHandshake {
-					ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+					var response m.Packet
+					ongoingHandshake, response, err = conn.ProcessServerHello(handshake)
 					if err != nil {
-						trace.MarkError(HR_TLSHandshakeFailed, err.Error())
+						trace.MarkError(HR_TLSHandshakeFailed, err.Error(), response)
 						break outerLoop
 					}
 					if !ongoingHandshake {
@@ -118,7 +119,7 @@ outerLoop:
 				}
 			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 				if err := conn.ProcessVersionNegotation(vn); err != nil {
-					trace.MarkError(HR_VNDidNotComplete, err.Error())
+					trace.MarkError(HR_VNDidNotComplete, err.Error(), vn)
 					break outerLoop
 				}
 				initial = conn.GetInitialPacket()

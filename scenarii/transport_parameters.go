@@ -55,7 +55,7 @@ outerLoop:
 		case *m.HandshakePacket, *m.RetryPacket:
 			ongoingHandhake, p, err = conn.ProcessServerHello(p.(m.Framer))
 			if err != nil {
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error(), p)
 				return
 			}
 			if p != nil {
@@ -67,13 +67,13 @@ outerLoop:
 		case *m.VersionNegotationPacket:
 			err = conn.ProcessVersionNegotation(p)
 			if err != nil {
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error(), p)
 				return
 			}
 			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 		default:
 			trace.Results["unexpected_packet_type"] = p.Header().PacketType()
-			trace.MarkError(TP_HandshakeDidNotComplete, "")
+			trace.MarkError(TP_HandshakeDidNotComplete, "", p)
 			if debug {
 				spew.Dump(p)
 			}

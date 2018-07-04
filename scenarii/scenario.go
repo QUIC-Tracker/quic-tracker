@@ -43,41 +43,43 @@ func (s *AbstractScenario) IPv6() bool {
 	return s.ipv6
 }
 
-func CompleteHandshake(conn *m.Connection) error {
+func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the handshake and returns the last packet received
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	var err error
-	for p := range conn.IncomingPackets {
-		if !ongoingHandhake {
-			return nil
-		}
-
+	var p m.Packet
+	for p = range conn.IncomingPackets {
 		switch p.(type) {
 		case *m.HandshakePacket, *m.RetryPacket:
-			ongoingHandhake, p, err = conn.ProcessServerHello(p.(m.Framer))
+			var response m.Packet
+			ongoingHandhake, response, err = conn.ProcessServerHello(p.(m.Framer))
 			if err != nil {
-				return err
+				return p, err
 			}
-			if p != nil {
-				conn.SendHandshakeProtectedPacket(p)
+			if response != nil {
+				conn.SendHandshakeProtectedPacket(response)
 			}
 		case *m.VersionNegotationPacket:
 			err := conn.ProcessVersionNegotation(p.(*m.VersionNegotationPacket))
 			if err != nil {
-				return err
+				return p, err
 			}
 			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 		default:
 			if ongoingHandhake {
-				return errors.New("received incorrect packet type during handshake")
+				return p, errors.New("received incorrect packet type during handshake")
 			}
+		}
+
+		if !ongoingHandhake {
+			return p, nil
 		}
 	}
 
 	if ongoingHandhake {
-		return errors.New("could not complete handshake")
+		return p, errors.New("could not complete handshake")
 	}
 
-	return nil
+	return p, nil
 }

@@ -38,8 +38,8 @@ func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false}}
 }
 func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(ZR_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 			case resumptionData := <- conn.Streams.Get(0).ReadChan:
 				tlsOutput, _, err := conn.Tls.Input(resumptionData)
 				if err != nil {
-					trace.MarkError(ZR_TLSHandshakeFailed, err.Error())
+					trace.MarkError(ZR_TLSHandshakeFailed, err.Error(), packet)
 					return
 				}
 
@@ -121,9 +121,10 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 		for _, packet := range packet {
 			if fp, ok := packet.(m.Framer); ok {
-				ongoingHandhake, packet, err = conn.ProcessServerHello(fp)
+				var response m.Packet
+				ongoingHandhake, response, err = conn.ProcessServerHello(fp)
 				if err != nil {
-					trace.MarkError(ZR_ZeroRTTFailed, err.Error())
+					trace.MarkError(ZR_ZeroRTTFailed, err.Error(), response)
 					break
 				}
 				conn.SendHandshakeProtectedPacket(packet)
@@ -132,7 +133,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 					wasStateless = true
 				}
 			} else {
-				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake")
+				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake", packet)
 				break
 			}
 		}

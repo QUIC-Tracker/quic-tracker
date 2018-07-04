@@ -170,7 +170,7 @@ func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		switch frame.(type) {
-		case *AckFrame, *PaddingFrame:
+		case *AckFrame, *PaddingFrame, *ConnectionCloseFrame, *ApplicationCloseFrame:
 		default:
 			return true
 		}

@@ -59,6 +59,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	pp.Frames = append(pp.Frames, stopSendingFrame)
 	conn.SendProtectedPacket(pp)
 
+	trace.ErrorCode = SSRS_DidNotCloseTheConnection
 	for p := range conn.IncomingPackets {
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)

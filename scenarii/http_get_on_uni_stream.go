@@ -48,6 +48,9 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 
 	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
+		if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni == 0 {
+			trace.ErrorCode = GS2_DidNotCloseTheConnection
+		}
 	} else {
 		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received", p)
 	}
@@ -71,8 +74,8 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 						// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
 					}
 				case *m.ConnectionCloseFrame:
-					if trace.ErrorCode == GS2_TooLowStreamIdUniToSendRequest {
-						trace.ErrorCode = 0
+					if trace.ErrorCode == GS2_DidNotCloseTheConnection {
+						trace.ErrorCode = GS2_TooLowStreamIdUniToSendRequest
 					}
 					break
 				}

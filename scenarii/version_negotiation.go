@@ -50,7 +50,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 		switch p := p.(type) {
 		case *m.VersionNegotationPacket:
 			vnCount++
-			if unusedField != p.UnusedField {
+			if vnCount > 1 && unusedField != p.UnusedField {
 				trace.ErrorCode = 0
 				break
 			} else if vnCount == threshold {
@@ -59,6 +59,9 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			}
 			unusedField = p.UnusedField
 			trace.Results["supported_versions"] = p.SupportedVersions  // TODO: Compare versions announced ?
+			newInitial := m.NewInitialPacket(conn)
+			newInitial.Frames = initial.Frames
+			conn.SendHandshakeProtectedPacket(newInitial)
 		default:
 			trace.MarkError(VN_NotAnsweringToVN, "", p)
 			trace.Results["received_packet_type"] = p.Header().PacketType()

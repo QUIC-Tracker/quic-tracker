@@ -44,6 +44,8 @@ def parse_packet_with(buffer, protocol, context):
     for top_struct in top_level:
         try:
             ret, inc, _ = parse_structure(buffer[:], protocol[top_struct], protocol, 0, context)
+            if inc < len(buffer):
+                raise ParseError('There are bytes left unparsed in the buffer')
             return [(top_struct, ('', ret, 0, inc), 0, inc)]
         except ParseError as e:
             last_e = e

@@ -55,8 +55,10 @@ type Connection struct {
 	ackQueue             []uint64 // Stores the packet numbers to be acked
 	retransmissionBuffer map[uint64]RetransmittableFrames
 	RetransmissionTicker *time.Ticker
+
 	IgnorePathChallenge   bool
 	DisableRetransmits    bool
+	DisableIncPacketChan  bool
 
 	UseIPv6        bool
 	Host           *net.UDPAddr
@@ -506,20 +508,22 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 
 	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
 
-	c.IncomingPackets = make(chan Packet)
+	if !c.DisableIncPacketChan {
+		c.IncomingPackets = make(chan Packet)
 
-	go func() {
-		for {
-			packets, err, _ := c.ReadNextPackets()
-			if err != nil {
-				close(c.IncomingPackets)
-				break
+		go func() {
+			for {
+				packets, err, _ := c.ReadNextPackets()
+				if err != nil {
+					close(c.IncomingPackets)
+					break
+				}
+				for _, p := range packets {
+					c.IncomingPackets <- p
+				}
 			}
-			for _, p := range packets {
-				c.IncomingPackets <- p
-			}
-		}
-	}()
+		}()
+	}
 
 	go func() {
 		for range c.RetransmissionTicker.C {

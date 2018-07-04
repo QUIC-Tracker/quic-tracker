@@ -61,42 +61,33 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 
 	conn.SendProtectedPacket(protectedPacket)
 
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			for streamId, stream := range conn.Streams {
-				if streamId != 0 && !stream.ReadClosed {
-					allClosed = false
-					break
-				}
-			}
-			break
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
 		}
 
-		for _, packet := range packets {
-
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
+		for streamId, stream := range conn.Streams {
+			if streamId != 0 && !stream.ReadClosed {
+				allClosed = false
+				break
 			}
+		}
 
-			for streamId, stream := range conn.Streams {
-				if streamId != 0 && !stream.ReadClosed {
-					allClosed = false
-					break
-				}
-			}
-
-			if allClosed {
-				conn.CloseConnection(false, 0, "")
-				return
-			}
+		if allClosed {
+			conn.CloseConnection(false, 0, "")
+			return
 		}
 	}
 
+	allClosed = true
+	for streamId, stream := range conn.Streams {
+		if streamId != 0 && !stream.ReadClosed {
+			allClosed = false
+			break
+		}
+	}
 
 	if !allClosed {
 		trace.ErrorCode = MS_NotAllStreamsWereClosed

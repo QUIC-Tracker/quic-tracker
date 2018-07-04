@@ -49,48 +49,40 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 
 	var expectingResponse bool
 	var alternativeConnectionIDs [][]byte
-	for {
-		packets, err, _ := conn.ReadNextPackets()
 
-		if err != nil {
-			trace.Results["error"] = err.Error()
+	for p := range conn.IncomingPackets {
+		if expectingResponse {
+			if bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
+				trace.MarkError(NCI_HostDidNotAdaptCID, "")
+			} else {
+				trace.ErrorCode = 0
+			}
 			return
 		}
 
-		for _, packet := range packets {
-			if expectingResponse {
-				if bytes.Equal(packet.Header().DestinationConnectionID(), conn.SourceCID) {
-					trace.MarkError(NCI_HostDidNotAdaptCID, "")
-				} else {
-					trace.ErrorCode = 0
-				}
-				return
-			}
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
+		}
 
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
+		if pp, ok := p.(*m.ProtectedPacket); ok {
+			for _, frame := range pp.Frames {
+				if nci, ok := frame.(*m.NewConnectionIdFrame); ok {
+					if nci.Length < 4 || nci.Length > 18 {
+						err := fmt.Sprintf("Connection ID length must be comprised between 4 and 18, it was %d", nci.Length)
+						trace.MarkError(NCI_HostSentInvalidCIDLength, err)
+						conn.CloseConnection(true, m.ERR_PROTOCOL_VIOLATION, err)
+					}
 
-			if pp, ok := packet.(*m.ProtectedPacket); ok {
-				for _, frame := range pp.Frames {
-					if nci, ok := frame.(*m.NewConnectionIdFrame); ok {
-						if nci.Length < 4 || nci.Length > 18 {
-							err := fmt.Sprintf("Connection ID length must be comprised between 4 and 18, it was %d", nci.Length)
-							trace.MarkError(NCI_HostSentInvalidCIDLength, err)
-							conn.CloseConnection(true, m.ERR_PROTOCOL_VIOLATION, err)
-						}
+					alternativeConnectionIDs = append(alternativeConnectionIDs, nci.ConnectionId)
 
-						alternativeConnectionIDs = append(alternativeConnectionIDs, nci.ConnectionId)
-
-						if !expectingResponse {
-							trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
-							conn.SourceCID = nci.ConnectionId
-							conn.PacketNumber += uint64(m.GetPacketGap(conn))
-							conn.SendHTTPGETRequest(preferredUrl, 4)
-							expectingResponse = true
-						}
+					if !expectingResponse {
+						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
+						conn.SourceCID = nci.ConnectionId
+						conn.PacketNumber += uint64(m.GetPacketGap(conn))
+						conn.SendHTTPGETRequest(preferredUrl, 4)
+						expectingResponse = true
 					}
 				}
 			}

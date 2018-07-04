@@ -39,6 +39,7 @@ func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	initial := conn.GetInitialPacket()
 	conn.IgnorePathChallenge = true
+	conn.DisableIncPacketChan = true  // TODO: Integrate this scenario
 	conn.SendHandshakeProtectedPacket(initial)
 
 	var arrivals []uint64

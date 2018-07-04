@@ -47,42 +47,39 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
-	for ongoingHandhake {
-		packets, err, _ := conn.ReadNextPackets()
+	var err error
 
-		if err != nil {
-			trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
-			return
-		}
-		for _, packet := range packets {
-			switch packet.(type) {
-			case *m.HandshakePacket, *m.RetryPacket:
-				ongoingHandhake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
-				if err != nil {
-					trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
-					return
-				}
-				if packet != nil {
-					conn.SendHandshakeProtectedPacket(packet)
-				}
-			case *m.VersionNegotationPacket:
-				err = conn.ProcessVersionNegotation(packet.(*m.VersionNegotationPacket))
-				if err != nil {
-					trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
-					return
-				}
-				conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-			default:
-				trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
-				trace.MarkError(TP_HandshakeDidNotComplete, "")
-				if debug {
-					spew.Dump(packet)
-				}
+outerLoop:
+	for p := range conn.IncomingPackets {
+		switch p := p.(type) {
+		case *m.HandshakePacket, *m.RetryPacket:
+			ongoingHandhake, p, err = conn.ProcessServerHello(p.(m.Framer))
+			if err != nil {
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
 				return
 			}
+			if p != nil {
+				conn.SendHandshakeProtectedPacket(p)
+			}
+			if !ongoingHandhake {
+				break outerLoop
+			}
+		case *m.VersionNegotationPacket:
+			err = conn.ProcessVersionNegotation(p)
+			if err != nil {
+				trace.MarkError(TP_HandshakeDidNotComplete, err.Error())
+				return
+			}
+			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+		default:
+			trace.Results["unexpected_packet_type"] = p.Header().PacketType()
+			trace.MarkError(TP_HandshakeDidNotComplete, "")
+			if debug {
+				spew.Dump(p)
+			}
+			return
 		}
 	}
-
 
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
 		trace.ErrorCode = TP_NoTPReceived
@@ -95,7 +92,9 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 		trace.ErrorCode = TP_MissingParameters
 	}
 
-	conn.CloseConnection(false, 0, "")
+	if conn.Protected != nil {
+		conn.CloseConnection(false, 0, "")
+	}
 }
 
 func validate(parameters map[string]interface{}) bool {

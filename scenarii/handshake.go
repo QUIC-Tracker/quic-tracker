@@ -39,61 +39,49 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandshake := true
-	defer func() {
-		if debug {
-			if r := recover(); r != nil {
-				if err, ok := r.(error); ok {
-					println(err.Error())
+	var err error
+	for p := range conn.IncomingPackets {
+		if !ongoingHandshake {
+			break
+		}
+		switch p := p.(type) {
+		case *m.HandshakePacket, *m.RetryPacket:
+			ongoingHandshake, p, err = conn.ProcessServerHello(p.(m.Framer))
+			if err == nil && !ongoingHandshake {
+				trace.Results["negotiated_version"] = conn.Version
+				conn.CloseConnection(false, 42, "")
+			} else if err != nil {
+				trace.MarkError(H_TLSHandshakeFailed, err.Error())
+				conn.CloseConnection(true, 0, "")
+			}
+			if p != nil {
+				conn.SendHandshakeProtectedPacket(p)
+			}
+		case *m.VersionNegotationPacket:
+			var version uint32
+			for _, v := range p.SupportedVersions {
+				if v >= m.MinimumVersion && v <= m.MaximumVersion {
+					version = uint32(v)
 				}
 			}
-		}
-		ongoingHandshake = false
-	}()
-
-	for ongoingHandshake {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			trace.ErrorCode = H_Timeout
+			if version == 0 {
+				trace.MarkError(H_NoCompatibleVersionAvailable, "")
+				trace.Results["supported_versions"] = p.SupportedVersions
+				return
+			}
+			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
+			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version&0xff)
+			conn.TransitionTo(version, m.QuicALPNToken, nil)
+			s.Run(conn, trace, preferredUrl, debug)
+			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
+			return
+		default:
+			trace.MarkError(H_ReceivedUnexpectedPacketType, "")
+			trace.Results["unexpected_packet_type"] = p.Header().PacketType()
 			return
 		}
-		for _, packet := range packets {
-			switch packet.(type) {
-			case *m.HandshakePacket, *m.RetryPacket:
-				ongoingHandshake, packet, err = conn.ProcessServerHello(packet.(m.Framer))
-				if err == nil && !ongoingHandshake {
-					trace.Results["negotiated_version"] = conn.Version
-					conn.CloseConnection(false, 42, "")
-				} else if err != nil {
-					trace.MarkError(H_TLSHandshakeFailed, err.Error())
-					conn.CloseConnection(true, 0, "")
-				}
-				if packet != nil {
-					conn.SendHandshakeProtectedPacket(packet)
-				}
-			case *m.VersionNegotationPacket:
-				vn := packet.(*m.VersionNegotationPacket)
-				var version uint32
-				for _, v := range vn.SupportedVersions {
-					if v >= m.MinimumVersion && v <= m.MaximumVersion {
-						version = uint32(v)
-					}
-				}
-				if version == 0 {
-					trace.MarkError(H_NoCompatibleVersionAvailable, "")
-					trace.Results["supported_versions"] = vn.SupportedVersions
-					return
-				}
-				oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
-				m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version&0xff)
-				conn.TransitionTo(version, m.QuicALPNToken, nil)
-				s.Run(conn, trace, preferredUrl, debug)
-				m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
-				return
-			default:
-				trace.MarkError(H_ReceivedUnexpectedPacketType, "")
-				trace.Results["unexpected_packet_type"] = packet.Header().PacketType()
-				return
-			}
-		}
+	}
+	if ongoingHandshake {
+		trace.ErrorCode = H_TLSHandshakeFailed
 	}
 }

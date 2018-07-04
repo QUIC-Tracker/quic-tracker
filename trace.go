@@ -62,7 +62,7 @@ func (t *Trace) AddPcap(c *exec.Cmd) error {
 	return err
 }
 
-func (t *Trace) MarkError(error uint8, message string) {
+func (t *Trace) MarkError(error uint8, message string) {  // TODO: This should be refactored because of the asynchronism introduced
 	t.ErrorCode = error
 	t.Stream[len(t.Stream) - 1].IsOfInterest = true
 	if message != "" {

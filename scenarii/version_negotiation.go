@@ -37,48 +37,31 @@ func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
 }
 func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	handlePacket := func (packet m.Packet, err error) *m.VersionNegotationPacket {
-		if err != nil {
-			trace.ErrorCode = VN_Timeout
-			return nil
-		} else {
-			if _, isVN := packet.(*m.VersionNegotationPacket); !isVN {
-				trace.MarkError(VN_NotAnsweringToVN, "")
-				trace.Results["received_packet_type"] = packet.Header().PacketType()
-				return nil
-			} else {
-				packet, _ := packet.(*m.VersionNegotationPacket)
-				trace.Results["supported_versions"] = packet.SupportedVersions
-				return packet
-			}
-		}
-	}
-
 	conn.RetransmissionTicker.Stop()
 	conn.Version = ForceVersionNegotiation
+	trace.ErrorCode = VN_Timeout
 	initial := conn.GetInitialPacket()
 	conn.SendHandshakeProtectedPacket(initial)
-	packets, err, _ := conn.ReadNextPackets()
 
-	for _, packet := range packets {
-		vn1 := handlePacket(packet, err)
-		if vn1 != nil {
-			conn.SendHandshakeProtectedPacket(initial)
-			packets, err, _ = conn.ReadNextPackets()
-			for _, packet := range packets {
-				vn2 := handlePacket(packet, err)
-				if vn2 != nil && vn1.UnusedField == vn2.UnusedField {
-					trace.ErrorCode = VN_UnusedFieldIsIdentical  // Assume true until proven otherwise
-					conn.SendHandshakeProtectedPacket(initial)
-					packets, err, _ = conn.ReadNextPackets()
-					for _, packet := range packets {
-						vn3 := handlePacket(packet, err)
-						if vn3 != nil && vn3.UnusedField != vn2.UnusedField {
-							trace.ErrorCode = 0
-						}
-					}
-				}
+	threshold := 3
+	vnCount := 0
+	var unusedField byte
+	for p := range conn.IncomingPackets {
+		switch p := p.(type) {
+		case *m.VersionNegotationPacket:
+			vnCount++
+			if unusedField != p.UnusedField {
+				trace.ErrorCode = 0
+				break
+			} else if vnCount == threshold {
+				trace.ErrorCode = VN_UnusedFieldIsIdentical
+				break
 			}
+			unusedField = p.UnusedField
+			trace.Results["supported_versions"] = p.SupportedVersions  // TODO: Compare versions announced ?
+		default:
+			trace.MarkError(VN_NotAnsweringToVN, "")
+			trace.Results["received_packet_type"] = p.Header().PacketType()
 		}
 	}
 }

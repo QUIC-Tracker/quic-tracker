@@ -29,6 +29,7 @@ import (
 	"sort"
 	"github.com/mpiraux/pigotls"
 	"crypto/cipher"
+	"unsafe"
 )
 
 type Connection struct {
@@ -41,10 +42,11 @@ type Connection struct {
 	Protected        *CryptoState
 	ZeroRTTprotected *CryptoState
 
-	ReceivedPacketHandler func([]byte)
-	SentPacketHandler     func([]byte)
+	ReceivedPacketHandler func([]byte, unsafe.Pointer)
+	SentPacketHandler     func([]byte, unsafe.Pointer)
 
-	Streams              map[uint64]*Stream
+	Streams              Streams
+	IncomingPackets		 chan Packet
 	SourceCID            ConnectionID
 	DestinationCID       ConnectionID
 	PacketNumber         uint64
@@ -54,8 +56,10 @@ type Connection struct {
 	ackQueue             []uint64 // Stores the packet numbers to be acked
 	retransmissionBuffer map[uint64]RetransmittableFrames
 	RetransmissionTicker *time.Ticker
+
 	IgnorePathChallenge   bool
 	DisableRetransmits    bool
+	DisableIncPacketChan  bool
 
 	UseIPv6        bool
 	Host           *net.UDPAddr
@@ -111,7 +115,7 @@ func (c *Connection) SendHandshakeProtectedPacket(packet Packet) {
 	lHeader.PayloadLength = uint64(len(payload) + c.Cleartext.Write.Overhead())
 
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
 	}
 
 	header := packet.EncodeHeader()
@@ -135,7 +139,7 @@ func (c *Connection) sendProtectedPacket(packet Packet, cipher cipher.AEAD) {
 	}
 
 	if c.SentPacketHandler != nil {
-		c.SentPacketHandler(packet.Encode(packet.EncodePayload()))
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
 	}
 
 	header := packet.EncodeHeader()
@@ -157,7 +161,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	}
 	c.ClientRandom = make([]byte, 32, 32)
 	copy(c.ClientRandom, handshakeResult[11:11+32])
-	handshakeFrame := NewStreamFrame(0, c.Streams[0], handshakeResult, false)
+	handshakeFrame := NewStreamFrame(0, c.Streams.Get(0), handshakeResult, false)
 
 	var initialLength int
 	if c.UseIPv6 {
@@ -180,25 +184,23 @@ func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { /
 	lHeader := packet.Header().(*LongHeader)
 	c.DestinationCID = lHeader.SourceCID  // TODO: see https://tools.ietf.org/html/draft-ietf-quic-transport-11#section-4.7
 
-	if packet.Header().PacketType() == Retry {
+	var handshakeData []byte
+	select {
+		case handshakeData = <- c.Streams.Get(0).ReadChan:
+		default:
+	}
+
+	if lHeader.PacketType() == Retry {
 		c.Streams = make(map[uint64]*Stream)
-		c.Streams[0] = new(Stream)
 		c.Cleartext = NewCleartextSaltedCryptoState(c)
 		c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
 		c.ackQueue = nil
 	}
 
-	var serverData []byte
-	for _, frame := range packet.GetFrames() {
-		if streamFrame, ok := frame.(*StreamFrame); ok {
-			serverData = append(serverData, streamFrame.StreamData...)
-		}
-	}
-
 	var responsePacket Framer
-	defer func() {if c.ackQueue != nil {responsePacket.AddFrame(c.GetAckFrame())}}()
+	defer func() {if c.ackQueue != nil && lHeader.PacketType() != Retry && !(packet.Contains(ConnectionCloseType) || packet.Contains(ApplicationCloseType)) {responsePacket.AddFrame(c.GetAckFrame())}}()
 
-	if len(serverData) > 0 {
+	if len(handshakeData) > 0 {
 		switch packet.(type) {
 		case *HandshakePacket:
 			responsePacket = NewHandshakePacket(c)
@@ -212,27 +214,26 @@ func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { /
 					initialLength = MinimumInitialLength
 				}
 				paddingLength := initialLength - (responsePacket.Header().Length() + len(responsePacket.EncodePayload()) + c.Cleartext.Write.Overhead())
-				for i := 0; i < paddingLength; i++  {
+				for i := 0; i < paddingLength; i++ {
 					responsePacket.AddFrame(new(PaddingFrame))
 				}
 			}()
 		}
 
-		tlsData, notCompleted, err := c.Tls.Input(serverData)
+		tlsData, notCompleted, err := c.Tls.Input(handshakeData)
 
 		if err != nil {
 			return notCompleted, responsePacket, err
 		}
 
 		if tlsData != nil && len(tlsData) > 0 {
-			responsePacket.AddFrame(NewStreamFrame(0, c.Streams[0], tlsData, false))
+			responsePacket.AddFrame(NewStreamFrame(0, c.Streams.Get(0), tlsData, false))
 		}
 
 		if !notCompleted {
 			c.Protected = NewProtectedCryptoState(c.Tls)
 			c.ExporterSecret = c.Tls.ExporterSecret()
 
-			// TODO: Export secret if completed
 			// TODO: Check negotiated ALPN ?
 
 			err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.ReceivedQUICTransportParameters())
@@ -240,9 +241,13 @@ func (c *Connection) ProcessServerHello(packet Framer) (bool, Framer, error) { /
 				return false, responsePacket, err
 			}
 		}
-		return notCompleted, responsePacket,  nil
+		return notCompleted, responsePacket, nil
 	} else {
 		responsePacket = NewHandshakePacket(c)
+	}
+
+	if packet.Contains(ConnectionCloseType) || packet.Contains(ApplicationCloseType) {
+		return false, responsePacket, errors.New("connection closed")
 	}
 	return true, responsePacket, nil
 }
@@ -261,7 +266,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	return nil
 }
 func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
-	saveCleartext := func (ct []byte) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct)}}
+	saveCleartext := func (ct []byte, p unsafe.Pointer) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct, p)}}
 
 	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
 	i, _, err := c.UdpConnection.ReadFromUDP(rec)
@@ -283,7 +288,7 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			for k := range c.retransmissionBuffer {
 				delete(c.retransmissionBuffer, k)
 			}
-			saveCleartext(rec)
+			saveCleartext(rec, packet.Pointer())
 			off = len(rec)
 
 			packets = append(packets, packet)
@@ -317,7 +322,6 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 				return packets, errors.New("unknown packet type"), rec
 			}
 
-			saveCleartext(data)
 			buffer := bytes.NewReader(data)
 
 			switch header.PacketType() {
@@ -330,6 +334,8 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 			case Retry:
 				packet = ReadRetryPacket(buffer, c)
 			}
+
+			saveCleartext(data, packet.Pointer())
 
 			fullPacketNumber := (c.ExpectedPacketNumber & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 
@@ -422,7 +428,6 @@ func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionSecret 
 	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionSecret)
 	c.Cleartext = NewCleartextSaltedCryptoState(c)
 	c.Streams = make(map[uint64]*Stream)
-	c.Streams[0] = &Stream{}
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
 	pkt := NewProtectedPacket(c)
@@ -434,7 +439,7 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 	c.SendProtectedPacket(pkt)
 }
 func (c *Connection) CloseStream(streamId uint64) {
-	frame := *NewStreamFrame(streamId, c.Streams[streamId], nil, true)
+	frame := *NewStreamFrame(streamId, c.Streams.Get(streamId), nil, true)
 	if c.Protected == nil {
 		pkt := NewHandshakePacket(c)
 		pkt.Frames = append(pkt.Frames, frame)
@@ -446,9 +451,7 @@ func (c *Connection) CloseStream(streamId uint64) {
 	}
 }
 func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
-	c.Streams[streamID] = new(Stream)
-
-	streamFrame := NewStreamFrame(streamID, c.Streams[streamID], []byte(fmt.Sprintf("GET %s\r\n", path)), true)
+	streamFrame := NewStreamFrame(streamID, c.Streams.Get(streamID), []byte(fmt.Sprintf("GET %s\r\n", path)), true)
 
 	pp := NewProtectedPacket(c)
 	pp.Frames = append(pp.Frames, streamFrame)
@@ -506,6 +509,23 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.retransmissionBuffer = make(map[uint64]RetransmittableFrames)
 
 	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
+
+	if !c.DisableIncPacketChan {
+		c.IncomingPackets = make(chan Packet)
+
+		go func() {
+			for {
+				packets, err, _ := c.ReadNextPackets()
+				if err != nil {
+					close(c.IncomingPackets)
+					break
+				}
+				for _, p := range packets {
+					c.IncomingPackets <- p
+				}
+			}
+		}()
+	}
 
 	go func() {
 		for range c.RetransmissionTicker.C {

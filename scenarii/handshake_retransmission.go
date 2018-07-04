@@ -39,6 +39,7 @@ func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	initial := conn.GetInitialPacket()
 	conn.IgnorePathChallenge = true
+	conn.DisableIncPacketChan = true  // TODO: Integrate this scenario
 	conn.SendHandshakeProtectedPacket(initial)
 
 	var arrivals []uint64
@@ -80,9 +81,10 @@ outerLoop:
 				}
 
 				if ongoingHandshake {
-					ongoingHandshake, packet, err = conn.ProcessServerHello(handshake)
+					var response m.Packet
+					ongoingHandshake, response, err = conn.ProcessServerHello(handshake)
 					if err != nil {
-						trace.MarkError(HR_TLSHandshakeFailed, err.Error())
+						trace.MarkError(HR_TLSHandshakeFailed, err.Error(), response)
 						break outerLoop
 					}
 					if !ongoingHandshake {
@@ -124,7 +126,7 @@ outerLoop:
 				}
 			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 				if err := conn.ProcessVersionNegotation(vn); err != nil {
-					trace.MarkError(HR_VNDidNotComplete, err.Error())
+					trace.MarkError(HR_VNDidNotComplete, err.Error(), vn)
 					break outerLoop
 				}
 				initial = conn.GetInitialPacket()
@@ -151,7 +153,7 @@ outerLoop:
 		trace.ErrorCode = HR_NoPathChallengeReceived
 	} else if handshakePacketReceived >= 3 && handshakePacketReceivedBeforePC > 0 {
 		trace.ErrorCode = HR_NoPathChallengeInAllPackets
-	} else if conn.Streams[4] != nil && conn.Streams[4].ReadClosed {
+	} else if conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = 0
 	}
 

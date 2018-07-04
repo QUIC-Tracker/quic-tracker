@@ -67,42 +67,29 @@ func main() {
 		println(string(out))
 	}()
 
-	spew.Dump(conn.DestinationCID)
-
-	packets, err := scenarii.CompleteHandshake(conn)
-	if err != nil {
-		spew.Dump(packets, err)
+	if scenarii.CompleteHandshake(conn); err != nil {
+		spew.Dump(err)
 	}
 
-	spew.Dump(conn.ClientRandom)
-	spew.Dump(conn.ExporterSecret)
-
-	conn.Streams[4] = &m.Stream{}
-	streamFrame := m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
+	streamFrame := m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
 	ackFrame := conn.GetAckFrame()
 
 	protectedPacket := m.NewProtectedPacket(conn)
 	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
 	conn.SendProtectedPacket(protectedPacket)
 
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			spew.Dump(err)
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			pp := m.NewProtectedPacket(conn)
+			pp.Frames = append(pp.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(pp)
+		}
+
+		if conn.Streams.Get(4).ReadClosed {
+			spew.Dump(conn.Streams.Get(4).ReadData)
 			break
 		}
-
-		spew.Dump("---> Received packets")
-		spew.Dump(packets)
-
-		for _, packet := range packets {
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket = m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				spew.Dump("<--- Send ack packet")
-				spew.Dump(protectedPacket)
-				conn.SendProtectedPacket(protectedPacket)
-			}
-		}
 	}
+
+	conn.CloseConnection(false, 0, "")
 }

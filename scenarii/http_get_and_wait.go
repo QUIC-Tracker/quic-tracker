@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"net"
 	"fmt"
 	"reflect"
 )
@@ -75,14 +74,15 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 	conn.TLSTPHandler.MaxStreamIdBidi = 0
 	conn.TLSTPHandler.MaxStreamIdUni = 0
-	if _, err := CompleteHandshake(conn); err != nil {
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
-		trace.MarkError(SGW_TLSHandshakeFailed, err.Error())
+		trace.MarkError(SGW_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
-		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi))
+		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi), p)
 	}
 
 	requestPacketNumber := conn.PacketNumber + 1
@@ -95,117 +95,74 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 
 	var receivedAckBlocks [][]m.AckBlock
 
-	for i := 0; i < 50; i++ {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			switch e := err.(type) {
-			case *net.OpError:
-				// the peer timed out without closing the connection
-				if e.Timeout() {
-					if false {
-						// FIXME: accurate timeout computation
-						trace.ErrorCode = SGW_DidNotCloseTheConnection
-						errors[SGW_DidNotCloseTheConnection] = true
-						message := fmt.Sprintf("the peer did not close the connection after waiting %d seconds", conn.TLSTPHandler.ReceivedParameters.IdleTimeout)
-						errorMessages = append(errorMessages, message)
-						trace.Results["error"] = message
-						errorMessages = append(errorMessages, message)
-					} else {
-						trace.ErrorCode = 0
+	for p := range conn.IncomingPackets {
+		switch p := p.(type) {
+		case *m.ProtectedPacket:
+			for _, f := range p.Frames {
+				switch f2 := f.(type) {
+				case *m.StreamFrame:
+					if f2.StreamId == 4 {
+						receivedRequestedData = true
 					}
-				} else {
-					trace.ErrorCode = SGW_UnknownError
-					errors[SGW_UnknownError] = true
-					trace.Results["error"] = e.Error()
-					errorMessages = append(errorMessages, e.Error())
+					if _, ok := receivedStreamOffsets[f2.StreamId]; !ok {
+						// We received a frame on a forbidden stream
+						if _, ok := errors[SGW_WrongStreamIDReceived]; !ok {
+							errors[SGW_WrongStreamIDReceived] = true
+							message := fmt.Sprintf("received StreamID %d", f2.StreamId)
+							errorMessages = append(errorMessages, message)
+							trace.MarkError(SGW_WrongStreamIDReceived, "", p)
+						}
+					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
+						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
+					}
+					if f2.Length == 0 && !f2.FinBit {
+						if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
+							errors[SGW_EmptyStreamFrameNoFinBit] = true
+							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
+							errorMessages = append(errorMessages, message)
+							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message, p)
+						}
+					}
+				case *m.AckFrame:
+					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber&0xffffffff00000000)|uint64(requestPacketNumber) {
+						duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
+
+						// check if we already receive these ack blocks
+						for _, blocks := range receivedAckBlocks {
+							if reflect.DeepEqual(blocks, f2.AckBlocks) {
+								// in this case, the ack blocks are the same and the largest acknowledged is the same
+								duplicated = true
+								break
+							}
+						}
+
+						if duplicated {
+							if _, ok := errors[SGW_RetransmittedAck]; !ok {
+								errors[SGW_RetransmittedAck] = true
+								message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
+								errorMessages = append(errorMessages, message)
+								trace.MarkError(SGW_RetransmittedAck, message, p)
+							}
+						} else {
+							// record the received ack blocks
+							receivedAckBlocks = append(receivedAckBlocks, f2.AckBlocks)
+						}
+					}
+				case *m.ConnectionCloseFrame:
+					return
 				}
+
 			}
-			return
-		}
-
-		for _, packet := range packets {
-			switch pp := packet.(type) {
-			case *m.ProtectedPacket:
-				for _, f := range pp.Frames {
-					switch f2 := f.(type) {
-					case *m.StreamFrame:
-						if f2.StreamId == 4 {
-							receivedRequestedData = true
-						}
-						if _, ok := receivedStreamOffsets[f2.StreamId]; !ok {
-							// We received a frame on a forbidden stream
-							if _, ok := errors[SGW_WrongStreamIDReceived]; !ok {
-								errors[SGW_WrongStreamIDReceived] = true
-								message := fmt.Sprintf("received StreamID %d", f2.StreamId)
-								errorMessages = append(errorMessages, message)
-								trace.MarkError(SGW_WrongStreamIDReceived, "")
-							}
-						} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
-							receivedStreamOffsets[f2.StreamId][f2.Offset] = true
-						}
-						if f2.Length == 0 && !f2.FinBit {
-							if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
-								errors[SGW_EmptyStreamFrameNoFinBit] = true
-								message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
-								errorMessages = append(errorMessages, message)
-								trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message)
-							}
-						}
-					case *m.AckFrame:
-						if f2.LargestAcknowledged == (conn.ExpectedPacketNumber&0xffffffff00000000)|uint64(requestPacketNumber) {
-							duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
-
-							// check if we already receive these ack blocks
-							for _, blocks := range receivedAckBlocks {
-								if reflect.DeepEqual(blocks, f2.AckBlocks) {
-									// in this case, the ack blocks are the same and the largest acknowledged is the same
-									duplicated = true
-									break
-								}
-							}
-
-							if duplicated {
-								if _, ok := errors[SGW_RetransmittedAck]; !ok {
-									errors[SGW_RetransmittedAck] = true
-									message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
-									errorMessages = append(errorMessages, message)
-									trace.MarkError(SGW_RetransmittedAck, message)
-								}
-							} else {
-								// record the received ack blocks
-								receivedAckBlocks = append(receivedAckBlocks, f2.AckBlocks)
-							}
-						}
-					case *m.ConnectionCloseFrame:
-						return
-					}
-
-				}
-				if pp.ShouldBeAcknowledged() {
-					toSend := m.NewProtectedPacket(conn)
-					toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-					conn.SendProtectedPacket(toSend)
-				}
-
-			default:
-				toSend := m.NewHandshakePacket(conn)
+			if p.ShouldBeAcknowledged() {
+				toSend := m.NewProtectedPacket(conn)
 				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-				conn.SendHandshakeProtectedPacket(toSend)
+				conn.SendProtectedPacket(toSend)
 			}
-		}
-	}
 
-	if conn.TLSTPHandler.ReceivedParameters.IdleTimeout <= 10 {
-		// FIXME: accurate timeout measurement
-		// the peer did not close the connection
-		if false {
-			errors[SGW_DidNotCloseTheConnection] = true
-			message := fmt.Sprintf("the peer did not close the connection after waiting %d seconds", conn.TLSTPHandler.ReceivedParameters.IdleTimeout)
-			errorMessages = append(errorMessages, message)
-			trace.ErrorCode = SGW_DidNotCloseTheConnection
-			trace.Results["error"] = message
-		} else {
-			trace.ErrorCode = 0
+		default:
+			toSend := m.NewHandshakePacket(conn)
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+			conn.SendHandshakeProtectedPacket(toSend)
 		}
 	}
 }

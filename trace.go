@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"time"
 	"strings"
+	"unsafe"
 )
 
 type Trace struct {
@@ -62,20 +63,25 @@ func (t *Trace) AddPcap(c *exec.Cmd) error {
 	return err
 }
 
-func (t *Trace) MarkError(error uint8, message string) {
+func (t *Trace) MarkError(error uint8, message string, packet Packet) {
 	t.ErrorCode = error
-	t.Stream[len(t.Stream) - 1].IsOfInterest = true
 	if message != "" {
 		t.Results["error"] = message
+	}
+	for _, tp := range t.Stream {
+		if packet != nil && tp.Pointer == packet.Pointer() {
+			tp.IsOfInterest = true
+			return
+		}
 	}
 }
 
 func (t *Trace) AttachTo(conn *Connection) {
-	conn.ReceivedPacketHandler = func(data []byte) {
-		t.Stream = append(t.Stream, TracePacket{Direction: ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
+	conn.ReceivedPacketHandler = func(data []byte, origin unsafe.Pointer) {
+		t.Stream = append(t.Stream, TracePacket{Direction: ToClient, Timestamp: time.Now().UnixNano() / 1e6, Data: data, Pointer: origin})
 	}
-	conn.SentPacketHandler = func(data []byte) {
-		t.Stream = append(t.Stream, TracePacket{Direction: ToServer, Timestamp: time.Now().UnixNano() / 1e6, Data: data})
+	conn.SentPacketHandler = func(data []byte, origin unsafe.Pointer) {
+		t.Stream = append(t.Stream, TracePacket{Direction: ToServer, Timestamp: time.Now().UnixNano() / 1e6, Data: data, Pointer: origin})
 	}
 }
 
@@ -91,10 +97,11 @@ const ToServer Direction = "to_server"
 const ToClient Direction = "to_client"
 
 type TracePacket struct {
-	Direction    Direction `json:"direction"`
-	Timestamp    int64     `json:"timestamp"`
-	Data         []byte    `json:"data"`
-	IsOfInterest bool	   `json:"is_of_interest"`
+	Direction    Direction      `json:"direction"`
+	Timestamp    int64          `json:"timestamp"`
+	Data         []byte         `json:"data"`
+	IsOfInterest bool           `json:"is_of_interest"`
+	Pointer      unsafe.Pointer `json:"-"`
 }
 
 func GitCommit() string {

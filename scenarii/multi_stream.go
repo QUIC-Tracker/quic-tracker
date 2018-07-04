@@ -40,13 +40,14 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
 
 	allClosed := true
-	if _, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(MS_TLSHandshakeFailed, err.Error())
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
+		trace.MarkError(MS_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-		trace.MarkError(MS_NoTPReceived, "")
+		trace.MarkError(MS_NoTPReceived, "", p)
 		return
 	}
 
@@ -55,50 +56,39 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	protectedPacket := m.NewProtectedPacket(conn)
 	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
 		streamId := uint64(i * 4)
-		if _, ok := conn.Streams[streamId]; !ok {
-			conn.Streams[streamId] = new(m.Stream)
-		}
-		streamFrame := m.NewStreamFrame(streamId, conn.Streams[streamId], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
+		streamFrame := m.NewStreamFrame(streamId, conn.Streams.Get(streamId), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
 	}
 
 	conn.SendProtectedPacket(protectedPacket)
 
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			for streamId, stream := range conn.Streams {
-				if streamId != 0 && !stream.ReadClosed {
-					allClosed = false
-				}
-			}
-			return
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
 		}
 
-		for _, packet := range packets {
-
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
+		for streamId, stream := range conn.Streams {
+			if streamId != 0 && !stream.ReadClosed {
+				allClosed = false
+				break
 			}
+		}
 
-			for streamId, stream := range conn.Streams {
-				if streamId != 0 && !stream.ReadClosed {
-					allClosed = false
-					break
-				}
-			}
-
-			if allClosed {
-				conn.CloseConnection(false, 0, "")
-				return
-			}
+		if allClosed {
+			conn.CloseConnection(false, 0, "")
+			return
 		}
 	}
 
+	allClosed = true
+	for streamId, stream := range conn.Streams {
+		if streamId != 0 && !stream.ReadClosed {
+			allClosed = false
+			break
+		}
+	}
 
 	if !allClosed {
 		trace.ErrorCode = MS_NotAllStreamsWereClosed

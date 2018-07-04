@@ -33,8 +33,8 @@ func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
 func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if _, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(AO_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(AO_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
@@ -42,37 +42,23 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	var ackOnlyPackets []uint64
 
-testCase:
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			return
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
+			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
 		}
 
-		for _, packet := range packets {
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-				ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
-			}
-
-			if pp, ok := packet.(*m.ProtectedPacket); ok && !packet.ShouldBeAcknowledged() {
-				for _, frame := range pp.Frames {
-					if ack, ok := frame.(*m.AckFrame); ok {
-						if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
-							trace.MarkError(AO_SentAOInResponseOfAO, "")
-							break testCase
-						}
-					}
-				}
+		if framer, ok := p.(m.Framer); ok && !p.ShouldBeAcknowledged() && framer.Contains(m.AckType){
+			ack := framer.GetFirst(m.AckType).(*m.AckFrame)
+			if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
+				trace.MarkError(AO_SentAOInResponseOfAO, "", p)
+				break
 			}
 		}
 	}
-
-	conn.CloseConnection(false, 42, "")
+	conn.CloseConnection(false, 0, "")
 }
 
 

@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"io"
 	"github.com/davecgh/go-spew/spew"
+	"unsafe"
 )
 
 type Acknowledger interface {
@@ -37,6 +38,7 @@ type Packet interface {
 	Header() Header
 	Acknowledger
 	PacketEncoder
+	Pointer() unsafe.Pointer
 }
 
 type abstractPacket struct {
@@ -66,8 +68,8 @@ type VersionNegotationPacket struct {
 	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
-func (p VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
-func (p VersionNegotationPacket) EncodePayload() []byte {
+func (p *VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
+func (p *VersionNegotationPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.WriteByte(p.UnusedField & 0x80)
 	binary.Write(buffer, binary.BigEndian, p.Version)
@@ -78,6 +80,9 @@ func (p VersionNegotationPacket) EncodePayload() []byte {
 		binary.Write(buffer, binary.BigEndian, version)
 	}
 	return buffer.Bytes()
+}
+func (p *VersionNegotationPacket) Pointer() unsafe.Pointer {
+	return unsafe.Pointer(p)
 }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
@@ -143,6 +148,9 @@ func (p *FramePacket) GetRetransmittableFrames() []Frame {
 	}
 	return frames
 }
+func (p *FramePacket) Pointer() unsafe.Pointer {
+	return unsafe.Pointer(p)
+}
 func (p *FramePacket) Contains(frameType FrameType) bool {
 	for _, f := range p.Frames {
 		if f.FrameType() == frameType {
@@ -162,7 +170,7 @@ func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		switch frame.(type) {
-		case *AckFrame, *PaddingFrame:
+		case *AckFrame, *PaddingFrame, *ConnectionCloseFrame, *ApplicationCloseFrame:
 		default:
 			return true
 		}

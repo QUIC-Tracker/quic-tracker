@@ -40,47 +40,38 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 	sendUnsupportedInitial(conn)
 
 	var connectionClosed bool
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
+	for p := range conn.IncomingPackets {
+		switch p := p.(type) {
+		case *m.VersionNegotationPacket:
+			if err := conn.ProcessVersionNegotation(p); err != nil {
+				trace.MarkError(UTS_VNDidNotComplete, err.Error(), p)
+				return
+			}
+			sendUnsupportedInitial(conn)
+		case m.Framer:
+			for _, frame := range p.GetFrames() {
+				if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
+					if cc.ErrorCode != 0x201 {
+						trace.MarkError(UTS_WrongErrorCodeIsUsed, "", p)
+					}
+					trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
+					connectionClosed = true
+				}
+			}
+		default:
+			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "", p)
 		}
 
-		for _, packet := range packets {
-			if packet.ShouldBeAcknowledged() {
-				handshakePacket := m.NewHandshakePacket(conn)
-				handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
-				conn.SendHandshakeProtectedPacket(handshakePacket)
-			}
-
-			if vn, ok := packet.(*m.VersionNegotationPacket); ok {
-				if err := conn.ProcessVersionNegotation(vn); err != nil {
-					trace.MarkError(UTS_VNDidNotComplete, err.Error())
-					return
-				}
-				sendUnsupportedInitial(conn)
-			} else if fPacket, ok := packet.(m.Framer); ok {
-				for _, frame := range fPacket.GetFrames() {
-					if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
-						if cc.ErrorCode != 0x201 {
-							trace.MarkError(UTS_WrongErrorCodeIsUsed, "")
-						}
-						trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
-						connectionClosed = true
-					}
-				}
-			} else {
-				trace.MarkError(UTS_ReceivedUnexpectedPacketType, "")
-			}
+		if p.ShouldBeAcknowledged() {
+			handshakePacket := m.NewHandshakePacket(conn)
+			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
+			conn.SendHandshakeProtectedPacket(handshakePacket)
 		}
 	}
 
 	if !connectionClosed {
 		trace.ErrorCode = UTS_NoConnectionCloseSent
 	}
-
 }
 
 func sendUnsupportedInitial(conn *m.Connection) {

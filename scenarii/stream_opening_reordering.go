@@ -34,47 +34,34 @@ func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	packets, err := CompleteHandshake(conn)
-	if err != nil {
-		trace.MarkError(SOR_TLSHandshakeFailed, "")
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(SOR_TLSHandshakeFailed, "", p)
 		return
 	}
 
-	conn.Streams[4] = &m.Stream{}
-
 	pp1 := m.NewProtectedPacket(conn)
-	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
+	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
 
 	pp2 := m.NewProtectedPacket(conn)
-	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams[4], []byte{}, true))
+	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte{}, true))
 
 	conn.SendProtectedPacket(pp2)
 	conn.SendProtectedPacket(pp1)
 
-	for {
-		packets, err, _ = conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
 		}
 
-		for _, packet := range packets {
-
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
-
-			if conn.Streams[4].ReadClosed {
-				break
-			}
+		if conn.Streams.Get(4).ReadClosed {
+			break
 		}
 	}
 
 	conn.CloseConnection(false, 0, "")
-	if !conn.Streams[4].ReadClosed {
+	if !conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = SOR_HostDidNotRespond
 	}
 

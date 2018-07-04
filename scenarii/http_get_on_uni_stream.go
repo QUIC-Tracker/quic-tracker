@@ -18,8 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"net"
-	"fmt"
 )
 
 const (
@@ -40,76 +38,59 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 }
 
 func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.Streams[3] = new(m.Stream)
-
 	conn.TLSTPHandler.MaxStreamIdBidi = 1
 	conn.TLSTPHandler.MaxStreamIdUni = 1
-	if _, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(GS2_TLSHandshakeFailed, err.Error())
+	var p m.Packet; var err error
+	if p, err = CompleteHandshake(conn); err != nil {
+		trace.MarkError(GS2_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
+		if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni == 0 {
+			trace.ErrorCode = GS2_DidNotCloseTheConnection
+		}
 	} else {
-		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received")
+		trace.MarkError(GS2_TLSHandshakeFailed, "no transport parameters received", p)
 	}
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
 
-outerLoop:
-	for i := 0 ; i < 50 ; i++ {
-		packets, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			switch e := err.(type) {
-			case *net.OpError:
-				// the peer timed out without closing the connection
-				if e.Timeout() && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
-					trace.ErrorCode = GS2_DidNotCloseTheConnection
-					trace.Results["error"] = fmt.Sprintf("the peer did not close the connection after waiting %d seconds", conn.TLSTPHandler.ReceivedParameters.IdleTimeout)
-				}
-			default:
-				trace.Results["error"] = err.Error()
-			}
-			return
-		}
-
-		for _, packet := range packets {
-			switch pp := packet.(type) {
-			case *m.ProtectedPacket:
-				for _, f := range pp.Frames {
-					switch f2 := f.(type) {
-					case *m.StreamFrame:
-						if f2.StreamId == 2 {
-							trace.MarkError(GS2_ReceivedDataOnStream2, "")
-							break outerLoop
-						} else if f2.StreamId > 3 {
-							trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "")
-						} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
-							// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
-							// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
-							// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
-						}
-					case *m.ConnectionCloseFrame:
-						if trace.ErrorCode == GS2_TooLowStreamIdUniToSendRequest {
-							trace.ErrorCode = 0
-						}
-						break outerLoop
+	for p := range conn.IncomingPackets {
+		switch p := p.(type) {
+		case *m.ProtectedPacket:
+			for _, f := range p.Frames {
+				switch f2 := f.(type) {
+				case *m.StreamFrame:
+					if f2.StreamId == 2 {
+						trace.MarkError(GS2_ReceivedDataOnStream2, "", p)
+						break
+					} else if f2.StreamId > 3 {
+						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "", p)
+					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
+						// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
+						// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
+						// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
 					}
+				case *m.ConnectionCloseFrame:
+					if trace.ErrorCode == GS2_DidNotCloseTheConnection {
+						trace.ErrorCode = GS2_TooLowStreamIdUniToSendRequest
+					}
+					break
 				}
-				if pp.ShouldBeAcknowledged() {
-					toSend := m.NewProtectedPacket(conn)
-					toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-					conn.SendProtectedPacket(toSend)
-				}
-
-			default:
-				toSend := m.NewHandshakePacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
-				conn.SendHandshakeProtectedPacket(toSend)
 			}
-		}
+			if p.ShouldBeAcknowledged() {
+				toSend := m.NewProtectedPacket(conn)
+				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+				conn.SendProtectedPacket(toSend)
+			}
 
+		default:
+			toSend := m.NewHandshakePacket(conn)
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+			conn.SendHandshakeProtectedPacket(toSend)
+		}
 	}
 
 	conn.CloseConnection(false, 0, "")

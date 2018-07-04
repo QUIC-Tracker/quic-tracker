@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"net"
 	"time"
 )
 
@@ -37,29 +36,18 @@ func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if _, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(CM_TLSHandshakeFailed, err.Error())
+	if p, err := CompleteHandshake(conn); err != nil {
+		trace.MarkError(CM_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
 
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 
-	for {  // Acks and restransmits if needed
-		packets, err, _ := conn.ReadNextPackets()
-
-		if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
-			break
-		} else if err != nil {
-			trace.Results["error"] = err.Error()
-		}
-
-		for _, packet := range packets {
-
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
+	for p := range conn.IncomingPackets {
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
 		}
 	}
 
@@ -72,36 +60,42 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	conn.UdpConnection.Close()
 	conn.UdpConnection = newUdpConn
 
+	conn.IncomingPackets = make(chan m.Packet)
+
+	go func() {
+		for {
+			packets, err, _ := conn.ReadNextPackets()
+			if err != nil {
+				close(conn.IncomingPackets)
+				break
+			}
+			for _, p := range packets {
+				conn.IncomingPackets <- p
+			}
+		}
+	}()
+
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 	trace.ErrorCode = CM_HostDidNotMigrate  // Assume it until proven wrong
 
-	for {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
-		}
-
+	for p := range conn.IncomingPackets {
 		if trace.ErrorCode == CM_HostDidNotMigrate {
 			trace.ErrorCode = CM_HostDidNotValidateNewPath
 		}
 
-		for _, packet := range packets {
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
+		if p.ShouldBeAcknowledged() {
+			protectedPacket := m.NewProtectedPacket(conn)
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			conn.SendProtectedPacket(protectedPacket)
+		}
 
-			if fp, ok := packet.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
-				trace.ErrorCode = 0
-			}
+		if fp, ok := p.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
+			trace.ErrorCode = 0
+		}
 
-			if conn.Streams[4].ReadClosed {
-				conn.CloseConnection(false, 0, "")
-				return
-			}
+		if conn.Streams.Get(4).ReadClosed {
+			conn.CloseConnection(false, 0, "")
+			return
 		}
 	}
 }

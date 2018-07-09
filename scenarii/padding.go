@@ -29,7 +29,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 		initialPacket := m.NewInitialPacket(conn)
 
-		paddingLength := initialLength - (initialPacket.Header().Length() + len(initialPacket.EncodePayload()) + conn.Cleartext.Write.Overhead())
+		paddingLength := initialLength - (initialPacket.Header().Length() + len(initialPacket.EncodePayload()) + conn.InitialCrypto.Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
 			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
 		}

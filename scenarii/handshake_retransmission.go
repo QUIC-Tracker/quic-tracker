@@ -100,7 +100,7 @@ outerLoop:
 						trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 
 						handshakeResponse := m.NewHandshakePacket(conn)
-						handshakeResponse.Frames = append(handshakeResponse.Frames, m.PathResponse{pathChallenge.(*m.PathChallenge).Data}, conn.GetAckFrame())
+						handshakeResponse.Frames = append(handshakeResponse.Frames, m.PathResponse{pathChallenge.(*m.PathChallenge).Data}, conn.GetAckFrame(packet.PNSpace()))
 						conn.SendHandshakeProtectedPacket(handshakeResponse)
 
 						trace.ErrorCode = HR_NoPathChallengeConfirmation  // Assume true unless proven otherwise
@@ -120,7 +120,7 @@ outerLoop:
 							conn.IgnorePathChallenge = false
 						}
 						protectedPacket := m.NewProtectedPacket(conn)
-						protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+						protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 						conn.SendProtectedPacket(protectedPacket)
 					}
 				}
@@ -135,7 +135,7 @@ outerLoop:
 			} else if pp, ok := packet.(*m.ProtectedPacket); ok && (isStateless || pathChallengeReceived > 0){
 				if pp.ShouldBeAcknowledged() {
 					protectedPacket := m.NewProtectedPacket(conn)
-					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 					conn.SendProtectedPacket(protectedPacket)
 				}
 			} else if _, ok := packet.(*m.RetryPacket); ok {

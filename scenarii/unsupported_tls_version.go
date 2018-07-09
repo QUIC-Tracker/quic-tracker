@@ -64,7 +64,7 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 
 		if p.ShouldBeAcknowledged() {
 			handshakePacket := m.NewHandshakePacket(conn)
-			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame())
+			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendHandshakeProtectedPacket(handshakePacket)
 		}
 	}

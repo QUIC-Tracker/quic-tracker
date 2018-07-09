@@ -18,17 +18,18 @@ package masterthesis
 
 import (
 	"encoding/binary"
+	"github.com/mpiraux/pigotls"
 )
 
-var QuicVersion uint32 = 0xff00000b // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-11"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff00000d // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-13"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MinimumVersion         = 0xff00000b
-	MaximumVersion         = 0xff00000b
+	MaximumVersion         = 0xff00000d
+	MinimumVersion         = 0xff00000c
 )
 
 // errors
@@ -36,6 +37,21 @@ const (
 const (
 	ERR_PROTOCOL_VIOLATION = 0xA
 )
+
+type PNSpace int
+
+const (
+	PNSpaceInitial PNSpace = iota
+	PNSpaceHandshake
+	PNSpaceAppData
+	PNSpaceNoSpace
+)
+
+var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
+	PNSpaceInitial: pigotls.EpochInitial,
+	PNSpaceHandshake: pigotls.EpochHandshake,
+	PNSpaceAppData: pigotls.Epoch1RTT,
+}
 
 func Uint32ToBEBytes(uint32 uint32) []byte {
 	b := make([]byte, 4, 4)

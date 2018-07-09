@@ -44,10 +44,10 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
+	if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams < 1 {
 		trace.MarkError(SSRS_MaxStreamUniTooLow, "", p)
 		trace.Results["expected_max_stream_uni"] = ">= 1"
-		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni
+		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxUniStreams
 		return
 	}
 
@@ -63,7 +63,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	for p := range conn.IncomingPackets {
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendProtectedPacket(protectedPacket)
 		}
 

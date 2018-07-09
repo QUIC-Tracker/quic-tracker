@@ -92,7 +92,7 @@ outerLoop:
 		trace.ErrorCode = TP_MissingParameters
 	}
 
-	if conn.Protected != nil {
+	if conn.ProtectedCrypto != nil {
 		conn.CloseConnection(false, 0, "")
 	}
 }

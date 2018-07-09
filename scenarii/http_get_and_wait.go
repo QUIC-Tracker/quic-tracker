@@ -58,9 +58,9 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 			trace.ErrorCode = SGW_DidntReceiveTheRequestedData
 			trace.Results["error"] = message
 		}
-		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
+		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams < 1 {
 			errors[SGW_AnsweredOnUnannouncedStream] = true
-			message := fmt.Sprintf("the host sent data on stream 4 despite setting initial_max_stream_bidi to %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi)
+			message := fmt.Sprintf("the host sent data on stream 4 despite setting initial_max_stream_bidi to %d", conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams)
 			errorMessages = append(errorMessages, message)
 		}
 		// end of the test, the connection has well been closed
@@ -72,8 +72,8 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 		}
 	}()
 
-	conn.TLSTPHandler.MaxStreamIdBidi = 0
-	conn.TLSTPHandler.MaxStreamIdUni = 0
+	conn.TLSTPHandler.MaxBidiStreams = 0
+	conn.TLSTPHandler.MaxUniStreams = 0
 	var p m.Packet; var err error
 	if p, err = CompleteHandshake(conn); err != nil {
 		errors[SGW_TLSHandshakeFailed] = true
@@ -81,11 +81,11 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi < 1 {
-		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi), p)
+	if conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams < 1 {
+		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams), p)
 	}
 
-	requestPacketNumber := conn.PacketNumber + 1
+	requestPacketNumber := conn.PacketNumber[m.PNSpaceAppData] + 1
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	receivedStreamOffsets := map[uint64]map[uint64]bool{
@@ -93,7 +93,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 		4: make(map[uint64]bool),
 	}
 
-	var receivedAckBlocks [][]m.AckBlock
+	receivedAckBlocks := make(map[m.PNSpace][][]m.AckBlock)
 
 	for p := range conn.IncomingPackets {
 		switch p := p.(type) {
@@ -124,11 +124,11 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 						}
 					}
 				case *m.AckFrame:
-					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber&0xffffffff00000000)|uint64(requestPacketNumber) {
+					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(requestPacketNumber) {
 						duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
 
 						// check if we already receive these ack blocks
-						for _, blocks := range receivedAckBlocks {
+						for _, blocks := range receivedAckBlocks[p.PNSpace()] {
 							if reflect.DeepEqual(blocks, f2.AckBlocks) {
 								// in this case, the ack blocks are the same and the largest acknowledged is the same
 								duplicated = true
@@ -145,7 +145,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 							}
 						} else {
 							// record the received ack blocks
-							receivedAckBlocks = append(receivedAckBlocks, f2.AckBlocks)
+							receivedAckBlocks[p.PNSpace()] = append(receivedAckBlocks[p.PNSpace()], f2.AckBlocks)
 						}
 					}
 				case *m.ConnectionCloseFrame:
@@ -155,13 +155,13 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 			}
 			if p.ShouldBeAcknowledged() {
 				toSend := m.NewProtectedPacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+				toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
 				conn.SendProtectedPacket(toSend)
 			}
 
 		default:
 			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendHandshakeProtectedPacket(toSend)
 		}
 	}

@@ -44,7 +44,7 @@ func (s *AbstractScenario) IPv6() bool {
 }
 
 func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the handshake and returns the last packet received
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	conn.SendInitialProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	var err error

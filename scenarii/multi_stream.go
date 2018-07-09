@@ -54,7 +54,7 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	protectedPacket := m.NewProtectedPacket(conn)
-	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxStreamIdBidi && len(protectedPacket.Frames) < 4; i++ {
+	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && len(protectedPacket.Frames) < 4; i++ {
 		streamId := uint64(i * 4)
 		streamFrame := m.NewStreamFrame(streamId, conn.Streams.Get(streamId), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
@@ -65,7 +65,7 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 	for p := range conn.IncomingPackets {
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendProtectedPacket(protectedPacket)
 		}
 

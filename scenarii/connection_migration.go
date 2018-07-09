@@ -46,7 +46,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	for p := range conn.IncomingPackets {
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendProtectedPacket(protectedPacket)
 		}
 	}
@@ -85,7 +85,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendProtectedPacket(protectedPacket)
 		}
 

@@ -38,8 +38,8 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 }
 
 func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.TLSTPHandler.MaxStreamIdBidi = 1
-	conn.TLSTPHandler.MaxStreamIdUni = 1
+	conn.TLSTPHandler.MaxBidiStreams = 1
+	conn.TLSTPHandler.MaxUniStreams = 1
 	var p m.Packet; var err error
 	if p, err = CompleteHandshake(conn); err != nil {
 		trace.MarkError(GS2_TLSHandshakeFailed, err.Error(), p)
@@ -48,7 +48,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 
 	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
-		if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni == 0 {
+		if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams == 0 {
 			trace.ErrorCode = GS2_DidNotCloseTheConnection
 		}
 	} else {
@@ -68,7 +68,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 						break
 					} else if f2.StreamId > 3 {
 						trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "", p)
-					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
+					} else if f2.StreamId == 3 && conn.TLSTPHandler.ReceivedParameters.MaxUniStreams < 1 {
 						// they answered us even if we sent a get request on a Stream ID above their initial_max_stream_id_uni
 						// trace.MarkError(GS2_AnswersToARequestOnAForbiddenStreamID, "")
 						// Let's be more liberal about this case until the HTTP mapping is adopted in an implementation draft
@@ -82,13 +82,13 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 			}
 			if p.ShouldBeAcknowledged() {
 				toSend := m.NewProtectedPacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+				toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
 				conn.SendProtectedPacket(toSend)
 			}
 
 		default:
 			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame())
+			toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendHandshakeProtectedPacket(toSend)
 		}
 	}

@@ -39,6 +39,7 @@ type Packet interface {
 	Acknowledger
 	PacketEncoder
 	Pointer() unsafe.Pointer
+	PNSpace() PNSpace
 }
 
 type abstractPacket struct {
@@ -84,6 +85,7 @@ func (p *VersionNegotationPacket) EncodePayload() []byte {
 func (p *VersionNegotationPacket) Pointer() unsafe.Pointer {
 	return unsafe.Pointer(p)
 }
+func (p *VersionNegotationPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
 	b, err := buffer.ReadByte()
@@ -188,9 +190,10 @@ func (p *FramePacket) EncodePayload() []byte {
 type InitialPacket struct {
 	FramePacket
 }
-func (p InitialPacket) GetRetransmittableFrames() []Frame {
+func (p *InitialPacket) GetRetransmittableFrames() []Frame {
 	return p.Frames
 }
+func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)
@@ -209,33 +212,40 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 }
 func NewInitialPacket(conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
-	p.header = NewLongHeader(Initial, conn)
+	p.header = NewLongHeader(Initial, conn, PNSpaceInitial)
 	return p
 }
 
 type RetryPacket struct {
-	FramePacket
+	abstractPacket
+	OriginalDestinationCID ConnectionID
+	RetryToken []byte
 }
-func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
+func ReadRetryPacket(buffer *bytes.Reader) *RetryPacket {
 	p := new(RetryPacket)
 	p.header = ReadLongHeader(buffer)
-	for {
-		frame, err := NewFrame(buffer, conn)
-		if err != nil {
-			spew.Dump(p)
-			panic(err)
-		}
-		if frame == nil {
-			break
-		}
-		p.Frames = append(p.Frames, frame)
-	}
+	OCIDL, _ := buffer.ReadByte()
+	p.OriginalDestinationCID = make([]byte, OCIDL)
+	p.RetryToken = make([]byte, buffer.Len())
+	buffer.Read(p.RetryToken)
 	return p
+}
+func (p *RetryPacket) GetRetransmittableFrames() []Frame { return nil }
+func (p *RetryPacket) Pointer() unsafe.Pointer { return unsafe.Pointer(p) }
+func (p *RetryPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *RetryPacket) ShouldBeAcknowledged() bool { return false }
+func (p *RetryPacket) EncodePayload() []byte {
+	buffer := new(bytes.Buffer)
+	buffer.WriteByte(byte(len(p.OriginalDestinationCID)))
+	buffer.Write(p.OriginalDestinationCID)
+	buffer.Write(p.RetryToken)
+	return buffer.Bytes()
 }
 
 type HandshakePacket struct {
 	FramePacket
 }
+func (p *HandshakePacket) PNSpace() PNSpace { return PNSpaceHandshake }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = ReadLongHeader(buffer)
@@ -254,13 +264,14 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 }
 func NewHandshakePacket(conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
-	p.header = NewLongHeader(Handshake, conn)
+	p.header = NewLongHeader(Handshake, conn, PNSpaceHandshake)
 	return p
 }
 
 type ProtectedPacket struct {
 	FramePacket
 }
+func (p *ProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
 	p.header = ReadHeader(buffer, conn)
@@ -279,15 +290,16 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 }
 func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewShortHeader(FourBytesPacketNumber, KeyPhaseZero, conn)
+	p.header = NewShortHeader(KeyPhaseZero, conn)
 	return p
 }
 
 type ZeroRTTProtectedPacket struct {
 	FramePacket
 }
+func (p *ZeroRTTProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
 func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	p := new(ZeroRTTProtectedPacket)
-	p.header = NewLongHeader(ZeroRTTProtected, conn)
+	p.header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)
 	return p
 }

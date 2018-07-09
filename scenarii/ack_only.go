@@ -45,7 +45,7 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	for p := range conn.IncomingPackets {
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
 			conn.SendProtectedPacket(protectedPacket)
 			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
 		}

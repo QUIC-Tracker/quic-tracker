@@ -21,6 +21,7 @@ import (
 	"time"
 	"net"
 	"fmt"
+	"errors"
 )
 
 const (
@@ -56,7 +57,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		for _, packet := range packet {
 			if packet.ShouldBeAcknowledged() {
 				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 				conn.SendProtectedPacket(protectedPacket)
 			}
 
@@ -105,7 +106,12 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
-	conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
+	if conn.Tls.ZeroRTTSecret() != nil {
+		conn.ZeroRTTCrypto = m.NewProtectedCryptoState(conn.Tls, nil, conn.Tls.ZeroRTTSecret())
+	} else {
+		trace.ErrorCode = ZR_ZeroRTTFailed
+		trace.Results["error"] = errors.New("no zero rtt secret available")
+	}
 
 	pp := m.NewZeroRTTProtectedPacket(conn)
 	pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
@@ -128,10 +134,8 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 					break
 				}
 				conn.SendHandshakeProtectedPacket(packet)
-
-				if _, ok := fp.(*m.RetryPacket); ok {
-					wasStateless = true
-				}
+			} else if _, ok := packet.(*m.RetryPacket); ok {
+				wasStateless = true
 			} else {
 				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake", packet)
 				break
@@ -158,7 +162,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		for _, packet := range packets {
 			if packet.ShouldBeAcknowledged() {
 				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 				conn.SendProtectedPacket(protectedPacket)
 			}
 

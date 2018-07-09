@@ -19,7 +19,6 @@ package masterthesis
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
 )
 
 type Header interface {
@@ -48,6 +47,7 @@ type LongHeader struct {
 	SourceCID      ConnectionID
 	PayloadLength  uint64
 	packetNumber   uint32
+	Token		   []byte
 	length         int
 }
 func (h *LongHeader) Encode() []byte {
@@ -60,7 +60,11 @@ func (h *LongHeader) Encode() []byte {
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
 	binary.Write(buffer, binary.BigEndian, h.SourceCID)
 	WriteVarInt(buffer, h.PayloadLength)
-	binary.Write(buffer, binary.BigEndian, h.packetNumber)
+	buffer.Write(EncodePacketNumber(h.packetNumber))
+	if h.packetType == Initial {
+		WriteVarInt(buffer, uint64(len(h.Token)))
+		buffer.Write(h.Token)
+	}
 	return buffer.Bytes()
 }
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
@@ -81,16 +85,25 @@ func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h.SourceCID = make([]byte, SCIL, SCIL)
 	binary.Read(buffer, binary.BigEndian, &h.SourceCID)
 	h.PayloadLength, _ = ReadVarInt(buffer)
-	binary.Read(buffer, binary.BigEndian, &h.packetNumber)
+	h.packetNumber = DecodePacketNumber(buffer)
+	if h.packetType == Initial {
+		tokenLength, _ := ReadVarInt(buffer)
+		h.Token = make([]byte, tokenLength)
+		buffer.Read(h.Token)
+	}
 	h.length -= buffer.Len()
 	return h
 }
-func NewLongHeader(packetType PacketType, conn *Connection) *LongHeader {
+func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *LongHeader {
 	h := new(LongHeader)
 	h.packetType = packetType
 	h.SourceCID = conn.SourceCID
-	h.DestinationCID = conn.DestinationCID
-	h.packetNumber = uint32(conn.nextPacketNumber())
+	if packetType == ZeroRTTProtected {
+		h.DestinationCID = conn.OriginalDestinationCID
+	} else {
+		h.DestinationCID = conn.DestinationCID
+	}
+	h.packetNumber = uint32(conn.nextPacketNumber(space))
 	h.Version = conn.Version
 	return h
 }
@@ -103,14 +116,11 @@ const (
 	Handshake        PacketType = 0x7d
 	ZeroRTTProtected PacketType = 0x7c
 
-	OneBytePacketNumber   PacketType = 0x0
-	TwoBytesPacketNumber  PacketType = 0x1
-	FourBytesPacketNumber PacketType = 0x2
+	ShortHeaderPacket PacketType = 0  // TODO: Find a way around this
 )
 
 type ShortHeader struct {
 	KeyPhase       KeyPhaseBit
-	packetType     PacketType
 	DestinationCID ConnectionID
 	packetNumber   uint32
 }
@@ -121,24 +131,16 @@ func (h *ShortHeader) Encode() []byte {
 		typeByte |= 0x40
 	}
 	typeByte |= 0x30
-	typeByte |= uint8(h.packetType)
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
+	buffer.Write(EncodePacketNumber(h.packetNumber))
 
-	switch h.packetType {
-	case OneBytePacketNumber:
-		binary.Write(buffer, binary.BigEndian, uint8(h.packetNumber))
-	case TwoBytesPacketNumber:
-		binary.Write(buffer, binary.BigEndian, uint16(h.packetNumber))
-	case FourBytesPacketNumber:
-		binary.Write(buffer, binary.BigEndian, h.packetNumber)
-	}
 	return buffer.Bytes()
 }
-func (h *ShortHeader) PacketType() PacketType { return h.packetType }
+func (h *ShortHeader) PacketType() PacketType { return ShortHeaderPacket }
 func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *ShortHeader) PacketNumber() uint32 { return h.packetNumber }
-func (h *ShortHeader) Length() int { return 1 + len(h.DestinationCID) + int(math.Pow(2, float64(h.packetType))) }
+func (h *ShortHeader) Length() int { return 1 + len(h.DestinationCID) + len(EncodePacketNumber(h.packetNumber)) }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()
@@ -148,33 +150,60 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 		println("SH fixed bits not respected")
 	}
 
-	h.packetType = PacketType(typeByte & 0x3)
 	h.DestinationCID = make([]byte, len(conn.SourceCID), len(conn.SourceCID))
 	buffer.Read(h.DestinationCID)
+	h.packetNumber = DecodePacketNumber(buffer)
 
-	switch h.packetType {
-	case OneBytePacketNumber:
-		var number uint8
-		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = (uint32(conn.ExpectedPacketNumber) & 0xffffff00) | uint32(number)
-	case TwoBytesPacketNumber:
-		var number uint16
-		binary.Read(buffer, binary.BigEndian, &number)
-		h.packetNumber = (uint32(conn.ExpectedPacketNumber) & 0xffff0000) | uint32(number)
-	case FourBytesPacketNumber:
-		binary.Read(buffer, binary.BigEndian, &h.packetNumber)
-	}
 	return h
 }
-func NewShortHeader(packetType PacketType, keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
+func NewShortHeader(keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	h.KeyPhase = keyPhase
-	h.packetType = packetType
 	h.DestinationCID = conn.DestinationCID
-	h.packetNumber = uint32(conn.nextPacketNumber())
+	h.packetNumber = uint32(conn.nextPacketNumber(PNSpaceAppData))
 	return h
 }
 
 type KeyPhaseBit bool
 const KeyPhaseZero KeyPhaseBit = false
 const KeyPhaseOne KeyPhaseBit = true
+
+func EncodePacketNumber(packetNumber uint32) []byte {
+	if packetNumber <= 0x7f {
+		return []byte{byte(packetNumber)}
+	} else if packetNumber <= 0x3fff {
+		return Uint16ToBEBytes(uint16(0x8000 | packetNumber))
+	} else if packetNumber <= 0x3fffffff {
+		return Uint16ToBEBytes(uint16(0xc0000000 | packetNumber))
+	} else {
+		panic("Could not encode packet number")
+	}
+}
+func DecodePacketNumber(buffer *bytes.Reader) uint32 {
+	firstByte, _ := buffer.ReadByte()
+	if firstByte & 0x80 == 0 {
+		return uint32(firstByte)
+	} else if firstByte & 0xc0 == 0x80 {
+		twoBytes := make([]byte, 2)
+		buffer.Read(twoBytes)
+		return uint32(0x3fff & binary.BigEndian.Uint16(twoBytes))
+	} else if firstByte & 0xc0 == 0xc0 {
+		fourBytes := make([]byte, 4)
+		buffer.Read(fourBytes)
+		return uint32(0x3fffffff & binary.BigEndian.Uint32(fourBytes))
+	} else {
+		panic("Could not decode packet number")
+	}
+}
+func PacketNumberLen(packetNumber uint32) int {
+	switch {
+	case packetNumber <= 0x7f:
+		return 1
+	case packetNumber <= 0x3fff:
+		return 2
+	case packetNumber <= 0x3fffffff:
+		return 4
+	default:
+		panic("could not determine packet number length")
+	}
+}

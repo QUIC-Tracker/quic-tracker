@@ -563,13 +563,12 @@ func ReadCryptoFrame(buffer *bytes.Reader, conn *Connection) *CryptoFrame {
 	ReadVarInt(buffer)  // Discards frame type
 	frame.Offset, _ = ReadVarInt(buffer)
 	frame.Length, _ = ReadVarInt(buffer)
+	frame.CryptoData = make([]byte, frame.Length)
 	buffer.Read(frame.CryptoData)
-
-	conn.CryptoStream.addToRead(&StreamFrame{Offset: frame.Offset, Length: frame.Length, StreamData: frame.CryptoData})
 
 	return frame
 }
-func NewCryptoFrame(cryptoStream Stream, data []byte) *CryptoFrame {
+func NewCryptoFrame(cryptoStream *Stream, data []byte) *CryptoFrame {
 	frame := &CryptoFrame{Offset: cryptoStream.WriteOffset, CryptoData: data, Length: uint64(len(data))}
 	cryptoStream.WriteOffset += frame.Length
 	cryptoStream.WriteData = append(cryptoStream.WriteData, data...)

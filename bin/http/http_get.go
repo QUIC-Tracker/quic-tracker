@@ -26,9 +26,17 @@ import (
 	"os"
 	"encoding/json"
 	"github.com/mpiraux/master-thesis/scenarii"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	url := flag.String("url", "/index.html", "The URL to request")
@@ -38,6 +46,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	conn.DisableRetransmits = true
 	pcap, err := m.StartPcapCapture(conn, *netInterface)
 	if err != nil {
 		panic(err)
@@ -76,7 +85,10 @@ func main() {
 	ackFrame := conn.GetAckFrame(m.PNSpaceAppData)
 
 	protectedPacket := m.NewProtectedPacket(conn)
-	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
+	protectedPacket.AddFrame(streamFrame)
+	if ackFrame != nil {
+		protectedPacket.AddFrame(ackFrame)
+	}
 	conn.SendProtectedPacket(protectedPacket)
 
 	for p := range conn.IncomingPackets {

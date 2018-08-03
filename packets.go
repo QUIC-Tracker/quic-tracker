@@ -206,6 +206,9 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 		if frame == nil {
 			break
 		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
+		}
 		p.Frames = append(p.Frames, frame)
 	}
 	return p
@@ -258,6 +261,9 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 		if frame == nil {
 			break
 		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
+		}
 		p.Frames = append(p.Frames, frame)
 	}
 	return p
@@ -283,6 +289,9 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 		}
 		if frame == nil {
 			break
+		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
 		}
 		p.Frames = append(p.Frames, frame)
 	}

@@ -29,6 +29,8 @@ import (
 	"github.com/mpiraux/pigotls"
 	"crypto/cipher"
 	"unsafe"
+	"log"
+	"encoding/hex"
 )
 
 type Connection struct {
@@ -51,9 +53,11 @@ type Connection struct {
 	ReceivedPacketHandler func([]byte, unsafe.Pointer)
 	SentPacketHandler     func([]byte, unsafe.Pointer)
 
-	CryptoStream 		 Stream  // TODO: It should be a parent class without closing states
-	Streams              Streams
-	IncomingPackets		 chan Packet
+	CryptoStreams       CryptoStreams  // TODO: It should be a parent class without closing states
+	Streams             Streams
+	IncomingPackets     chan Packet
+	IncomingPayloads    chan []byte // Contains the UDP payloads that are left to be decrypted. TODO: They should aged with each try and eventually be removed
+	UnprocessedPayloads chan []byte // Contains the UDP payloads that cannot be decrypted because no sufficient crypto state exists
 
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
@@ -66,6 +70,7 @@ type Connection struct {
 	ackQueue             map[PNSpace][]uint64 // Stores the packet numbers to be acked
 	retransmissionBuffer map[PNSpace]map[uint64]RetransmittableFrames
 	RetransmissionTicker *time.Ticker
+	Logger 				 *log.Logger
 
 	IgnorePathChallenge   bool
 	DisableRetransmits    bool
@@ -110,45 +115,38 @@ func (c *Connection) SendFrames(frames []Frame) {
 		c.SendHandshakeProtectedPacket(packet)
 	}
 }
-func (c *Connection) SendPacket(packet Packet, cipher cipher.AEAD, pnCipher pigotls.Cipher) {
+func (c *Connection) SendPacket(packet Packet, cipher cipher.AEAD, pnCipher *pigotls.Cipher) {
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
+		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
+
 		if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
 			fullPacketNumber := (c.PacketNumber[packet.PNSpace()] & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
 			c.retransmissionBuffer[packet.PNSpace()][fullPacketNumber] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames(), packet.PNSpace())
 		}
 
 		payload := packet.EncodePayload()
-		if lHeader, ok := packet.Header().(*LongHeader); ok {
-			lHeader.PayloadLength = uint64(PacketNumberLen(lHeader.packetNumber) + len(payload) + cipher.Overhead())
-		}
-
-		if c.SentPacketHandler != nil {
-			c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
+		if h, ok := packet.Header().(*LongHeader); ok {
+			h.PayloadLength = uint64(PacketNumberLen(h.packetNumber) + len(payload) + cipher.Overhead())
+			h.LengthBeforePN = 6 + len(h.DestinationCID) + len(h.SourceCID) + int(VarIntLen(h.PayloadLength))
+			if h.packetType == Initial {
+				h.LengthBeforePN += int(VarIntLen(uint64(len(h.Token)))) + len(h.Token)
+			}
 		}
 
 		header := packet.EncodeHeader()
 		protectedPayload := cipher.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
 		packetBytes := append(header, protectedPayload...)
 
-		var sampleOffset int
-		sampleLength := 16
-		switch h := packet.Header().(type) {
-		case *LongHeader:
-			sampleOffset = 6 + len(h.DestinationCID) + len(h.SourceCID) + int(VarIntLen(h.PayloadLength)) + 4
-		case *ShortHeader:
+		sample, sampleOffset := GetPacketSample(packet.Header(), packetBytes)
 
-			sampleOffset := 1 + len(h.DestinationCID) + 4
-
-			if sampleOffset + sampleLength > len(packetBytes) {
-				sampleOffset = len(packetBytes) - sampleLength
-			}
-		}
-		sample := packetBytes[sampleOffset:sampleOffset+sampleLength]
-
-		packetBytes[sampleOffset-4:sampleOffset] = pnCipher.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])
+		copy(packetBytes[sampleOffset-4:sampleOffset], pnCipher.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])[:PacketNumberLen(packet.Header().PacketNumber())])
 
 		c.UdpConnection.Write(packetBytes)
+
+		if c.SentPacketHandler != nil {
+			c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
+		}
 	default:
 		// Clients do not send cleartext packets
 	}
@@ -180,7 +178,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	}
 	c.ClientRandom = make([]byte, 32, 32)
 	copy(c.ClientRandom, clientHello[11:11+32])
-	cryptoFrame := NewCryptoFrame(c.CryptoStream, clientHello)
+	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)
 
 	var initialLength int
 	if c.UseIPv6 {
@@ -207,10 +205,18 @@ func (c *Connection) ProcessServerHello(packet Packet) (bool, Framer, error) { /
 	lHeader := packet.Header().(*LongHeader)
 	c.DestinationCID = lHeader.SourceCID  // TODO: see https://tools.ietf.org/html/draft-ietf-quic-transport-11#section-4.7
 
+	cryptoStream := c.CryptoStreams.Get(packet.PNSpace())
+
 	var handshakeData []byte
-	select {
-		case handshakeData = <- c.CryptoStream.ReadChan:
-		default:
+
+forLoop:
+	for {
+		select {
+			case d := <- cryptoStream.ReadChan:
+				handshakeData = append(handshakeData, d...)
+			default:
+				break forLoop
+		}
 	}
 
 	var responsePacket Framer
@@ -221,11 +227,11 @@ func (c *Connection) ProcessServerHello(packet Packet) (bool, Framer, error) { /
 
 	switch packet.(type) {
 	case Framer:
-		if packet.(*InitialPacket) != nil {
+		if _, ok := packet.(*InitialPacket); ok {
 			responsePacket = NewInitialPacket(c)
-		} else if packet.(*HandshakePacket) != nil {
+		} else if _, ok := packet.(*HandshakePacket); ok {
 			responsePacket = NewHandshakePacket(c)
-		} else if packet.(*ProtectedPacket) != nil {
+		} else if _, ok := packet.(*ProtectedPacket); ok {
 			responsePacket = NewProtectedPacket(c)
 		} else {
 			return true, responsePacket, nil
@@ -239,14 +245,27 @@ func (c *Connection) ProcessServerHello(packet Packet) (bool, Framer, error) { /
 			}
 
 			if responseData != nil && len(responseData) > 0 {
-				responsePacket.AddFrame(NewCryptoFrame(c.CryptoStream, responseData))
+				responsePacket.AddFrame(NewCryptoFrame(cryptoStream, responseData))
 			}
 
-			if c.HandshakeCrypto == nil && c.Tls.HandshakeReadSecret() != nil && c.Tls.HandshakeWriteSecret() != nil {
-				c.HandshakeCrypto = NewProtectedCryptoState(c.Tls, c.Tls.HandshakeReadSecret(), c.Tls.HandshakeWriteSecret())
+			if c.HandshakeCrypto == nil {
+				c.HandshakeCrypto = new(CryptoState)
+			}
+
+			if c.HandshakeCrypto != nil {
+				if c.HandshakeCrypto.PacketRead == nil && len(c.Tls.HandshakeReadSecret()) > 0{
+					c.Logger.Printf("Installing handshake read crypto with secret %s\n", hex.EncodeToString(c.Tls.HandshakeReadSecret()))
+					c.HandshakeCrypto.InitRead(c.Tls, c.Tls.HandshakeReadSecret())
+				}
+				if c.HandshakeCrypto.PacketWrite == nil && len(c.Tls.HandshakeWriteSecret()) > 0 {
+					c.Logger.Printf("Installing handshake write crypto with secret %s\n", hex.EncodeToString(c.Tls.HandshakeWriteSecret()))
+					c.HandshakeCrypto.InitWrite(c.Tls, c.Tls.HandshakeWriteSecret())
+					spew.Dump(c.Tls.HandshakeWriteSecret())
+				}
 			}
 
 			if !notCompleted {
+				c.Logger.Printf("Handshake has completed, installing protected crypto {read=%s, write=%s}\n", hex.EncodeToString(c.Tls.ProtectedReadSecret()), hex.EncodeToString(c.Tls.ProtectedWriteSecret()))
 				c.ProtectedCrypto = NewProtectedCryptoState(c.Tls, c.Tls.ProtectedReadSecret(), c.Tls.ProtectedWriteSecret())
 				c.ExporterSecret = c.Tls.ExporterSecret()
 
@@ -254,6 +273,7 @@ func (c *Connection) ProcessServerHello(packet Packet) (bool, Framer, error) { /
 
 				err = c.TLSTPHandler.ReceiveExtensionData(c.Tls.ReceivedQUICTransportParameters())
 				if err != nil {
+					c.Logger.Println("Failed to decode extension data")
 					return false, responsePacket, err
 				}
 			}
@@ -284,6 +304,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 		}
 	}
 	if version == 0 {
+		c.Logger.Println("No appropriate version was found in the VN packet")
 		return errors.New("no appropriate version found")
 	}
 	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
@@ -293,63 +314,94 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 	saveCleartext := func (ct []byte, p unsafe.Pointer) {if c.ReceivedPacketHandler != nil {c.ReceivedPacketHandler(ct, p)}}
 
-	rec := make([]byte, MaxUDPPayloadSize, MaxUDPPayloadSize)
-	i, _, err := c.UdpConnection.ReadFromUDP(rec)
-	if err != nil {
-		return nil, err, nil
-	}
-	rec = rec[:i]
+	udpPayload := <- c.IncomingPayloads
 
 	var packets []Packet
 	var off int
 
-	for len(rec) > off {
-		header := ReadHeader(bytes.NewReader(rec[off:]), c)
+outerLoop:
+	for len(udpPayload) > off {
+		packetBytes := udpPayload[off:]
+		header := ReadHeader(bytes.NewReader(packetBytes), c)
+
+		sample, sampleOffset := GetPacketSample(header, packetBytes)
+
+		var cryptoState *CryptoState = nil
+		switch header.PacketType() {
+		case Initial:
+			cryptoState = c.InitialCrypto
+		case Handshake:
+			cryptoState = c.HandshakeCrypto
+		case ZeroRTTProtected:
+			cryptoState = c.ZeroRTTCrypto
+		case ShortHeaderPacket:
+			cryptoState = c.ProtectedCrypto
+		}
+
+		var pnLength int
+
+		switch header.PacketType() {
+		case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket:
+			if cryptoState != nil && cryptoState.PacketRead != nil && cryptoState.Read != nil {
+				c.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(packetBytes))
+				pn := cryptoState.PacketRead.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])
+				pnbuf := bytes.NewReader(pn)
+				DecodePacketNumber(pnbuf)
+				pnLength = len(pn) - pnbuf.Len()
+				copy(packetBytes[sampleOffset-4:sampleOffset], pn[:pnLength])
+				header = ReadHeader(bytes.NewReader(packetBytes), c) // Update packet number
+			} else {
+				c.Logger.Printf("Packet number of %s packet of length %d bytes could not be decrypted, putting it back in the buffer\n", header.PacketType().String(), len(packetBytes))
+				c.UnprocessedPayloads <- packetBytes
+				break outerLoop
+			}
+		}
+
+		c.Logger.Printf("Successfully decrypted header {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 
 		var packet Packet
 
 		if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
-			packet = ReadVersionNegotationPacket(bytes.NewReader(rec))
+			packet = ReadVersionNegotationPacket(bytes.NewReader(udpPayload))
 			for k := range c.retransmissionBuffer {
 				delete(c.retransmissionBuffer, k)
 			}
-			saveCleartext(rec, packet.Pointer())
-			off = len(rec)
+			saveCleartext(udpPayload, packet.Pointer())
+			off = len(udpPayload)
 
 			packets = append(packets, packet)
 		} else {
 			hLen := header.Length()
 			var data []byte
 			switch header.PacketType() {
-			case Handshake, Initial, Retry:
+			case Handshake, Initial:
 				longHeader := header.(*LongHeader)
-				pLen := int(longHeader.PayloadLength)
+				pLen := int(longHeader.PayloadLength) - pnLength
 
-				payload, err := c.InitialCrypto.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[off+hLen:off+hLen+pLen], rec[off:off+hLen])
+				c.Logger.Printf("Decrypt op: {off=%d, hLen=%d, pLen=%d, len(udpPayload)=%d}\n", off, hLen, pLen, len(udpPayload))
+				payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), udpPayload[off+hLen:off+hLen+pLen], udpPayload[off:off+hLen])
 				if err != nil {
-					return packets, err, rec
+					c.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
+					return packets, err, udpPayload
 				}
-				data = append(append(data, rec[off:off+hLen]...), payload...)
+				data = append(append(data, udpPayload[off:off+hLen]...), payload...)
 				off += hLen + pLen
 			case ShortHeaderPacket:  // Packets with a short header always include a 1-RTT protected payload.
-				if c.ProtectedCrypto == nil {
-					println("Crypto state is not ready to decrypt protected packets")
-					return c.ReadNextPackets() // Packet may have been reordered, TODO: Implement a proper packet queue instead of triggering retransmissions
-				}
-				payload, err := c.ProtectedCrypto.Read.Open(nil, EncodeArgs(header.PacketNumber()), rec[off+hLen:], rec[off:off+hLen])
+				payload, err := c.ProtectedCrypto.Read.Open(nil, EncodeArgs(header.PacketNumber()), udpPayload[off+hLen:], udpPayload[off:off+hLen])
 				if err != nil {
-					return packets, err, rec
+					c.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
+					return packets, err, udpPayload
 				}
-				data = append(append(data, rec[off:off+hLen]...), payload...)
-				off = len(rec)
+				data = append(append(data, udpPayload[off:off+hLen]...), payload...)
+				off = len(udpPayload)
 			case Retry:
-				longHeader := header.(*LongHeader)
-				pLen := int(longHeader.PayloadLength)
-				data =
+				panic("TODO PR#1498")
 			default:
 				spew.Dump(header)
-				return packets, errors.New("unknown packet type"), rec
+				return packets, errors.New("unknown packet type"), udpPayload
 			}
+
+			c.Logger.Printf("Successfully unprotected packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 
 			buffer := bytes.NewReader(data)
 
@@ -364,6 +416,8 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 				packet = ReadRetryPacket(buffer)
 			}
 
+			c.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), int(buffer.Size()) - buffer.Len())
+
 			saveCleartext(data, packet.Pointer())
 
 			if packet.PNSpace() != PNSpaceNoSpace {
@@ -371,7 +425,7 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 
 				for _, number := range c.ackQueue[packet.PNSpace()] {
 					if number == fullPacketNumber {
-						fmt.Fprintf(os.Stderr, "Received duplicate packet number %d\n", fullPacketNumber)
+						c.Logger.Printf("Received duplicate packet number %d in PN space %s\n", fullPacketNumber, packet.PNSpace().String())
 						spew.Dump(packet)
 						return c.ReadNextPackets()
 						// TODO: Should it be acked again ?
@@ -397,11 +451,14 @@ func (c *Connection) ReadNextPackets() ([]Packet, error, []byte) {
 		}
 	}
 
-	return packets, nil, rec
+	return packets, nil, udpPayload
 }
 func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack frame based on the packet numbers received
 	sort.Sort(PacketNumberQueue(c.ackQueue[space]))
 	packetNumbers := c.ackQueue[space]
+	if len(packetNumbers) == 0 {
+		return nil
+	}
 	frame := new(AckFrame)
 	frame.AckBlocks = make([]AckBlock, 0, 255)
 	frame.LargestAcknowledged = packetNumbers[0]
@@ -541,6 +598,10 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.PacketNumber[PNSpaceInitial] = 0
 	c.PacketNumber[PNSpaceHandshake] = 0
 	c.PacketNumber[PNSpaceAppData] = 0
+	c.ExpectedPacketNumber = make(map[PNSpace]uint64)
+	c.ExpectedPacketNumber[PNSpaceInitial] = 0
+	c.ExpectedPacketNumber[PNSpaceHandshake] = 0
+	c.ExpectedPacketNumber[PNSpaceAppData] = 0
 	c.ackQueue = make(map[PNSpace][]uint64)
 	c.ackQueue[PNSpaceInitial] = nil
 	c.ackQueue[PNSpaceHandshake] = nil
@@ -549,8 +610,11 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.retransmissionBuffer[PNSpaceInitial] = make(map[uint64]RetransmittableFrames)
 	c.retransmissionBuffer[PNSpaceHandshake] = make(map[uint64]RetransmittableFrames)
 	c.retransmissionBuffer[PNSpaceAppData] = make(map[uint64]RetransmittableFrames)
+	c.CryptoStreams = make(map[PNSpace]*Stream)
 
 	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
+
+	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.LstdFlags | log.Lshortfile)
 
 	if !c.DisableIncPacketChan {
 		c.IncomingPackets = make(chan Packet)
@@ -559,10 +623,13 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 			for {
 				packets, err, _ := c.ReadNextPackets()
 				if err != nil {
+					c.Logger.Println("Closing IncomingPackets channels due to error:", err.Error())
 					close(c.IncomingPackets)
 					break
 				}
 				for _, p := range packets {
+					c.Logger.Println("Received packet")
+					spew.Dump(p)
 					c.IncomingPackets <- p
 				}
 			}
@@ -583,8 +650,63 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 					}
 				}
 			}
-
+			if len(frames) > 0 {
+				c.Logger.Printf("Retransmitting %d frames\n", len(frames))
+			}
 			c.RetransmitFrames(frames)
+		}
+	}()
+
+	recChan := make(chan []byte)
+	go func() {
+		for {
+			recBuf := make([]byte, MaxUDPPayloadSize)
+			i, _, err := c.UdpConnection.ReadFromUDP(recBuf)
+			if err != nil {
+				c.Logger.Println("Closing UDP socket because of error", err.Error())
+				close(recChan)
+				break
+			}
+			c.Logger.Printf("Received %d bytes from UDP socket\n", i)
+			payload := make([]byte, i)
+			copy(payload, recBuf[:i])
+			recChan <- payload
+		}
+	}()
+
+	c.IncomingPayloads = make(chan []byte, 1000)
+	c.UnprocessedPayloads = make(chan []byte, 1000)
+
+	go func() {
+		isRecChanClosed := false
+		for {
+			if isRecChanClosed {
+				p := <- c.UnprocessedPayloads
+				c.IncomingPayloads <- p
+				c.Logger.Printf("Put back an %d-byte payload in to the ring buffer\n", len(p))
+			} else {
+				select {
+				case p := <-c.UnprocessedPayloads:
+					c.IncomingPayloads <- p
+					c.Logger.Printf("Put back an %d-byte payload in to the ring buffer\n", len(p))
+				case payload := <-recChan:
+					if payload != nil {
+					forLoop:
+						for {
+							select {
+							case p := <-c.UnprocessedPayloads:
+								c.IncomingPayloads <- p
+								c.Logger.Printf("Put back an %d-byte payload in to the ring buffer\n", len(p))
+							case c.IncomingPayloads <- payload:
+								c.Logger.Printf("Put an %d-byte payload in to the ring buffer\n", len(payload))
+								break forLoop
+							}
+						}
+					} else {
+						isRecChanClosed = true
+					}
+				}
+			}
 		}
 	}()
 

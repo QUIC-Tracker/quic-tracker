@@ -51,14 +51,19 @@ func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the
 	var p m.Packet
 	for p = range conn.IncomingPackets {
 		switch p.(type) {
-		case *m.HandshakePacket, *m.RetryPacket:
+		case *m.InitialPacket, *m.HandshakePacket, *m.RetryPacket:
 			var response m.Packet
 			ongoingHandhake, response, err = conn.ProcessServerHello(p.(m.Framer))
 			if err != nil {
 				return p, err
 			}
 			if response != nil {
-				conn.SendHandshakeProtectedPacket(response)
+				switch p.(type) {
+				case *m.InitialPacket, *m.RetryPacket:
+					conn.SendInitialProtectedPacket(response)
+				default:
+					conn.SendHandshakeProtectedPacket(response)
+				}
 			}
 		case *m.VersionNegotationPacket:
 			err := conn.ProcessVersionNegotation(p.(*m.VersionNegotationPacket))

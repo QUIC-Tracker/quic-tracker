@@ -30,6 +30,16 @@ func (s Streams) Get(streamId uint64) *Stream {  // TODO: This should enforce li
 	return s[streamId]
 }
 
+type CryptoStreams map[PNSpace]*Stream
+
+func (s CryptoStreams) Get(space PNSpace) *Stream {
+	if s[space] == nil {
+		s[space] = NewStream()
+	}
+
+	return s[space]
+}
+
 type Stream struct {
 	ReadOffset  uint64
 	WriteOffset uint64

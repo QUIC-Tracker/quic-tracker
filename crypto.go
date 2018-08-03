@@ -30,39 +30,45 @@ var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-qui
 const (
 	clientInitialLabel = "client in"
 	serverInitialLabel = "server in"
-
-	packetProtectionLabel = "pn"
 )
 
 type CryptoState struct {
 	Read  cipher.AEAD
 	Write cipher.AEAD
-	PacketRead pigotls.Cipher
-	PacketWrite pigotls.Cipher
+	PacketRead *pigotls.Cipher
+	PacketWrite *pigotls.Cipher
+}
+
+func (s *CryptoState) InitRead(tls *pigotls.Connection, readSecret []byte) {
+	s.Read = newProtectedAead(tls, readSecret)
+	s.PacketRead = tls.NewCipher(tls.HkdfExpandLabel(readSecret, "pn", nil, tls.AEADKeySize()))
+}
+
+func (s *CryptoState) InitWrite(tls *pigotls.Connection, writeSecret []byte) {
+	s.Write = newProtectedAead(tls, writeSecret)
+	s.PacketWrite = tls.NewCipher(tls.HkdfExpandLabel(writeSecret, "pn", nil, tls.AEADKeySize()))
 }
 
 func NewInitialPacketProtection(conn *Connection) *CryptoState {
-	handshakeSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
-	readSecret := conn.Tls.HkdfExpandLabel(handshakeSecret, serverInitialLabel, nil, conn.Tls.HashDigestSize())
-	writeSecret := conn.Tls.HkdfExpandLabel(handshakeSecret, clientInitialLabel, nil, conn.Tls.HashDigestSize())
+	initialSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
+	readSecret := conn.Tls.HkdfExpandLabel(initialSecret, serverInitialLabel, nil, conn.Tls.HashDigestSize())
+	writeSecret := conn.Tls.HkdfExpandLabel(initialSecret, clientInitialLabel, nil, conn.Tls.HashDigestSize())
 	return NewProtectedCryptoState(conn.Tls, readSecret, writeSecret)
 }
 
 func NewProtectedCryptoState(tls *pigotls.Connection, readSecret []byte, writeSecret []byte) *CryptoState {
 	s := new(CryptoState)
 	if len(readSecret) > 0 {
-		s.Read = newProtectedAead(tls, readSecret, "key")
-		s.PacketRead = newProtectedAead(tls, readSecret, packetProtectionLabel)
+		s.InitRead(tls, readSecret)
 	}
 	if len(writeSecret) > 0 {
-		s.Write = newProtectedAead(tls, writeSecret, "key")
-		s.PacketWrite = newProtectedAead(tls, writeSecret, packetProtectionLabel)
+		s.InitWrite(tls, writeSecret)
 	}
 	return s
 }
 
-func newProtectedAead(tls *pigotls.Connection, secret []byte, keyLabel string) cipher.AEAD {
-	k := tls.HkdfExpandLabel(secret, keyLabel, nil, tls.AEADKeySize())
+func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
+	k := tls.HkdfExpandLabel(secret, "key", nil, tls.AEADKeySize())
 	iv := tls.HkdfExpandLabel(secret, "iv", nil, tls.AEADIvSize())
 
 	aead, err := newWrappedAESGCM(k, iv)

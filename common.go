@@ -47,10 +47,24 @@ const (
 	PNSpaceNoSpace
 )
 
+var PNSpaceToString = map[PNSpace]string{
+	PNSpaceInitial: "Initial",
+	PNSpaceHandshake: "Handshake",
+	PNSpaceAppData: "Application data",
+}
+
 var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
 	PNSpaceInitial: pigotls.EpochInitial,
 	PNSpaceHandshake: pigotls.EpochHandshake,
 	PNSpaceAppData: pigotls.Epoch1RTT,
+}
+
+func (pns PNSpace) String() string {
+	return PNSpaceToString[pns]
+}
+
+func (pns PNSpace) Epoch() pigotls.Epoch {
+	return PNSpaceToEpoch[pns]
 }
 
 func Uint32ToBEBytes(uint32 uint32) []byte {
@@ -93,4 +107,20 @@ func max(a, b uint64) uint64 {
 		return a
 	}
 	return b
+}
+
+func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
+	var sampleOffset int
+	sampleLength := 16
+	switch h := header.(type) {
+	case *LongHeader:
+		sampleOffset = h.LengthBeforePN + 4
+	case *ShortHeader:
+		sampleOffset = 1 + len(h.DestinationCID) + 4
+
+		if sampleOffset + sampleLength > len(packetBytes) {
+			sampleOffset = len(packetBytes) - sampleLength
+		}
+	}
+	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
 }

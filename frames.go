@@ -22,7 +22,6 @@ import (
 	"io"
 	"fmt"
 	"errors"
-	"time"
 )
 
 type Frame interface {
@@ -683,21 +682,3 @@ func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
 
 	return frame
 }
-
-type RetransmitBatch []RetransmittableFrames
-
-type RetransmittableFrames struct {
-	Frames    []Frame
-	Timestamp time.Time
-	PNSpace
-}
-func NewRetransmittableFrames(frames []Frame, space PNSpace) *RetransmittableFrames {
-	r := new(RetransmittableFrames)
-	r.Frames = frames
-	r.Timestamp = time.Now()
-	r.PNSpace = space
-	return r
-}
-func (a RetransmitBatch) Less(i, j int) bool { return a[i].Timestamp.Before(a[j].Timestamp) }
-func (a RetransmitBatch) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a RetransmitBatch) Len() int           { return len(a) }

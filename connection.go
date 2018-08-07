@@ -29,7 +29,6 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/dustin/go-broadcast"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Connection struct {
@@ -53,6 +52,7 @@ type Connection struct {
 	Streams             Streams
 
 	IncomingPackets           broadcast.Broadcaster //type: Packet
+	OutgoingPackets           broadcast.Broadcaster //type: Packet
 	IncomingPayloads          broadcast.Broadcaster //type: []byte
 	UnprocessedPayloads       broadcast.Broadcaster //type: UnprocessedPayload
 	EncryptionLevelsAvailable broadcast.Broadcaster //type: DirectionalEncryptionLevel
@@ -64,58 +64,23 @@ type Connection struct {
 	Version                uint32
 
 	PacketNumber         map[PNSpace]uint64
-	ExpectedPacketNumber map[PNSpace]uint64
 
-	AckQueue             map[PNSpace][]uint64 // Stores the packet numbers to be acked
-	RetransmissionBuffer map[PNSpace]map[uint64]RetransmittableFrames
-	RetransmissionTicker *time.Ticker
+	AckQueue             map[PNSpace][]uint64 // Stores the packet numbers to be acked TODO: This should be a channel actually
 	Logger               *log.Logger
-
-	IgnorePathChallenge   bool
-	DisableRetransmits    bool
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
 }
-func (c *Connection) nextPacketNumber(space PNSpace) uint64 {
+func (c *Connection) nextPacketNumber(space PNSpace) uint64 {  // TODO: This should be thread safe
 	pn := c.PacketNumber[space]
 	c.PacketNumber[space]++
 	return pn
-}
-func (c *Connection) RetransmitFrames(frames RetransmitBatch) {  // TODO: Split in smaller packets if needed
-	sort.Sort(frames)
-	for _, f := range frames {
-		switch f.PNSpace {
-		case PNSpaceInitial:
-			packet := NewInitialPacket(c)
-			packet.Frames = f.Frames
-			c.SendPacket(packet, packetTypeToEncryptionLevel[packet.Header().PacketType()])
-		case PNSpaceHandshake:
-			packet := NewHandshakePacket(c)
-			packet.Frames = f.Frames
-			c.SendPacket(packet, packetTypeToEncryptionLevel[packet.Header().PacketType()])
-		case PNSpaceAppData:
-			packet := NewProtectedPacket(c)
-			packet.Frames = f.Frames
-			c.SendPacket(packet, packetTypeToEncryptionLevel[packet.Header().PacketType()])
-		default:
-		}
-	}
 }
 func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 	cryptoState := c.CryptoStates[level]
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
 		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
-
-		if packet.PNSpace() == PNSpaceAppData && packet.Header().PacketNumber() == 0 {
-			spew.Dump(packet)
-		}
-
-		if framePacket, ok := packet.(Framer); ok && len(framePacket.GetRetransmittableFrames()) > 0 {
-			fullPacketNumber := (c.PacketNumber[packet.PNSpace()] & 0xffffffff00000000) | uint64(packet.Header().PacketNumber())
-			c.RetransmissionBuffer[packet.PNSpace()][fullPacketNumber] = *NewRetransmittableFrames(framePacket.GetRetransmittableFrames(), packet.PNSpace())
-		}
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
@@ -139,6 +104,7 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 		if c.SentPacketHandler != nil {
 			c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
 		}
+		c.OutgoingPackets.Submit(packet)
 	default:
 		// Clients do not send cleartext packets
 	}
@@ -218,31 +184,6 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	}
 	return frame
 }
-func (c *Connection) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch {
-	threshold := uint64(1000)
-	var frames RetransmitBatch
-	currentPacketNumber := ack.LargestAcknowledged
-	buffer := c.RetransmissionBuffer[space]
-	delete(buffer, currentPacketNumber)
-	for i := uint64(0); i < ack.AckBlocks[0].Block && i < threshold; i++ {
-		currentPacketNumber--
-		delete(buffer, currentPacketNumber)
-	}
-	for _, ackBlock := range ack.AckBlocks[1:] {
-		for i := uint64(0); i <= ackBlock.Gap && i < threshold; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
-			if f, ok := buffer[currentPacketNumber]; ok {
-				frames = append(frames, f)
-			}
-			currentPacketNumber--
-			delete(buffer, currentPacketNumber)
-		}
-		for i := uint64(0); i < ackBlock.Block && i < threshold; i++ {
-			currentPacketNumber--
-			delete(buffer, currentPacketNumber)
-		}
-	}
-	return frames
-}
 func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionSecret []byte) {  // TODO:
 	var prevVersion uint32
 	if c.Version == 0 {
@@ -267,7 +208,6 @@ func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
 	c.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, c.Streams.Get(streamID), []byte(fmt.Sprintf("GET %s\r\n", path)), true), EncryptionLevelBest})
 }
 func (c *Connection) Close() {
-	c.RetransmissionTicker.Stop()
 	c.Tls.Close()
 	c.UdpConnection.Close()
 }
@@ -316,27 +256,21 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.OriginalDestinationCID = DCID
 
 	c.IncomingPackets = broadcast.NewBroadcaster(1000)
+	c.OutgoingPackets = broadcast.NewBroadcaster(1000)
 	c.IncomingPayloads = broadcast.NewBroadcaster(1000)
 	c.UnprocessedPayloads = broadcast.NewBroadcaster(1000)
 	c.EncryptionLevelsAvailable = broadcast.NewBroadcaster(10)
 	c.FrameQueue = broadcast.NewBroadcaster(1000)
 
 	c.PacketNumber = make(map[PNSpace]uint64)
-	c.ExpectedPacketNumber = make(map[PNSpace]uint64)
 	c.AckQueue = make(map[PNSpace][]uint64)
-	c.RetransmissionBuffer = make(map[PNSpace]map[uint64]RetransmittableFrames)
-
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0
-		c.ExpectedPacketNumber[space] = 0
 		c.AckQueue[space] = nil
-		c.RetransmissionBuffer[space] = make(map[uint64]RetransmittableFrames)
 	}
 
 	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
 	c.CryptoStreams = make(map[PNSpace]*Stream)
-
-	c.RetransmissionTicker = time.NewTicker(100 * time.Millisecond)  // Dumb retransmission mechanism
 
 	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.LstdFlags | log.Lshortfile)
 

@@ -22,6 +22,7 @@ import (
 	"io"
 	"github.com/davecgh/go-spew/spew"
 	"unsafe"
+	"fmt"
 )
 
 type Acknowledger interface {
@@ -41,6 +42,7 @@ type Packet interface {
 	Pointer() unsafe.Pointer
 	PNSpace() PNSpace
 	EncryptionLevel() EncryptionLevel
+	ShortString() string
 }
 
 type abstractPacket struct {
@@ -59,6 +61,9 @@ func (p abstractPacket) Encode(payload []byte) []byte {
 	buffer.Write(p.EncodeHeader())
 	buffer.Write(payload)
 	return buffer.Bytes()
+}
+func (p abstractPacket) ShortString() string {
+	return fmt.Sprintf("{type=%s, number=%d}", p.header.PacketType().String(), p.header.PacketNumber())
 }
 
 type VersionNegotationPacket struct {
@@ -132,6 +137,7 @@ type Framer interface {
 	GetRetransmittableFrames() []Frame
 	Contains(frameType FrameType) bool
 	GetFirst(frameType FrameType) Frame
+	GetAll(frameType FrameType) []Frame
 }
 type FramePacket struct {
 	abstractPacket
@@ -171,6 +177,15 @@ func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 	}
 	return nil
 }
+func (p *FramePacket) GetAll(frameType FrameType) []Frame {
+	var frames []Frame
+	for _, f := range p.Frames {
+		if f.FrameType() == frameType {
+			frames = append(frames)
+		}
+	}
+	return frames
+}
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		switch frame.(type) {
@@ -193,7 +208,13 @@ type InitialPacket struct {
 	FramePacket
 }
 func (p *InitialPacket) GetRetransmittableFrames() []Frame {
-	return p.Frames
+	var frames []Frame
+	for _, frame := range p.Frames {
+		if frame.shouldBeRetransmitted() || frame.FrameType() == PaddingFrameType {
+			frames = append(frames, frame)
+		}
+	}
+	return frames
 }
 func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
 func (p *InitialPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelInitial }

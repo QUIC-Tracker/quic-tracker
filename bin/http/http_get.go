@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	conn.DisableRetransmits = true
+
 	pcap, err := m.StartPcapCapture(conn, *netInterface)
 	if err != nil {
 		panic(err)
@@ -75,14 +75,9 @@ func main() {
 		println(string(out))
 	}()
 
-	tlsAgent := &agents.TLSAgent{}
-	handshakeAgent := &agents.HandshakeAgent{TLSAgent: tlsAgent}
-
-	connAgents := []agents.Agent{&agents.SocketAgent{}, &agents.ParsingAgent{}, &agents.BufferAgent{}, tlsAgent, handshakeAgent, &agents.AckAgent{}, &agents.SendingAgent{MTU: 1200}}
-
-	for _, a := range connAgents {
-		a.Run(conn)
-	}
+	Agents := agents.AttachAgentsToConnection(conn, agents.DefaultAgents...)
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: Agents.Get("TLSAgent").(*agents.TLSAgent)}
+	Agents.Add(handshakeAgent)
 
 	handshakeStatus := make(chan interface{}, 10)
 	handshakeAgent.HandshakeStatus.Register(handshakeStatus)

@@ -16,13 +16,19 @@ func (a *AckAgent) Run(conn *Connection) {
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)
 
+	expectedPacketNumber := map[PNSpace]uint64 {
+		PNSpaceInitial: 0,
+		PNSpaceHandshake: 0,
+		PNSpaceAppData: 0,
+	}
+
 	go func() {
 		for {
 			select {
 			case i := <-incomingPackets:
 				p := i.(Packet)
 				if p.PNSpace() != PNSpaceNoSpace {
-					fullPacketNumber := (conn.ExpectedPacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(p.Header().PacketNumber())
+					fullPacketNumber := (expectedPacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(p.Header().PacketNumber())
 
 					for _, number := range conn.AckQueue[p.PNSpace()] {
 						if number == fullPacketNumber {
@@ -32,7 +38,7 @@ func (a *AckAgent) Run(conn *Connection) {
 					}
 
 					conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], fullPacketNumber)
-					conn.ExpectedPacketNumber[p.PNSpace()] = fullPacketNumber + 1
+					expectedPacketNumber[p.PNSpace()] = fullPacketNumber + 1
 
 					if framePacket, ok := p.(Framer); ok {
 						if pathChallenge := framePacket.GetFirst(PathChallengeType); !a.DisablePathResponse && pathChallenge != nil {

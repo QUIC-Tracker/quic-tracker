@@ -19,12 +19,14 @@ package masterthesis
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 )
 
 type Header interface {
 	PacketType() PacketType
 	DestinationConnectionID() ConnectionID
 	PacketNumber() uint32
+	EncryptionLevel() EncryptionLevel
 	Encode() []byte
 	Length() int
 }
@@ -71,6 +73,7 @@ func (h *LongHeader) Encode() []byte {
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
 func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *LongHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
 func (h *LongHeader) Length() int { return h.length }
 func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 	h := new(LongHeader)
@@ -157,6 +160,7 @@ func (h *ShortHeader) Encode() []byte {
 func (h *ShortHeader) PacketType() PacketType { return ShortHeaderPacket }
 func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *ShortHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *ShortHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
 func (h *ShortHeader) Length() int { return h.length }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
@@ -165,7 +169,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h.KeyPhase = (typeByte & 0x40) == 0x40
 
 	if typeByte & 0x38 != 0x30 {
-		println("SH fixed bits not respected")
+		fmt.Printf("SH fixed bits not respected: expected %b, got %b\n", 0x30, typeByte & 0x38)
 	}
 
 	h.DestinationCID = make([]byte, len(conn.SourceCID), len(conn.SourceCID))

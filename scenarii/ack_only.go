@@ -32,21 +32,24 @@ type AckOnlyScenario struct {
 func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
 }
-func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {  // TODO disable the AckAgent after handshake and schedule frames to be sent
 	if p, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(AO_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	var ackOnlyPackets []uint64
 
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
 		if p.ShouldBeAcknowledged() {
 			protectedPacket := m.NewProtectedPacket(conn)
 			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
+			conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
 			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
 		}
 

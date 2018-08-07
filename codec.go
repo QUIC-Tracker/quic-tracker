@@ -72,7 +72,7 @@ func ignoreField(name string) bool {
 	return unicode.IsLower(rune(name[0]))
 }
 
-// Length specifications are of the form:
+// FrameLength specifications are of the form:
 //
 // lengthbits: "B:L1,L2,...LN
 //

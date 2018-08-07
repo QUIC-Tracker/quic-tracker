@@ -45,12 +45,16 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 		return
 	}
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	trace.ErrorCode = NCI_HostDidNotProvideCID
 
 	var expectingResponse bool
 	var alternativeConnectionIDs [][]byte
 
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
 		if expectingResponse {
 			if bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
 				trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
@@ -58,12 +62,6 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 				trace.ErrorCode = 0
 			}
 			return
-		}
-
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
 		}
 
 		if pp, ok := p.(*m.ProtectedPacket); ok {

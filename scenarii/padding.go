@@ -29,40 +29,28 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 		initialPacket := m.NewInitialPacket(conn)
 
-		paddingLength := initialLength - (initialPacket.Header().Length() + len(initialPacket.EncodePayload()) + conn.InitialCrypto.Write.Overhead())
+		paddingLength := initialLength - (initialPacket.Header().Length() + len(initialPacket.EncodePayload()) + conn.CryptoStates[m.EncryptionLevelInitial].Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
 			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
 		}
 
-		conn.SendHandshakeProtectedPacket(initialPacket)
+		conn.SendPacket(initialPacket, m.EncryptionLevelInitial)
 	}
 
 	sendEmptyInitialPacket()
-	packets, err, _ := conn.ReadNextPackets()
 
-	for _, packet := range packets {
-		if vn, ok := packet.(*m.VersionNegotationPacket); packet != nil && ok {
-			if err := conn.ProcessVersionNegotation(vn); err != nil {
-				trace.MarkError(P_VNDidNotComplete, err.Error(), vn)
-				return
-			}
-			sendEmptyInitialPacket()
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
+	packet := (<-incPackets).(m.Packet)
+
+	if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+		if err := conn.ProcessVersionNegotation(vn); err != nil {
+			trace.MarkError(P_VNDidNotComplete, err.Error(), vn)
+			return
 		}
-	}
-
-	for {
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
-		} else {
-			for _, packet := range packets {
-				if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {  // TODO: Distinguish ACKs from other packets, see https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-9.1
-					trace.MarkError(P_ReceivedSmth, "", packet)
-					break
-				}
-			}
-		}
-
-		packets, err, _ = conn.ReadNextPackets()
+		sendEmptyInitialPacket()
+	} else {
+		trace.MarkError(P_ReceivedSmth, "", packet)
 	}
 }

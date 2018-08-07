@@ -46,6 +46,9 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 		return
 	}
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
 		trace.MarkError(MS_NoTPReceived, "", p)
 		return
@@ -60,15 +63,10 @@ func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
 	}
 
-	conn.SendProtectedPacket(protectedPacket)
+	conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
+	for {
+		<-incPackets
 		for streamId, stream := range conn.Streams {
 			if streamId != 0 && !stream.ReadClosed {
 				allClosed = false

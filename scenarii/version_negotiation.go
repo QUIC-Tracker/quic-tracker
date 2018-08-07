@@ -37,16 +37,21 @@ func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
 }
 func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	conn.RetransmissionTicker.Stop()
 	conn.Version = ForceVersionNegotiation
 	trace.ErrorCode = VN_Timeout
 	initial := conn.GetInitialPacket()
-	conn.SendHandshakeProtectedPacket(initial)
+	conn.SendPacket(initial, m.EncryptionLevelInitial)
 
 	threshold := 3
 	vnCount := 0
 	var unusedField byte
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
+
 		switch p := p.(type) {
 		case *m.VersionNegotationPacket:
 			vnCount++
@@ -61,7 +66,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 			trace.Results["supported_versions"] = p.SupportedVersions  // TODO: Compare versions announced ?
 			newInitial := m.NewInitialPacket(conn)
 			newInitial.Frames = initial.Frames
-			conn.SendHandshakeProtectedPacket(newInitial)
+			conn.SendPacket(initial, m.EncryptionLevelInitial)
 		default:
 			trace.MarkError(VN_NotAnsweringToVN, "", p)
 			trace.Results["received_packet_type"] = p.Header().PacketType()

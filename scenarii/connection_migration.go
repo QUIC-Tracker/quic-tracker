@@ -43,14 +43,6 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 
 	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
-		}
-	}
-
 	newUdpConn, err := m.EstablishUDPConnection(conn.Host)
 	if err != nil {
 		trace.ErrorCode = CM_UDPConnectionFailed
@@ -60,33 +52,16 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	conn.UdpConnection.Close()
 	conn.UdpConnection = newUdpConn
 
-	conn.IncomingPackets = make(chan m.Packet)
-
-	go func() {
-		for {
-			packets, err, _ := conn.ReadNextPackets()
-			if err != nil {
-				close(conn.IncomingPackets)
-				break
-			}
-			for _, p := range packets {
-				conn.IncomingPackets <- p
-			}
-		}
-	}()
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 	trace.ErrorCode = CM_HostDidNotMigrate  // Assume it until proven wrong
 
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
 		if trace.ErrorCode == CM_HostDidNotMigrate {
 			trace.ErrorCode = CM_HostDidNotValidateNewPath
-		}
-
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
 		}
 
 		if fp, ok := p.(m.Framer); ok && fp.Contains(m.PathChallengeType) {

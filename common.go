@@ -109,18 +109,12 @@ func max(a, b uint64) uint64 {
 	return b
 }
 
-func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
-	var sampleOffset int
-	sampleLength := 16
-	switch h := header.(type) {
-	case *LongHeader:
-		sampleOffset = h.LengthBeforePN + 4
-	case *ShortHeader:
-		sampleOffset = 1 + len(h.DestinationCID) + 4
+type UnprocessedPayload struct {
+	EncryptionLevel
+	Payload []byte
+}
 
-		if sampleOffset + sampleLength > len(packetBytes) {
-			sampleOffset = len(packetBytes) - sampleLength
-		}
-	}
-	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
+type QueuedFrame struct {
+	Frame
+	EncryptionLevel
 }

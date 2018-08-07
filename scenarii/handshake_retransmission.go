@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"time"
 )
 
 const (
@@ -37,6 +36,9 @@ func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
 	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 2, false}}
 }
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	// TODO: Integrate this scenario with the HandshakeAgent
+
+	/*
 	initial := conn.GetInitialPacket()
 	conn.IgnorePathChallenge = true
 	conn.DisableIncPacketChan = true  // TODO: Integrate this scenario
@@ -162,4 +164,5 @@ outerLoop:
 	if trace.Results["amplification_factor"] == nil {
 		trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 	}
+	*/
 }

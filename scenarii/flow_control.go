@@ -43,19 +43,19 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 		return
 	}
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
+
 	conn.SendHTTPGETRequest(preferredUrl, 4)
 
 	var shouldResume bool
 
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
+
 		if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
 			trace.MarkError(FC_HostSentMoreThanLimit, "", p)
-		}
-
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
 		}
 
 		if pp, ok := p.(*m.ProtectedPacket); ok {
@@ -78,7 +78,7 @@ func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredU
 				conn.TLSTPHandler.MaxStreamData *= 2
 				protectedPacket := m.NewProtectedPacket(conn)
 				protectedPacket.Frames = append(protectedPacket.Frames, maxData, maxStreamData)
-				conn.SendProtectedPacket(protectedPacket)
+				conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
 				shouldResume = true
 			}
 		}

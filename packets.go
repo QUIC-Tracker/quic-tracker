@@ -40,6 +40,7 @@ type Packet interface {
 	PacketEncoder
 	Pointer() unsafe.Pointer
 	PNSpace() PNSpace
+	EncryptionLevel() EncryptionLevel
 }
 
 type abstractPacket struct {
@@ -86,6 +87,7 @@ func (p *VersionNegotationPacket) Pointer() unsafe.Pointer {
 	return unsafe.Pointer(p)
 }
 func (p *VersionNegotationPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *VersionNegotationPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
 	b, err := buffer.ReadByte()
@@ -194,6 +196,7 @@ func (p *InitialPacket) GetRetransmittableFrames() []Frame {
 	return p.Frames
 }
 func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
+func (p *InitialPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelInitial }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)
@@ -236,6 +239,7 @@ func ReadRetryPacket(buffer *bytes.Reader) *RetryPacket {
 func (p *RetryPacket) GetRetransmittableFrames() []Frame { return nil }
 func (p *RetryPacket) Pointer() unsafe.Pointer { return unsafe.Pointer(p) }
 func (p *RetryPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *RetryPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
 func (p *RetryPacket) ShouldBeAcknowledged() bool { return false }
 func (p *RetryPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
@@ -249,6 +253,7 @@ type HandshakePacket struct {
 	FramePacket
 }
 func (p *HandshakePacket) PNSpace() PNSpace { return PNSpaceHandshake }
+func (p *HandshakePacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelHandshake }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = ReadLongHeader(buffer)
@@ -278,6 +283,7 @@ type ProtectedPacket struct {
 	FramePacket
 }
 func (p *ProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
+func (p *ProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel1RTT }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
 	p.header = ReadHeader(buffer, conn)
@@ -307,6 +313,7 @@ type ZeroRTTProtectedPacket struct {
 	FramePacket
 }
 func (p *ZeroRTTProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
+func (p *ZeroRTTProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel0RTT }
 func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	p := new(ZeroRTTProtectedPacket)
 	p.header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)

@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"github.com/davecgh/go-spew/spew"
 	"encoding/binary"
 )
 
@@ -44,42 +43,9 @@ func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, pre
 		conn.TLSTPHandler.AdditionalParameters.AddParameter(p)
 	}
 
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	conn.SendPacket(conn.GetInitialPacket(), m.EncryptionLevelInitial)
 
-	ongoingHandhake := true
-	var err error
-
-outerLoop:
-	for p := range conn.IncomingPackets {
-		switch p := p.(type) {
-		case *m.HandshakePacket, *m.RetryPacket:
-			ongoingHandhake, p, err = conn.ProcessServerHello(p.(m.Framer))
-			if err != nil {
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error(), p)
-				return
-			}
-			if p != nil {
-				conn.SendHandshakeProtectedPacket(p)
-			}
-			if !ongoingHandhake {
-				break outerLoop
-			}
-		case *m.VersionNegotationPacket:
-			err = conn.ProcessVersionNegotation(p)
-			if err != nil {
-				trace.MarkError(TP_HandshakeDidNotComplete, err.Error(), p)
-				return
-			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-		default:
-			trace.Results["unexpected_packet_type"] = p.Header().PacketType()
-			trace.MarkError(TP_HandshakeDidNotComplete, "", p)
-			if debug {
-				spew.Dump(p)
-			}
-			return
-		}
-	}
+	// TODO: Integrate this with the HandshakeAgent
 
 	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
 		trace.ErrorCode = TP_NoTPReceived
@@ -92,9 +58,7 @@ outerLoop:
 		trace.ErrorCode = TP_MissingParameters
 	}
 
-	if conn.ProtectedCrypto != nil {
-		conn.CloseConnection(false, 0, "")
-	}
+	conn.CloseConnection(false, 0, "")
 }
 
 func validate(parameters map[string]interface{}) bool {

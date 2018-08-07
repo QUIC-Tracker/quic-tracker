@@ -36,11 +36,15 @@ func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 	return &UnsupportedTLSVersionScenario{AbstractScenario{"unsupported_tls_version", 1, false}}
 }
 func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	conn.DisableRetransmits = true
 	sendUnsupportedInitial(conn)
 
 	var connectionClosed bool
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
 		switch p := p.(type) {
 		case *m.VersionNegotationPacket:
 			if err := conn.ProcessVersionNegotation(p); err != nil {
@@ -61,12 +65,6 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, 
 		default:
 			trace.MarkError(UTS_ReceivedUnexpectedPacketType, "", p)
 		}
-
-		if p.ShouldBeAcknowledged() {
-			handshakePacket := m.NewHandshakePacket(conn)
-			handshakePacket.Frames = append(handshakePacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendHandshakeProtectedPacket(handshakePacket)
-		}
 	}
 
 	if !connectionClosed {
@@ -81,5 +79,5 @@ func sendUnsupportedInitial(conn *m.Connection) {
 			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
-	conn.SendHandshakeProtectedPacket(initialPacket)
+	conn.SendPacket(initialPacket, m.EncryptionLevelInitial)
 }

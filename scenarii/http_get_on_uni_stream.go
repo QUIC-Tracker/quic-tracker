@@ -46,6 +46,9 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 		return
 	}
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	if conn.TLSTPHandler.ReceivedParameters != nil {
 		trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
 		if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams == 0 {
@@ -57,7 +60,8 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
 
-	for p := range conn.IncomingPackets {
+	for {
+		p := (<-incPackets).(m.Packet)
 		switch p := p.(type) {
 		case *m.ProtectedPacket:
 			for _, f := range p.Frames {
@@ -80,16 +84,7 @@ func (s *GetOnStream2Scenario) Run(conn *m.Connection, trace *m.Trace, preferred
 					break
 				}
 			}
-			if p.ShouldBeAcknowledged() {
-				toSend := m.NewProtectedPacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
-				conn.SendProtectedPacket(toSend)
-			}
-
 		default:
-			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendHandshakeProtectedPacket(toSend)
 		}
 	}
 

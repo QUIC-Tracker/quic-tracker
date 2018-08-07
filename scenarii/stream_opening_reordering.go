@@ -39,22 +39,20 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 		return
 	}
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	pp1 := m.NewProtectedPacket(conn)
 	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
 
 	pp2 := m.NewProtectedPacket(conn)
 	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte{}, true))
 
-	conn.SendProtectedPacket(pp2)
-	conn.SendProtectedPacket(pp1)
+	conn.SendPacket(pp2, m.EncryptionLevel1RTT)
+	conn.SendPacket(pp1, m.EncryptionLevel1RTT)
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
+	for {
+		<-incPackets
 		if conn.Streams.Get(4).ReadClosed {
 			break
 		}
@@ -64,5 +62,4 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 	if !conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = SOR_HostDidNotRespond
 	}
-
 }

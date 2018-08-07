@@ -18,8 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"fmt"
-	"reflect"
 )
 
 const (
@@ -45,7 +43,7 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 
 func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 
-	errors := make(map[uint]bool)
+	/*errors := make(map[uint]bool)
 	var errorMessages []string
 	receivedRequestedData := false
 
@@ -115,7 +113,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
 						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
 					}
-					if f2.Length == 0 && !f2.FinBit {
+					if f2.FrameLength == 0 && !f2.FinBit {
 						if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
 							errors[SGW_EmptyStreamFrameNoFinBit] = true
 							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
@@ -153,16 +151,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, prefe
 				}
 
 			}
-			if p.ShouldBeAcknowledged() {
-				toSend := m.NewProtectedPacket(conn)
-				toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
-				conn.SendProtectedPacket(toSend)
-			}
-
 		default:
-			toSend := m.NewHandshakePacket(conn)
-			toSend.Frames = append(toSend.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendHandshakeProtectedPacket(toSend)
 		}
-	}
+	}*/
 }

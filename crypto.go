@@ -32,6 +32,43 @@ const (
 	serverInitialLabel = "server in"
 )
 
+type EncryptionLevel int
+
+const (
+	EncryptionLevelNone EncryptionLevel = iota
+	EncryptionLevelInitial
+	EncryptionLevel0RTT
+	EncryptionLevelHandshake
+	EncryptionLevel1RTT
+	EncryptionLevelBest  // A special flag to indicate that the best encryption level available should be used
+)
+
+func (eL EncryptionLevel) String() string {
+	return encryptionLevelToString[eL]
+}
+
+var encryptionLevelToString = map[EncryptionLevel]string {
+	EncryptionLevelNone: "None",
+	EncryptionLevelInitial: "Initial",
+	EncryptionLevelHandshake: "Handshake",
+	EncryptionLevel0RTT: "0RTT",
+	EncryptionLevel1RTT: "1RTT",
+	EncryptionLevelBest: "Best",
+}
+
+var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{
+	Initial: EncryptionLevelInitial,
+	Retry: EncryptionLevelNone,
+	Handshake: EncryptionLevelHandshake,
+	ZeroRTTProtected: EncryptionLevel0RTT,
+	ShortHeaderPacket: EncryptionLevel1RTT,
+}
+
+type DirectionalEncryptionLevel struct {
+	EncryptionLevel
+	Read bool
+}
+
 type CryptoState struct {
 	Read  cipher.AEAD
 	Write cipher.AEAD
@@ -76,4 +113,20 @@ func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
 		panic(err)
 	}
 	return aead
+}
+
+func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
+	var sampleOffset int
+	sampleLength := 16
+	switch h := header.(type) {
+	case *LongHeader:
+		sampleOffset = h.LengthBeforePN + 4
+	case *ShortHeader:
+		sampleOffset = 1 + len(h.DestinationCID) + 4
+
+		if sampleOffset + sampleLength > len(packetBytes) {
+			sampleOffset = len(packetBytes) - sampleLength
+		}
+	}
+	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
 }

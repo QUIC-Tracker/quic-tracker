@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"errors"
 )
 
 type Scenario interface {
@@ -44,7 +43,9 @@ func (s *AbstractScenario) IPv6() bool {
 }
 
 func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the handshake and returns the last packet received
-	conn.SendInitialProtectedPacket(conn.GetInitialPacket())
+	// TODO: Move this to the HandshakeAgent
+
+	/*conn.SendInitialProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandhake := true
 	var err error
@@ -86,5 +87,6 @@ func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the
 		return p, errors.New("could not complete handshake")
 	}
 
-	return p, nil
+	return p, nil*/
+	return nil, nil
 }

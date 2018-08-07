@@ -52,40 +52,24 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Tr
 	}
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
+	conn.FrameQueue.Submit(&m.StopSendingFrame{StreamId: 2, ErrorCode: 42})
 
-	stopSendingFrame := m.StopSendingFrame{StreamId: 2, ErrorCode: 42}
-
-	pp := m.NewProtectedPacket(conn)
-	pp.Frames = append(pp.Frames, stopSendingFrame)
-	conn.SendProtectedPacket(pp)
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
 	trace.ErrorCode = SSRS_DidNotCloseTheConnection
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(p.PNSpace()))
-			conn.SendProtectedPacket(protectedPacket)
-		}
+	for {
+		p := (<-incPackets).(m.Packet)
 
-		switch packet := p.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range packet.Frames {
-				switch f2 := f.(type) {
-				case *m.ConnectionCloseFrame:
-					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
-						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "", packet)
-						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
-						return
-					}
-					trace.ErrorCode = 0
-					return
-				default:
-				}
+		if framer, ok := p.(m.Framer); ok && framer.Contains(m.ConnectionCloseType){
+			cc := framer.GetFirst(m.ConnectionCloseType).(*m.ConnectionCloseFrame)
+			if cc.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
+				trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "", p)
+				trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", cc.ErrorCode)
+				return
 			}
-		default:
-			// TODO: Detect spurious retransmissions
-			// handshake packet: should not happen here
-			// trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", packet.Header().PacketType(), packet)
+			trace.ErrorCode = 0
+			return
 		}
 	}
 }

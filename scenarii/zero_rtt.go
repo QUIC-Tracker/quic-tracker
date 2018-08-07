@@ -18,10 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"time"
-	"net"
-	"fmt"
-	"errors"
 )
 
 const (
@@ -39,7 +35,9 @@ func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false}}
 }
 func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if p, err := CompleteHandshake(conn); err != nil {
+	// TODO: Should the HandshakeAgent do optional 0RTT ?
+
+	/*if p, err := CompleteHandshake(conn); err != nil {
 		trace.MarkError(ZR_TLSHandshakeFailed, err.Error(), p)
 		return
 	}
@@ -183,5 +181,5 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	if !streamClosed {
 		trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	}
-
+	*/
 }

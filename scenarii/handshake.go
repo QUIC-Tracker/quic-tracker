@@ -18,7 +18,6 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"fmt"
 )
 
 const (
@@ -36,7 +35,9 @@ func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	// TODO: Integrate it with the HandshakeAgent
+
+	/*conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
 
 	ongoingHandshake := true
 	var err error
@@ -84,5 +85,5 @@ func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl
 	}
 	if ongoingHandshake {
 		trace.ErrorCode = H_TLSHandshakeFailed
-	}
+	}*/
 }

@@ -272,7 +272,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
 	c.CryptoStreams = make(map[PNSpace]*Stream)
 
-	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.LstdFlags | log.Lshortfile)
+	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.Lshortfile)
 
 	c.TransitionTo(version, ALPN, resumptionSecret)
 

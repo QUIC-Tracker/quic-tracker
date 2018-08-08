@@ -27,7 +27,7 @@ func (a *BaseAgent) Name() string { return a.name }
 
 func (a *BaseAgent) Init(name string, SCID ConnectionID) {
 	a.name = name
-	a.Logger = log.New(os.Stdout, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(SCID), a.Name()), log.LstdFlags | log.Lshortfile)
+	a.Logger = log.New(os.Stdout, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(SCID), a.Name()), log.Lshortfile)
 	a.Logger.Println("Agent started")
 	a.close = make(chan bool)
 }

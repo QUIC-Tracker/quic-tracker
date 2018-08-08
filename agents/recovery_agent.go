@@ -47,8 +47,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 				}
 				a.RetransmitBatch(batch)
 			case i := <-incomingPackets:
-				p := i.(Packet)
-				switch p := p.(type) {
+				switch p := i.(type) {
 				case Framer:
 					for _, frame := range p.GetAll(AckType) {
 						a.Logger.Printf("Processing ACK frame in packet %s\n", p.ShortString())
@@ -60,8 +59,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					}
 				}
 			case i := <-outgoingPackets:
-				p := i.(Packet)
-				switch p := p.(type) {
+				switch p := i.(type) {
 				case Framer:
 					frames := p.GetRetransmittableFrames()
 					if len(frames) > 0 {

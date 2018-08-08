@@ -181,7 +181,7 @@ func (p *FramePacket) GetAll(frameType FrameType) []Frame {
 	var frames []Frame
 	for _, f := range p.Frames {
 		if f.FrameType() == frameType {
-			frames = append(frames)
+			frames = append(frames, f)
 		}
 	}
 	return frames

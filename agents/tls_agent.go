@@ -96,7 +96,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 							conn.FrameQueue.Submit(QueuedFrame{NewCryptoFrame(cryptoStream, responseData), responseEncryptionLevel})
 						}
 
-						if !notCompleted { //TODO: Check that the resumption ticket does not trigger this if again
+						if !notCompleted && conn.CryptoStates[EncryptionLevel1RTT] == nil {
 							a.Logger.Printf("Handshake has completed, installing protected crypto {read=%s, write=%s}\n", hex.EncodeToString(conn.Tls.ProtectedReadSecret()), hex.EncodeToString(conn.Tls.ProtectedWriteSecret()))
 							conn.CryptoStates[EncryptionLevel1RTT] = NewProtectedCryptoState(conn.Tls, conn.Tls.ProtectedReadSecret(), conn.Tls.ProtectedWriteSecret())
 							conn.ExporterSecret = conn.Tls.ExporterSecret()
@@ -106,9 +106,8 @@ func (a *TLSAgent) Run(conn *Connection) {
 							err = conn.TLSTPHandler.ReceiveExtensionData(conn.Tls.ReceivedQUICTransportParameters())
 							if err != nil {
 								a.Logger.Printf("Failed to decode extension data: %s\n", err.Error())
-								a.TLSStatus.Submit(TLSStatus{true, packet, err})
 							}
-							a.TLSStatus.Submit(TLSStatus{true, packet, nil})
+							a.TLSStatus.Submit(TLSStatus{true, packet, err})
 						}
 
 						for _, e := range encryptionLevels {

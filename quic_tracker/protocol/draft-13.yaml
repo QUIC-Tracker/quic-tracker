@@ -1,0 +1,518 @@
+#
+#   Maxime Piraux's master's thesis
+#   Copyright (C) 2017-2018  Maxime Piraux
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU Affero General Public License version 3
+#   as published by the Free Software Foundation.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU Affero General Public License for more details.
+#
+#   You should have received a copy of the GNU Affero General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+top:
+  - Long Header
+  - Short Header
+  - Version Negotiation Packet
+Long Header:
+  - Header Form:
+      length: 1
+      values: 1
+  - Long Packet Type:
+      length: 7
+      values: [0x7f, 0x7e, 0x7d, 0x7c]
+      format: hex
+  - Version:
+      length: 32
+      values:
+        neq: 0
+      format: hex
+  - DCIL:
+      length: 4
+      triggers:
+        - Destination Connection ID:
+            length:
+              0: 0
+              1: 32
+              2: 40
+              3: 48
+              4: 56
+              5: 64
+              6: 72
+              7: 80
+              8: 88
+              9: 96
+              10: 104
+              11: 112
+              12: 120
+              13: 128
+              14: 136
+              15: 144
+          save_to_context:
+  - SCIL:
+      length: 4
+      triggers:
+        - Source Connection ID:
+            length:
+              0: 0
+              1: 32
+              2: 40
+              3: 48
+              4: 56
+              5: 64
+              6: 72
+              7: 80
+              8: 88
+              9: 96
+              10: 104
+              11: 112
+              12: 120
+              13: 128
+              14: 136
+              15: 144
+  - Destination Connection ID:
+      length: 0
+      conditions:
+        - DCIL:
+            neq: 0
+      format: hex
+  - Source Connection ID:
+      length: 0
+      conditions:
+        - SCIL:
+            neq: 0
+      format: hex
+  - Token Length:
+      length: varint
+      conditions:
+        - Long Packet Type:
+            eq: '0x7f'
+      triggers:
+        - Token:
+            length: set
+  - Token:
+      conditions:
+        - Long Packet Type:
+            eq: '0x7f'
+      format: bytes
+  - Length:
+      length: varint
+      triggers:
+        - Payload:
+            byte_length: set
+  - Packet Number:
+      length: pn
+  - Payload:
+      conditions:
+        - Long Packet Type:
+            neq: '0x7e'
+      parse: Frame
+  - Payload:
+      conditions:
+        - Long Packet Type:
+            eq: '0x7e'
+      parse: Retry Packet
+Retry Packet:
+  - ODCIL:
+      length: 8
+      triggers:
+        - Original Destination Connection ID:
+            length: set
+  - Original Destination Connection ID:
+      format: hex
+  - Retry Token:
+      length: '*'
+Short Header:
+  - Header Form:
+      length: 1
+      values: 0
+  - Key Phase Bit:
+      length: 1
+  - Third bit:
+      length: 1
+  - Fourth bit:
+      length: 1
+  - Google QUIC Demultipexing Bit:
+      length: 1
+  - Reserved:
+      length: 3
+  - Destination Connection ID:
+      length: 0
+      format: hex
+  - Packet Number:
+      length: pn
+  - Protected Payload:
+      parse: Frame
+Version Negotiation Packet:
+  - Header Form:
+      length: 1
+      values: 1
+  - Unused:
+      length: 7
+  - Version:
+      length: 32
+      values: 0
+  - DCIL:
+      length: 4
+      triggers:
+        - Destination Connection ID:
+            length:
+              0: 0
+              1: 32
+              2: 40
+              3: 48
+              4: 56
+              5: 64
+              6: 72
+              7: 80
+              8: 88
+              9: 96
+              10: 104
+              11: 112
+              12: 120
+              13: 128
+              14: 136
+              15: 144
+  - SCIL:
+      length: 4
+      triggers:
+        - Source Connection ID:
+            length:
+              0: 0
+              1: 32
+              2: 40
+              3: 48
+              4: 56
+              5: 64
+              6: 72
+              7: 80
+              8: 88
+              9: 96
+              10: 104
+              11: 112
+              12: 120
+              13: 128
+              14: 136
+              15: 144
+  - Destination Connection ID:
+      length: 0
+      conditions:
+        - DCIL:
+            neq: 0
+      format: hex
+  - Source Connection ID:
+      length: 0
+      conditions:
+        - SCIL:
+            neq: 0
+      format: hex
+  - Supported Version:
+      length: 32
+      repeated:
+      format: hex
+Stateless Reset Packet:
+  - Header Form:
+      length: 1
+      values: 0
+  - Key Phase Bit:
+      length: 1
+  - Third bit:
+      length: 1
+  - Fourth bit:
+      length: 1
+  - All Zeros:
+      length: 4
+      values: 0
+  - Random Octets:
+      length: '*'
+  - Stateless Reset Token:
+      length: 128
+      format: hex
+PADDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x00
+      repeated:
+      format: hex
+  - next: Frame
+RST_STREAM:
+  - type: Frame
+  - Frame Type:
+      length: varint
+      values: 0x01
+      format: hex
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+      format: hex
+  - Final Offset:
+      length: varint
+  - next: Frame
+CONNECTION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: varint
+      values: 0x02
+      format: hex
+  - Error Code:
+      length: 16
+      format: hex
+  - Frame Type:
+      length: varint
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - Reason Phrase:
+      length: 0
+  - next: Frame
+APPLICATION_CLOSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x03
+      format: hex
+  - Error Code:
+      length: 16
+      format: hex
+  - Reason Phrase Length:
+      length: varint
+      triggers:
+        - Reason Phrase:
+            length: set
+  - next: Frame
+MAX_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x04
+      format: hex
+  - Maximum Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_DATA:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x05
+      format: hex
+  - Stream ID:
+      length: varint
+  - Maximum Stream Data:
+      length: varint
+  - next: Frame
+MAX_STREAM_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x06
+      format: hex
+  - Maximum Stream ID:
+      length: varint
+  - next: Frame
+PING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x07
+      format: hex
+  - next: Frame
+BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x08
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x09
+      format: hex
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+  - next: Frame
+STREAM_ID_BLOCKED:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0a
+      format: hex
+  - Stream ID:
+      length: varint
+  - next: Frame
+NEW_CONNECTION_ID:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0b
+      format: hex
+  - Sequence:
+      length: varint
+  - Length:
+      length: 8
+      triggers:
+        - Connection ID:
+            length: set
+  - Connection ID:
+      length: 0
+      format: hex
+  - Stateless Reset Token:
+      length: 128
+      format: hex
+  - next: Frame
+STOP_SENDING:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0c
+      format: hex
+  - Stream ID:
+      length: varint
+  - Application Error Code:
+      length: 16
+      format: hex
+  - next: Frame
+ACK:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0d
+      format: hex
+  - Largest Acknowledged:
+      length: varint
+  - ACK Delay:
+      length: varint
+  - ACK Block Count:
+      length: varint
+      triggers:
+        - ACK Blocks:
+            length: set
+  - First ACK Block:
+      length: varint
+  - ACK Blocks:
+      parse: ACK Block
+  - next: Frame
+ACK Block:
+  - Gap:
+      length: varint
+  - ACK Block:
+      length: varint
+PATH_CHALLENGE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0e
+      format: hex
+  - Data:
+      length: 64
+      format: hex
+  - next: Frame
+PATH_RESPONSE:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x0f
+      format: hex
+  - Data:
+      length: 64
+      format: hex
+  - next: Frame
+STREAM:
+  - type: Frame
+  - Frame Type:
+      length: 5
+      values: 0x02
+      format: hex
+  - OFF bit:
+      length: 1
+  - LEN bit:
+      length: 1
+  - FIN bit:
+      length: 1
+  - Stream ID:
+      length: varint
+  - Offset:
+      length: varint
+      conditions:
+        - OFF bit:
+            eq: 1
+  - Length:
+      length: varint
+      conditions:
+        - LEN bit:
+            eq: 1
+      triggers:
+        - Stream Data:
+            length: set
+  - Stream Data:
+      length: '*'
+      format: bytes
+  - next: Frame
+CRYPTO:
+  - type: Frame
+  - Frame Type:
+      length: varint
+      values: 0x18
+      format: hex
+  - Offset:
+      length: varint
+  - Length:
+      length: varint
+      triggers:
+        - Crypto Data:
+            length: set
+  - Crypto Data:
+      format: bytes
+  - next: Frame
+NEW_TOKEN:
+  - type: Frame
+  - Frame Type:
+      length: varint
+      values: 0x19
+      format: hex
+  - Token Length:
+      length: varint
+      triggers:
+        - Token:
+            length: set
+  - Token:
+      format: bytes
+  - next: Frame
+ACK_ECN:
+  - type: Frame
+  - Frame Type:
+      length: 8
+      values: 0x20
+      format: hex
+  - Largest Acknowledged:
+      length: varint
+  - ACK Delay:
+      length: varint
+  - ECT(0) Count:
+      length: varint
+  - ECT(1) Count:
+      length: varint
+  - ECN-CE Count:
+      length: varint
+  - ACK Block Count:
+      length: varint
+      triggers:
+        - ACK Blocks:
+            length: set
+  - First ACK Block:
+      length: varint
+  - ACK Blocks:
+      parse: ACK Block
+  - next: Frame

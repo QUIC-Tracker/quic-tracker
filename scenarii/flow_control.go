@@ -18,6 +18,8 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"time"
 )
 
 const (
@@ -32,68 +34,61 @@ const (
 type FlowControlScenario struct {
 	AbstractScenario
 }
+
 func NewFlowControlScenario() *FlowControlScenario {
-	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false}}
+	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false, nil}}
 }
 func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxStreamData = 80
 
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(FC_TLSHandshakeFailed, err.Error(), p)
+	connAgents := s.CompleteHandshake(conn, trace, FC_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
-	conn.SendHTTPGETRequest(preferredUrl, 4)
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
+	conn.SendHTTPGETRequest(preferredUrl, 0)
 
 	var shouldResume bool
 
-	for p := range conn.IncomingPackets {
-		if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
-			trace.MarkError(FC_HostSentMoreThanLimit, "", p)
-		}
-
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
-		if pp, ok := p.(*m.ProtectedPacket); ok {
-			for _, frame := range pp.Frames {
-				_, isGloballyBlocked := frame.(*m.BlockedFrame)
-				_, isStreamBlocked := frame.(*m.StreamBlockedFrame)
-				if isGloballyBlocked || isStreamBlocked {
-					break
-				}
+forLoop:
+	for {
+		select {
+		case i := <-incPackets:
+			p := i.(m.Packet)
+			if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
+				trace.MarkError(FC_HostSentMoreThanLimit, "", p)
 			}
+
 			if conn.Streams.Get(4).ReadClosed {
-				continue
+				conn.IncomingPackets.Unregister(incPackets)
 			}
 
 			readOffset := conn.Streams.Get(4).ReadOffset
 			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
-				maxData := m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData * 2)}
 				conn.TLSTPHandler.MaxData *= 2
-				maxStreamData := m.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamData * 2)}
 				conn.TLSTPHandler.MaxStreamData *= 2
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, maxData, maxStreamData)
-				conn.SendProtectedPacket(protectedPacket)
+				conn.FrameQueue.Submit(m.QueuedFrame{m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, m.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(m.QueuedFrame{m.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamData)}, m.EncryptionLevel1RTT})
 				shouldResume = true
 			}
+			case <-s.Timeout().C:
+				break forLoop
 		}
 	}
 
 	readOffset := conn.Streams.Get(4).ReadOffset
 	if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
 		trace.ErrorCode = 0
-	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData) / 2 {
+	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData)/2 {
 		trace.ErrorCode = FC_HostDidNotResumeSending
 	} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
 		trace.ErrorCode = FC_NotEnoughDataAvailable
 	} else if readOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
 		trace.ErrorCode = FC_HostSentMoreThanLimit
 	}
-
-	conn.CloseConnection(false, 42, "")
 }

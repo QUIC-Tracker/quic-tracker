@@ -18,24 +18,55 @@ package masterthesis
 
 import (
 	"encoding/binary"
+	"github.com/mpiraux/pigotls"
 )
 
-var QuicVersion uint32 = 0xff00000b // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-11"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff00000d // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-13"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MinimumVersion         = 0xff00000b
-	MaximumVersion         = 0xff00000b
+	MaximumVersion         = 0xff00000d
+	MinimumVersion         = 0xff00000d
 )
 
 // errors
 
 const (
+	ERR_STREAM_ID_ERROR = 0x4
 	ERR_PROTOCOL_VIOLATION = 0xA
 )
+
+type PNSpace int
+
+const (
+	PNSpaceInitial PNSpace = iota
+	PNSpaceHandshake
+	PNSpaceAppData
+	PNSpaceNoSpace
+)
+
+var PNSpaceToString = map[PNSpace]string{
+	PNSpaceInitial: "Initial",
+	PNSpaceHandshake: "Handshake",
+	PNSpaceAppData: "Application data",
+}
+
+var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
+	PNSpaceInitial: pigotls.EpochInitial,
+	PNSpaceHandshake: pigotls.EpochHandshake,
+	PNSpaceAppData: pigotls.Epoch1RTT,
+}
+
+func (pns PNSpace) String() string {
+	return PNSpaceToString[pns]
+}
+
+func (pns PNSpace) Epoch() pigotls.Epoch {
+	return PNSpaceToEpoch[pns]
+}
 
 func Uint32ToBEBytes(uint32 uint32) []byte {
 	b := make([]byte, 4, 4)
@@ -77,4 +108,14 @@ func max(a, b uint64) uint64 {
 		return a
 	}
 	return b
+}
+
+type UnprocessedPayload struct {
+	EncryptionLevel
+	Payload []byte
+}
+
+type QueuedFrame struct {
+	Frame
+	EncryptionLevel
 }

@@ -18,14 +18,16 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-	"fmt"
+
+	"github.com/mpiraux/master-thesis/agents"
+	"time"
 )
 
 const (
 	H_ReceivedUnexpectedPacketType = 1
-	H_TLSHandshakeFailed = 2
+	H_TLSHandshakeFailed           = 2
 	H_NoCompatibleVersionAvailable = 3
-	H_Timeout = 4
+	H_Timeout                      = 4
 )
 
 type HandshakeScenario struct {
@@ -33,56 +35,42 @@ type HandshakeScenario struct {
 }
 
 func NewHandshakeScenario() *HandshakeScenario {
-	return &HandshakeScenario{AbstractScenario{"handshake", 2, false}}
+	return &HandshakeScenario{AbstractScenario{"handshake", 2, false, nil}}
 }
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	s.timeout = time.NewTimer(10 * time.Second)
+	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent)}
+	connAgents.Add(handshakeAgent)
 
-	ongoingHandshake := true
-	var err error
-	for p := range conn.IncomingPackets {
-		if !ongoingHandshake {
-			break
-		}
-		switch p := p.(type) {
-		case *m.HandshakePacket, *m.RetryPacket:
-			var response m.Packet
-			ongoingHandshake, response, err = conn.ProcessServerHello(p.(m.Framer))
-			if err == nil && !ongoingHandshake {
-				trace.Results["negotiated_version"] = conn.Version
-				conn.CloseConnection(false, 42, "")
-			} else if err != nil {
-				trace.MarkError(H_TLSHandshakeFailed, err.Error(), p)
-				conn.CloseConnection(true, 0, "")
-			}
-			if response != nil {
-				conn.SendHandshakeProtectedPacket(response)
-			}
-		case *m.VersionNegotationPacket:
-			var version uint32
-			for _, v := range p.SupportedVersions {
-				if v >= m.MinimumVersion && v <= m.MaximumVersion {
-					version = uint32(v)
+	handshakeStatus := make(chan interface{}, 10)
+	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeAgent.InitiateHandshake()
+
+	var status agents.HandshakeStatus
+	for {
+		select {
+		case i := <-handshakeStatus:
+			status = i.(agents.HandshakeStatus)
+			if !status.Completed {
+				switch status.Error.Error() {
+				case "no appropriate version found":
+					trace.MarkError(H_NoCompatibleVersionAvailable, status.Error.Error(), status.Packet)
+				case "received incorrect packet type during handshake":
+					trace.MarkError(H_ReceivedUnexpectedPacketType, "", status.Packet)
+				default:
+					trace.MarkError(H_TLSHandshakeFailed, status.Error.Error(), status.Packet)
 				}
 			}
-			if version == 0 {
-				trace.MarkError(H_NoCompatibleVersionAvailable, "", p)
-				trace.Results["supported_versions"] = p.SupportedVersions
-				return
+			handshakeAgent.HandshakeStatus.Unregister(handshakeStatus)
+		case <-s.Timeout().C:
+			if !status.Completed {
+				trace.MarkError(H_Timeout, "", nil)
+				connAgents.StopAll()
+			} else {
+				connAgents.CloseConnection(false, 0, "")
 			}
-			oldVersion, oldALPN := m.QuicVersion, m.QuicALPNToken
-			m.QuicVersion, m.QuicALPNToken = version, fmt.Sprintf("hq-%02d", version&0xff)
-			conn.TransitionTo(version, m.QuicALPNToken, nil)
-			s.Run(conn, trace, preferredUrl, debug)
-			m.QuicVersion, m.QuicALPNToken = oldVersion, oldALPN
-			return
-		default:
-			trace.MarkError(H_ReceivedUnexpectedPacketType, "", p)
-			trace.Results["unexpected_packet_type"] = p.Header().PacketType()
 			return
 		}
-	}
-	if ongoingHandshake {
-		trace.ErrorCode = H_TLSHandshakeFailed
 	}
 }

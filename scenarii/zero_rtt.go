@@ -18,9 +18,9 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
 	"time"
-	"net"
-	"fmt"
+	"github.com/mpiraux/master-thesis/agents"
 )
 
 const (
@@ -35,149 +35,90 @@ type ZeroRTTScenario struct {
 }
 
 func NewZeroRTTScenario() *ZeroRTTScenario {
-	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false}}
+	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false, nil}}
 }
 func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(ZR_TLSHandshakeFailed, err.Error(), p)
+	s.timeout = time.NewTimer(10 * time.Second)
+
+	connAgents := s.CompleteHandshake(conn, trace, ZR_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
 
-	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
-	for { // Acks and restransmits if needed
-		packet, err, _ := conn.ReadNextPackets()
-
-		if nerr, ok := err.(*net.OpError); ok && nerr.Timeout() {
-			break
-		} else if err != nil {
-			trace.Results["error"] = err.Error()
-		}
-		for _, packet := range packet {
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
-
-			select {
-			case resumptionData := <- conn.Streams.Get(0).ReadChan:
-				tlsOutput, _, err := conn.Tls.Input(resumptionData)
-				if err != nil {
-					trace.MarkError(ZR_TLSHandshakeFailed, err.Error(), packet)
-					return
-				}
-
-				if len(tlsOutput) > 0 {
-					protectedPacket := m.NewProtectedPacket(conn)
-					protectedPacket.Frames = append(protectedPacket.Frames, m.NewStreamFrame(0, conn.Streams.Get(0), tlsOutput, false))
-					conn.SendProtectedPacket(protectedPacket)
-				}
-			default:
-
-			}
-		}
-
+	select {
+	case <-incPackets:
 		if len(conn.Tls.ResumptionTicket()) > 0 {
-			conn.CloseConnection(false, 0, "")
-			conn.RetransmissionTicker.Stop()
+			break
 		}
-	}
-
-	resumptionSecret := conn.Tls.ResumptionTicket()
-
-	if len(resumptionSecret) == 0 {
-		trace.ErrorCode = ZR_NoResumptionSecret
+	case <-s.Timeout().C:
+		trace.MarkError(ZR_NoResumptionSecret, "", nil)
+		connAgents.CloseConnection(false, 0, "")
 		return
 	}
+	connAgents.CloseConnection(false, 0, "")
 
-	conn.Close()
+	<-time.NewTimer(3 * time.Second).C
+
+	resumptionTicket := conn.Tls.ResumptionTicket()
 	rh, sh := conn.ReceivedPacketHandler, conn.SentPacketHandler
-	conn, err := m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionSecret, s.ipv6)
+
+	var err error
+	conn, err = m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionTicket, s.ipv6)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	if err != nil {
-		trace.ErrorCode = ZR_ZeroRTTFailed
-		trace.Results["error"] = err.Error()
+		trace.MarkError(ZR_ZeroRTTFailed, err.Error(), nil)
 		return
 	}
-	conn.RetransmissionTicker.Stop() // Stop retransmissions until fixed for 0-RTT
 
-	conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
+	connAgents = agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	connAgents.Get("RecoveryAgent").Stop()
+	connAgents.Get("RecoveryAgent").Join()
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent)}
+	connAgents.Add(handshakeAgent)
+	defer connAgents.StopAll()
 
-	conn.ZeroRTTprotected = m.NewZeroRTTProtectedCryptoState(conn.Tls)
+	incPackets = make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
-	pp := m.NewZeroRTTProtectedPacket(conn)
-	pp.Frames = append(pp.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true))
-	conn.SendZeroRTTProtectedPacket(pp)
+	encryptionLevelsAvailable := make(chan interface{}, 10)
+	conn.EncryptionLevelsAvailable.Register(encryptionLevelsAvailable)
 
-	ongoingHandhake := true
-	wasStateless := false
-	for ongoingHandhake {
-		packet, err, _ := conn.ReadNextPackets()
-		if err != nil {
-			break
+	handshakeStatus := make(chan interface{}, 10)
+	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeAgent.InitiateHandshake()
+
+forLoop:
+	for {
+		select {
+		case i := <-encryptionLevelsAvailable:
+			eL := i.(m.DirectionalEncryptionLevel)
+			if eL.EncryptionLevel == m.EncryptionLevel0RTT && !eL.Read {
+				break forLoop
+			}
+		case <-s.Timeout().C:
+			trace.ErrorCode = ZR_ZeroRTTFailed
+			trace.Results["error"] = "0-RTT encryption was not available after feeding in the ticket"
+			return
 		}
+	}
+	// TODO: Handle stateless connection
 
-		for _, packet := range packet {
-			if fp, ok := packet.(m.Framer); ok {
-				var response m.Packet
-				ongoingHandhake, response, err = conn.ProcessServerHello(fp)
-				if err != nil {
-					trace.MarkError(ZR_ZeroRTTFailed, err.Error(), response)
-					break
+	conn.SendHTTPGETRequest(preferredUrl, 0)  // TODO: Verify that this get sent in a 0-RTT packet
+
+	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
+	for {
+		select {
+			case <-incPackets:
+				if conn.Streams.Get(0).ReadClosed {
+					trace.ErrorCode = 0
+					return
 				}
-				conn.SendHandshakeProtectedPacket(packet)
-
-				if _, ok := fp.(*m.RetryPacket); ok {
-					wasStateless = true
-				}
-			} else {
-				trace.MarkError(ZR_ZeroRTTFailed, "Received unexpected packet type during handshake", packet)
-				break
-			}
+			case <-s.Timeout().C:
+				return
 		}
 	}
-
-	if wasStateless {
-		pp2 := m.NewProtectedPacket(conn)
-		pp2.Frames = pp.Frames
-		conn.SendProtectedPacket(pp2)
-	}
-
-
-	streamClosed := false
-	for !streamClosed {
-		packets, err, _ := conn.ReadNextPackets()
-
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
-		}
-
-		for _, packet := range packets {
-			if packet.ShouldBeAcknowledged() {
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-				conn.SendProtectedPacket(protectedPacket)
-			}
-
-			for streamId, stream := range conn.Streams {
-				if streamId == 4 && stream.ReadClosed {
-					streamClosed = true
-					break
-				}
-			}
-
-			if streamClosed {
-				conn.CloseConnection(false, 0, "")
-				break
-			}
-		}
-	}
-
-	if !streamClosed {
-		trace.ErrorCode = ZR_DidntReceiveTheRequestedData
-	}
-
 }

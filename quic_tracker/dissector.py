@@ -146,6 +146,8 @@ def parse_structure(buffer, structure_description, protocol, start_idx, context)
         elif length:
             if length == 'varint':
                 val, length = read_varint(buffer)
+            elif length == 'pn':
+                val, length = read_pn(buffer)
             elif length == '*':
                 val = buffer
                 length = len(buffer) * 8
@@ -206,8 +208,16 @@ def parse_structure(buffer, structure_description, protocol, start_idx, context)
 
         previous_len = length
 
-    if not buffer and not repeating and structure_description and 'next' not in structure_description[-1]:
-        raise ParseError('The structure has not been fully parsed')
+    if not buffer and not repeating and structure_description:
+        for field, args in list(structure_description.pop().items()):
+            if field == 'next':
+                continue
+            field_ctx = context.get(field, {})
+            length = struct_triggers.get(field, {}).get('length', field_ctx.get('length', args.get('length')))
+            conditions = struct_triggers.get(field, {}).get('conditions', args.get('conditions', field_ctx.get('conditions')))
+            if not length or not all(verify_condition(structure, field, formula) for c in conditions for field, formula in c.items()):
+                continue
+            raise ParseError('The structure has not been fully parsed')
 
     return structure, i, next_struct
 
@@ -232,6 +242,23 @@ def read_varint(buffer):
     varint_buf = buffer[:length]
     varint_buf[0] &= 0x3f
     return read(varint_buf, length), length * 8
+
+
+def read_pn(buffer):
+    pattern = (buffer[0] & 0xc0) >> 6
+    if pattern == 0:
+        length = 1
+    elif pattern == 2:
+        length = 2
+    elif pattern == 3:
+        length = 4
+    else:
+        raise ParseError('Unknown PN pattern {}'.format(pattern))
+
+    pnbuf = buffer[:length]
+    pnbuf[0] &= 0x3f
+
+    return read(pnbuf, length), length * 8
 
 
 def verify_condition(structure, field, formula):

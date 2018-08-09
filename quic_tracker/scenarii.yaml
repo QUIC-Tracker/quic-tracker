@@ -21,6 +21,13 @@ ack_only:
   error_codes:
     1: The handshake did not complete
     2: Host sent an ACK-only packet in response of an ACK-only packet
+address_validation:
+  name: Address validation
+  description: |
+    This test verifies that the server is validating the client address using the Client Address Validation Procedure and does not send more than three UDP datagrams. The test sends an Initial packet and then intentionally does not reply to any packet received.
+  error_codes:
+    1: The handshake did not complete
+    2: The host sent more than three UDP datagrams without address validation
 connection_migration:
   name: Connection Migration
   description: |

@@ -19,6 +19,7 @@ package masterthesis
 import (
 	"fmt"
 	"math"
+	"github.com/dustin/go-broadcast"
 )
 
 type Streams map[uint64]*Stream
@@ -30,6 +31,16 @@ func (s Streams) Get(streamId uint64) *Stream {  // TODO: This should enforce li
 	return s[streamId]
 }
 
+type CryptoStreams map[PNSpace]*Stream
+
+func (s CryptoStreams) Get(space PNSpace) *Stream {
+	if s[space] == nil {
+		s[space] = NewStream()
+	}
+
+	return s[space]
+}
+
 type Stream struct {
 	ReadOffset  uint64
 	WriteOffset uint64
@@ -37,7 +48,7 @@ type Stream struct {
 	ReadData  []byte
 	WriteData []byte
 
-	ReadChan chan []byte
+	ReadChan broadcast.Broadcaster
 	MaxReadReceived uint64
 	gaps *byteIntervalList
 
@@ -46,11 +57,15 @@ type Stream struct {
 
 	WriteClosed bool
 	WriteCloseOffset uint64
+
+	readFeedback chan interface{}
 }
 
 func NewStream() *Stream {
 	s := new(Stream)
-	s.ReadChan = make(chan []byte, 1024)
+	s.ReadChan = broadcast.NewBroadcaster(1024)
+	s.readFeedback = make(chan interface{}, 1)
+	s.ReadChan.Register(s.readFeedback)
 	s.gaps = NewbyteIntervalList().Init()
 	s.ReadCloseOffset = math.MaxUint64
 	s.WriteCloseOffset = math.MaxUint64
@@ -73,7 +88,8 @@ func (s *Stream) addToRead(f *StreamFrame) {  // TODO: Flag implementations that
 		s.ReadOffset += f.Length
 		s.MaxReadReceived = s.ReadOffset
 		s.ReadData = append(s.ReadData, f.StreamData...)
-		s.ReadChan <- f.StreamData
+		s.ReadChan.Submit(f.StreamData)
+		<-s.readFeedback  // Makes sure it propagates before returning
 	} else if f.Offset + f.Length > s.MaxReadReceived {
 		if s.MaxReadReceived < f.Offset {
 			s.gaps.Add(byteInterval{s.MaxReadReceived, f.Offset})
@@ -94,7 +110,8 @@ func (s *Stream) addToRead(f *StreamFrame) {  // TODO: Flag implementations that
 		}
 
 		if s.ReadOffset < firstGap {
-			s.ReadChan <- s.ReadData[s.ReadOffset:firstGap]
+			s.ReadChan.Submit(s.ReadData[s.ReadOffset:firstGap])
+			<-s.readFeedback  // Makes sure it propagates before returning
 			s.ReadOffset = firstGap
 		}
 	}

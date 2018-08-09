@@ -2,11 +2,14 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"time"
+	"github.com/mpiraux/master-thesis/agents"
 )
 
 const (
 	P_VNDidNotComplete = 1
-	P_ReceivedSmth	   = 2
+	P_ReceivedSmth     = 2
 )
 
 type PaddingScenario struct {
@@ -14,10 +17,12 @@ type PaddingScenario struct {
 }
 
 func NewPaddingScenario() *PaddingScenario {
-	return &PaddingScenario{AbstractScenario{"padding", 1, false}}
+	return &PaddingScenario{AbstractScenario{"padding", 1, false, nil}}
 }
 func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	conn.RetransmissionTicker.Stop()
+	s.timeout = time.NewTimer(10 * time.Second)
+	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	defer connAgents.StopAll()
 
 	sendEmptyInitialPacket := func() {
 		var initialLength int
@@ -28,41 +33,33 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 		}
 
 		initialPacket := m.NewInitialPacket(conn)
-
-		paddingLength := initialLength - (initialPacket.Header().Length() + len(initialPacket.EncodePayload()) + conn.Cleartext.Write.Overhead())
+		payloadLen := len(initialPacket.EncodePayload())
+		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(m.VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoStates[m.EncryptionLevelInitial].Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
 			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
 		}
 
-		conn.SendHandshakeProtectedPacket(initialPacket)
+		conn.SendPacket(initialPacket, m.EncryptionLevelInitial)
 	}
 
-	sendEmptyInitialPacket()
-	packets, err, _ := conn.ReadNextPackets()
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
-	for _, packet := range packets {
-		if vn, ok := packet.(*m.VersionNegotationPacket); packet != nil && ok {
+	sendEmptyInitialPacket()
+
+	select {
+	case i := <-incPackets:
+		packet := i.(m.Packet)
+		if vn, ok := packet.(*m.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err != nil {
 				trace.MarkError(P_VNDidNotComplete, err.Error(), vn)
 				return
 			}
 			sendEmptyInitialPacket()
-		}
-	}
-
-	for {
-		if err != nil {
-			trace.Results["error"] = err.Error()
-			break
 		} else {
-			for _, packet := range packets {
-				if _, ok := packet.(*m.VersionNegotationPacket); packet != nil && !ok {  // TODO: Distinguish ACKs from other packets, see https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-9.1
-					trace.MarkError(P_ReceivedSmth, "", packet)
-					break
-				}
-			}
+			trace.MarkError(P_ReceivedSmth, "", packet)
 		}
-
-		packets, err, _ = conn.ReadNextPackets()
+	case <-s.Timeout().C:
+		return
 	}
 }

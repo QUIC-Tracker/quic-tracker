@@ -18,70 +18,95 @@ package masterthesis
 
 import (
 	"crypto/cipher"
-	"bytes"
-	"encoding/binary"
 	"github.com/mpiraux/pigotls"
 )
 
-var quicVersionSalt = []byte {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2
+var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2
 	0x9c, 0x10, 0x8f, 0x98, 0x52, 0x0a, 0x5c, 0x5c,
 	0x32, 0x96, 0x8e, 0x95, 0x0e, 0x8a, 0x2c, 0x5f,
 	0xe0, 0x6d, 0x6c, 0x38,
 }
 
 const (
-	clientHSecretLabel = "client hs"
-	serverHSecretLabel = "server hs"
-
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.3
-	clientPpSecret0Label = "EXPORTER-QUIC client 1rtt"
-	serverPpSecret0Label = "EXPORTER-QUIC server 1rtt"
-
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.4
-	client0rttSecretLabel = "EXPORTER-QUIC 0rtt"
-
-	// See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.6
-	packetNumberLabel = "EXPORTER-QUIC packet number"
+	clientInitialLabel = "client in"
+	serverInitialLabel = "server in"
 )
+
+type EncryptionLevel int
+
+const (
+	EncryptionLevelNone EncryptionLevel = iota
+	EncryptionLevelInitial
+	EncryptionLevel0RTT
+	EncryptionLevelHandshake
+	EncryptionLevel1RTT
+	EncryptionLevelBest  // A special flag to indicate that the best encryption level available should be used
+)
+
+func (eL EncryptionLevel) String() string {
+	return encryptionLevelToString[eL]
+}
+
+var encryptionLevelToString = map[EncryptionLevel]string {
+	EncryptionLevelNone: "None",
+	EncryptionLevelInitial: "Initial",
+	EncryptionLevelHandshake: "Handshake",
+	EncryptionLevel0RTT: "0RTT",
+	EncryptionLevel1RTT: "1RTT",
+	EncryptionLevelBest: "Best",
+}
+
+var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{
+	Initial: EncryptionLevelInitial,
+	Retry: EncryptionLevelNone,
+	Handshake: EncryptionLevelHandshake,
+	ZeroRTTProtected: EncryptionLevel0RTT,
+	ShortHeaderPacket: EncryptionLevel1RTT,
+}
+
+type DirectionalEncryptionLevel struct {
+	EncryptionLevel
+	Read bool
+}
 
 type CryptoState struct {
 	Read  cipher.AEAD
 	Write cipher.AEAD
+	PacketRead *pigotls.Cipher
+	PacketWrite *pigotls.Cipher
 }
-func NewCleartextSaltedCryptoState(conn *Connection) *CryptoState {
-	s := new(CryptoState)
-	handshakeSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
-	s.Read = newProtectedAead(conn.Tls, qhkdfExpand(conn.Tls, handshakeSecret, serverHSecretLabel, conn.Tls.HashDigestSize()))
-	s.Write = newProtectedAead(conn.Tls, qhkdfExpand(conn.Tls, handshakeSecret, clientHSecretLabel, conn.Tls.HashDigestSize()))
-	return s
-}
-func NewProtectedCryptoState(tls *pigotls.Connection) *CryptoState {
-	s := new(CryptoState)
-	readSecret, err := tls.ExportSecret(serverPpSecret0Label, []byte{}, false)
-	if err != nil {
-		panic(err)
-	}
+
+func (s *CryptoState) InitRead(tls *pigotls.Connection, readSecret []byte) {
 	s.Read = newProtectedAead(tls, readSecret)
-	writeSecret, err := tls.ExportSecret(clientPpSecret0Label, []byte{}, false)
-	if err != nil {
-		panic(err)
-	}
-	s.Write = newProtectedAead(tls, writeSecret)
-	return s
+	s.PacketRead = tls.NewCipher(tls.HkdfExpandLabel(readSecret, "pn", nil, tls.AEADKeySize()))
 }
-func NewZeroRTTProtectedCryptoState(tls *pigotls.Connection) *CryptoState {
-	s := new(CryptoState)
-	writeSecret, err := tls.ExportSecret(client0rttSecretLabel, []byte{}, true)
-	if err != nil {
-		panic(err)
-	}
+
+func (s *CryptoState) InitWrite(tls *pigotls.Connection, writeSecret []byte) {
 	s.Write = newProtectedAead(tls, writeSecret)
+	s.PacketWrite = tls.NewCipher(tls.HkdfExpandLabel(writeSecret, "pn", nil, tls.AEADKeySize()))
+}
+
+func NewInitialPacketProtection(conn *Connection) *CryptoState {
+	initialSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
+	readSecret := conn.Tls.HkdfExpandLabel(initialSecret, serverInitialLabel, nil, conn.Tls.HashDigestSize())
+	writeSecret := conn.Tls.HkdfExpandLabel(initialSecret, clientInitialLabel, nil, conn.Tls.HashDigestSize())
+	return NewProtectedCryptoState(conn.Tls, readSecret, writeSecret)
+}
+
+func NewProtectedCryptoState(tls *pigotls.Connection, readSecret []byte, writeSecret []byte) *CryptoState {
+	s := new(CryptoState)
+	if len(readSecret) > 0 {
+		s.InitRead(tls, readSecret)
+	}
+	if len(writeSecret) > 0 {
+		s.InitWrite(tls, writeSecret)
+	}
 	return s
 }
 
 func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
-	k := qhkdfExpand(tls, secret, "key", tls.AEADKeySize())
-	iv := qhkdfExpand(tls, secret, "iv", tls.AEADIvSize())
+	k := tls.HkdfExpandLabel(secret, "key", nil, tls.AEADKeySize())
+	iv := tls.HkdfExpandLabel(secret, "iv", nil, tls.AEADIvSize())
 
 	aead, err := newWrappedAESGCM(k, iv)
 	if err != nil {
@@ -89,20 +114,22 @@ func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
 	}
 	return aead
 }
-func qhkdfExpand(tls *pigotls.Connection, secret []byte, label string, length int) []byte {  // See https://tools.ietf.org/html/draft-ietf-quic-tls-09#section-5.2.3
-	label = "QUIC " + label
-	info := string(length >> 8) + string(byte(length)) + string(len(label)) + label
-	return tls.HkdfExpand(secret, bytes.NewBufferString(info).Bytes(), length)
-}
-func GetPacketGap(conn *Connection) uint32 {
-	packetNumberSecret, err := conn.Tls.ExportSecret(packetNumberLabel, []byte{}, false)
-	if err != nil {
-		panic(err)
+
+func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
+	var sampleOffset int
+	sampleLength := 16
+	switch h := header.(type) {
+	case *LongHeader:
+		sampleOffset = h.LengthBeforePN + 4
+	case *ShortHeader:
+		sampleOffset = 1 + len(h.DestinationCID) + 4
+
+		if sampleOffset + sampleLength > len(packetBytes) {
+			sampleOffset = len(packetBytes) - sampleLength
+		}
 	}
-
-	sequence := make([]byte, 4, 4)
-	binary.BigEndian.PutUint32(sequence, uint32(conn.PacketNumber))
-
-	gapBytes := conn.Tls.HkdfExpandLabel(packetNumberSecret, "packet sequence gap", sequence, 4)
-	return binary.BigEndian.Uint32(gapBytes)
+	if sampleOffset <= 0 || sampleOffset+sampleLength > len(packetBytes) {
+		sampleOffset = 4
+	}
+	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
 }

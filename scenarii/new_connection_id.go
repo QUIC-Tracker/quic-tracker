@@ -20,14 +20,18 @@ import (
 	m "github.com/mpiraux/master-thesis"
 	"bytes"
 	"fmt"
+
+	"time"
+	"encoding/hex"
+	"crypto/rand"
 )
 
 const (
-	NCI_TLSHandshakeFailed		  = 1
-	NCI_HostDidNotProvideCID      = 2
-	NCI_HostDidNotAnswerToNewCID  = 3
-	NCI_HostDidNotAdaptCID		  = 4
-	NCI_HostSentInvalidCIDLength  = 5
+	NCI_TLSHandshakeFailed       = 1
+	NCI_HostDidNotProvideCID     = 2
+	NCI_HostDidNotAnswerToNewCID = 3
+	NCI_HostDidNotAdaptCID       = 4
+	NCI_HostSentInvalidCIDLength = 5
 )
 
 type NewConnectionIDScenario struct {
@@ -35,59 +39,68 @@ type NewConnectionIDScenario struct {
 }
 
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
-	return &NewConnectionIDScenario{AbstractScenario{"new_connection_id", 1, false}}
+	return &NewConnectionIDScenario{AbstractScenario{"new_connection_id", 1, false, nil}}
 }
 func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
+	s.timeout = time.NewTimer(10 * time.Second)
 
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(NCI_TLSHandshakeFailed, err.Error(), p)
+	connAgents := s.CompleteHandshake(conn, trace, NCI_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
+
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
 	trace.ErrorCode = NCI_HostDidNotProvideCID
 
 	var expectingResponse bool
-	var alternativeConnectionIDs [][]byte
+	var alternativeConnectionIDs []string
+	defer func() { trace.Results["new_connection_ids"] = alternativeConnectionIDs }()
 
-	for p := range conn.IncomingPackets {
-		if expectingResponse {
-			if bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
-				trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
-			} else {
-				trace.ErrorCode = 0
+	scid := make([]byte, 8)
+	var resetToken [16]byte
+	rand.Read(scid)
+	rand.Read(resetToken[:])
+
+	for {
+		select {
+		case i := <-incPackets:
+			p := i.(m.Packet)
+			if expectingResponse {
+				if !bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
+					trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
+				} else {
+					trace.ErrorCode = 0
+				}
+				break
 			}
-			return
-		}
 
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
+			if pp, ok := p.(*m.ProtectedPacket); ok {
+				for _, frame := range pp.GetAll(m.NewConnectionIdType) {
+					nci := frame.(*m.NewConnectionIdFrame)
 
-		if pp, ok := p.(*m.ProtectedPacket); ok {
-			for _, frame := range pp.Frames {
-				if nci, ok := frame.(*m.NewConnectionIdFrame); ok {
 					if nci.Length < 4 || nci.Length > 18 {
 						err := fmt.Sprintf("Connection ID length must be comprised between 4 and 18, it was %d", nci.Length)
 						trace.MarkError(NCI_HostSentInvalidCIDLength, err, pp)
-						conn.CloseConnection(true, m.ERR_PROTOCOL_VIOLATION, err)
 					}
 
-					alternativeConnectionIDs = append(alternativeConnectionIDs, nci.ConnectionId)
+					alternativeConnectionIDs = append(alternativeConnectionIDs, hex.EncodeToString(nci.ConnectionId))
 
 					if !expectingResponse {
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
-						conn.SourceCID = nci.ConnectionId
-						conn.PacketNumber += uint64(m.GetPacketGap(conn))
-						conn.SendHTTPGETRequest(preferredUrl, 4)
+						conn.DestinationCID = nci.ConnectionId
+						conn.SourceCID = scid
+						conn.FrameQueue.Submit(m.QueuedFrame{&m.NewConnectionIdFrame{0, uint8(len(scid)), scid, resetToken}, m.EncryptionLevelBest})
+						conn.SendHTTPGETRequest(preferredUrl, 0)
 						expectingResponse = true
 					}
 				}
 			}
+		case <-s.Timeout().C:
+			return
 		}
 	}
-
-	trace.Results["new_connection_ids"] = alternativeConnectionIDs
 }

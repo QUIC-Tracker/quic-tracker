@@ -22,6 +22,7 @@ import (
 	"io"
 	"github.com/davecgh/go-spew/spew"
 	"unsafe"
+	"fmt"
 )
 
 type Acknowledger interface {
@@ -39,6 +40,9 @@ type Packet interface {
 	Acknowledger
 	PacketEncoder
 	Pointer() unsafe.Pointer
+	PNSpace() PNSpace
+	EncryptionLevel() EncryptionLevel
+	ShortString() string
 }
 
 type abstractPacket struct {
@@ -57,6 +61,9 @@ func (p abstractPacket) Encode(payload []byte) []byte {
 	buffer.Write(p.EncodeHeader())
 	buffer.Write(payload)
 	return buffer.Bytes()
+}
+func (p abstractPacket) ShortString() string {
+	return fmt.Sprintf("{type=%s, number=%d}", p.header.PacketType().String(), p.header.PacketNumber())
 }
 
 type VersionNegotationPacket struct {
@@ -84,6 +91,8 @@ func (p *VersionNegotationPacket) EncodePayload() []byte {
 func (p *VersionNegotationPacket) Pointer() unsafe.Pointer {
 	return unsafe.Pointer(p)
 }
+func (p *VersionNegotationPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *VersionNegotationPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
 func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
 	p := new(VersionNegotationPacket)
 	b, err := buffer.ReadByte()
@@ -102,7 +111,7 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
-		if err == io.EOF {
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			break
 		} else if err != nil {
 			panic(err)
@@ -128,6 +137,7 @@ type Framer interface {
 	GetRetransmittableFrames() []Frame
 	Contains(frameType FrameType) bool
 	GetFirst(frameType FrameType) Frame
+	GetAll(frameType FrameType) []Frame
 }
 type FramePacket struct {
 	abstractPacket
@@ -167,10 +177,19 @@ func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 	}
 	return nil
 }
+func (p *FramePacket) GetAll(frameType FrameType) []Frame {
+	var frames []Frame
+	for _, f := range p.Frames {
+		if f.FrameType() == frameType {
+			frames = append(frames, f)
+		}
+	}
+	return frames
+}
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
-		switch frame.(type) {
-		case *AckFrame, *PaddingFrame, *ConnectionCloseFrame, *ApplicationCloseFrame:
+		switch frame.FrameType() {
+		case AckType, PaddingFrameType, ConnectionCloseType, ApplicationCloseType:
 		default:
 			return true
 		}
@@ -188,9 +207,17 @@ func (p *FramePacket) EncodePayload() []byte {
 type InitialPacket struct {
 	FramePacket
 }
-func (p InitialPacket) GetRetransmittableFrames() []Frame {
-	return p.Frames
+func (p *InitialPacket) GetRetransmittableFrames() []Frame {
+	var frames []Frame
+	for _, frame := range p.Frames {
+		if frame.shouldBeRetransmitted() || frame.FrameType() == PaddingFrameType {
+			frames = append(frames, frame)
+		}
+	}
+	return frames
 }
+func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
+func (p *InitialPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelInitial }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = ReadLongHeader(buffer)
@@ -203,39 +230,51 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 		if frame == nil {
 			break
 		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
+		}
 		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }
 func NewInitialPacket(conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
-	p.header = NewLongHeader(Initial, conn)
+	p.header = NewLongHeader(Initial, conn, PNSpaceInitial)
 	return p
 }
 
 type RetryPacket struct {
-	FramePacket
+	abstractPacket
+	OriginalDestinationCID ConnectionID
+	RetryToken []byte
 }
-func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
+func ReadRetryPacket(buffer *bytes.Reader) *RetryPacket {
 	p := new(RetryPacket)
 	p.header = ReadLongHeader(buffer)
-	for {
-		frame, err := NewFrame(buffer, conn)
-		if err != nil {
-			spew.Dump(p)
-			panic(err)
-		}
-		if frame == nil {
-			break
-		}
-		p.Frames = append(p.Frames, frame)
-	}
+	OCIDL, _ := buffer.ReadByte()
+	p.OriginalDestinationCID = make([]byte, OCIDL)
+	p.RetryToken = make([]byte, buffer.Len())
+	buffer.Read(p.RetryToken)
 	return p
+}
+func (p *RetryPacket) GetRetransmittableFrames() []Frame { return nil }
+func (p *RetryPacket) Pointer() unsafe.Pointer { return unsafe.Pointer(p) }
+func (p *RetryPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *RetryPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
+func (p *RetryPacket) ShouldBeAcknowledged() bool { return false }
+func (p *RetryPacket) EncodePayload() []byte {
+	buffer := new(bytes.Buffer)
+	buffer.WriteByte(byte(len(p.OriginalDestinationCID)))
+	buffer.Write(p.OriginalDestinationCID)
+	buffer.Write(p.RetryToken)
+	return buffer.Bytes()
 }
 
 type HandshakePacket struct {
 	FramePacket
 }
+func (p *HandshakePacket) PNSpace() PNSpace { return PNSpaceHandshake }
+func (p *HandshakePacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelHandshake }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
 	p.header = ReadLongHeader(buffer)
@@ -248,19 +287,24 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 		if frame == nil {
 			break
 		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
+		}
 		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }
 func NewHandshakePacket(conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
-	p.header = NewLongHeader(Handshake, conn)
+	p.header = NewLongHeader(Handshake, conn, PNSpaceHandshake)
 	return p
 }
 
 type ProtectedPacket struct {
 	FramePacket
 }
+func (p *ProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
+func (p *ProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel1RTT }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
 	p.header = ReadHeader(buffer, conn)
@@ -273,21 +317,26 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 		if frame == nil {
 			break
 		}
+		if cf, ok := frame.(*CryptoFrame); ok {
+			conn.CryptoStreams.Get(p.PNSpace()).addToRead(&StreamFrame{Offset: cf.Offset, Length: cf.Length, StreamData: cf.CryptoData})
+		}
 		p.Frames = append(p.Frames, frame)
 	}
 	return p
 }
 func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewShortHeader(FourBytesPacketNumber, KeyPhaseZero, conn)
+	p.header = NewShortHeader(KeyPhaseZero, conn)
 	return p
 }
 
 type ZeroRTTProtectedPacket struct {
 	FramePacket
 }
+func (p *ZeroRTTProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
+func (p *ZeroRTTProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel0RTT }
 func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	p := new(ZeroRTTProtectedPacket)
-	p.header = NewLongHeader(ZeroRTTProtected, conn)
+	p.header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)
 	return p
 }

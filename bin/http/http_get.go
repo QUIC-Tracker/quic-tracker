@@ -17,7 +17,6 @@
 package main
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	m "github.com/mpiraux/master-thesis"
 	"flag"
 	"strings"
@@ -25,10 +24,18 @@ import (
 	"io/ioutil"
 	"os"
 	"encoding/json"
-	"github.com/mpiraux/master-thesis/scenarii"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"github.com/mpiraux/master-thesis/agents"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	url := flag.String("url", "/index.html", "The URL to request")
@@ -38,6 +45,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	pcap, err := m.StartPcapCapture(conn, *netInterface)
 	if err != nil {
 		panic(err)
@@ -67,27 +75,27 @@ func main() {
 		println(string(out))
 	}()
 
-	if scenarii.CompleteHandshake(conn); err != nil {
-		spew.Dump(err)
-	}
+	Agents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: Agents.Get("TLSAgent").(*agents.TLSAgent)}
+	Agents.Add(handshakeAgent)
 
-	streamFrame := m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
-	ackFrame := conn.GetAckFrame()
+	handshakeStatus := make(chan interface{}, 10)
+	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeAgent.InitiateHandshake()
 
-	protectedPacket := m.NewProtectedPacket(conn)
-	protectedPacket.Frames = append(protectedPacket.Frames, streamFrame, ackFrame)
-	conn.SendProtectedPacket(protectedPacket)
+	s := (<-handshakeStatus).(agents.HandshakeStatus)
+	if s.Completed {
+		conn.FrameQueue.Submit(m.QueuedFrame{m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true), m.EncryptionLevel1RTT})
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			pp := m.NewProtectedPacket(conn)
-			pp.Frames = append(pp.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(pp)
-		}
+		incomingPackets := make(chan interface{}, 1000)
+		conn.IncomingPackets.Register(incomingPackets)
 
-		if conn.Streams.Get(4).ReadClosed {
-			spew.Dump(conn.Streams.Get(4).ReadData)
-			break
+		for {
+			<-incomingPackets
+			if conn.Streams.Get(4).ReadClosed {
+				spew.Dump(conn.Streams.Get(4).ReadData)
+				break
+			}
 		}
 	}
 

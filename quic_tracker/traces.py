@@ -42,7 +42,7 @@ def parse_trace(trace):
 def get_type(packet):  # TODO: Modularise this on a per version basis
     top_struct_attributes = packet[0][1][1]
     for field, value, _, _ in top_struct_attributes:
-        if field == 'Short Packet Type':
+        if field == 'Header Form' and value == 0:
             return '1-RTT Protected Payload'
         elif field == 'Long Packet Type':
             value = int(value, base=0)

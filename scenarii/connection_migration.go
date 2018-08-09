@@ -18,6 +18,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
 	"time"
 )
 
@@ -33,23 +34,22 @@ type ConnectionMigrationScenario struct {
 }
 
 func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
-	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false}}
+	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false, nil}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(CM_TLSHandshakeFailed, err.Error(), p)
+	s.timeout = time.NewTimer(10 * time.Second)
+	connAgents := s.CompleteHandshake(conn, trace, CM_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
-	conn.UdpConnection.SetDeadline(time.Now().Add(3 * time.Second))
+	<-time.NewTimer(3 * time.Second).C // Wait some time before migrating
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-	}
+	connAgents.Get("SocketAgent").Stop()
+	connAgents.Get("SendingAgent").Stop()
+	connAgents.Get("SocketAgent").Join()
+	connAgents.Get("SendingAgent").Join()
 
 	newUdpConn, err := m.EstablishUDPConnection(conn.Host)
 	if err != nil {
@@ -60,41 +60,34 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	conn.UdpConnection.Close()
 	conn.UdpConnection = newUdpConn
 
-	conn.IncomingPackets = make(chan m.Packet)
+	connAgents.Get("SocketAgent").Run(conn)
+	connAgents.Get("SendingAgent").Run(conn)
 
-	go func() {
-		for {
-			packets, err, _ := conn.ReadNextPackets()
-			if err != nil {
-				close(conn.IncomingPackets)
-				break
+	conn.EncryptionLevelsAvailable.Submit(m.DirectionalEncryptionLevel{m.EncryptionLevelHandshake, false})  // TODO: Find a way around this
+	conn.EncryptionLevelsAvailable.Submit(m.DirectionalEncryptionLevel{m.EncryptionLevel1RTT, false})
+
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
+	conn.SendHTTPGETRequest(preferredUrl, 0)
+	trace.ErrorCode = CM_HostDidNotMigrate // Assume it until proven wrong
+
+	for {
+		select {
+		case i := <-incPackets:
+			p := i.(m.Packet)
+			if trace.ErrorCode == CM_HostDidNotMigrate {
+				trace.ErrorCode = CM_HostDidNotValidateNewPath
 			}
-			for _, p := range packets {
-				conn.IncomingPackets <- p
+
+			if fp, ok := p.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
+				trace.ErrorCode = 0
 			}
-		}
-	}()
 
-	conn.SendHTTPGETRequest(preferredUrl, 4)
-	trace.ErrorCode = CM_HostDidNotMigrate  // Assume it until proven wrong
-
-	for p := range conn.IncomingPackets {
-		if trace.ErrorCode == CM_HostDidNotMigrate {
-			trace.ErrorCode = CM_HostDidNotValidateNewPath
-		}
-
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
-		if fp, ok := p.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
-			trace.ErrorCode = 0
-		}
-
-		if conn.Streams.Get(4).ReadClosed {
-			conn.CloseConnection(false, 0, "")
+			if conn.Streams.Get(4).ReadClosed {
+				conn.CloseConnection(false, 0, "")
+			}
+		case <-s.Timeout().C:
 			return
 		}
 	}

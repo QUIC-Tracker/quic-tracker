@@ -19,14 +19,16 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"fmt"
+
+	"time"
 )
 
 const (
 	SSRS_TLSHandshakeFailed               = 1
 	SSRS_DidNotCloseTheConnection         = 2
 	SSRS_CloseTheConnectionWithWrongError = 3
-	SSRS_MaxStreamUniTooLow				  = 4
-	SSRS_UnknownError					  = 5
+	SSRS_MaxStreamUniTooLow               = 4
+	SSRS_UnknownError                     = 5
 )
 
 type StopSendingOnReceiveStreamScenario struct {
@@ -34,58 +36,48 @@ type StopSendingOnReceiveStreamScenario struct {
 }
 
 func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario {
-	return &StopSendingOnReceiveStreamScenario{AbstractScenario{"stop_sending_frame_on_receive_stream", 1, false}}
+	return &StopSendingOnReceiveStreamScenario{AbstractScenario{"stop_sending_frame_on_receive_stream", 1, false, nil}}
 }
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	var p m.Packet
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(SSRS_TLSHandshakeFailed, err.Error(), p)
+	s.timeout = time.NewTimer(10 * time.Second)
+
+	connAgents := s.CompleteHandshake(conn, trace, SSRS_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni < 1 {
-		trace.MarkError(SSRS_MaxStreamUniTooLow, "", p)
-		trace.Results["expected_max_stream_uni"] = ">= 1"
-		trace.Results["received_max_stream_uni"] = conn.TLSTPHandler.ReceivedParameters.MaxStreamIdUni
+	if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams == 0 {
+		trace.MarkError(SSRS_MaxStreamUniTooLow, "", nil)
 		return
 	}
 
 	conn.SendHTTPGETRequest(preferredUrl, 2)
+	conn.FrameQueue.Submit(m.QueuedFrame{&m.StopSendingFrame{2, 0}, m.EncryptionLevel1RTT})
 
-	stopSendingFrame := m.StopSendingFrame{StreamId: 2, ErrorCode: 42}
-
-	pp := m.NewProtectedPacket(conn)
-	pp.Frames = append(pp.Frames, stopSendingFrame)
-	conn.SendProtectedPacket(pp)
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
 
 	trace.ErrorCode = SSRS_DidNotCloseTheConnection
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-		}
-
-		switch packet := p.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range packet.Frames {
-				switch f2 := f.(type) {
-				case *m.ConnectionCloseFrame:
-					if f2.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
-						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "", packet)
-						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", f2.ErrorCode)
+	for {
+		select {
+		case i := <-incPackets:
+			switch p := i.(type) {
+			case m.Framer:
+				if p.Contains(m.ConnectionCloseType) {
+					cc := p.GetFirst(m.ConnectionCloseType).(*m.ConnectionCloseFrame)
+					if cc.ErrorCode != m.ERR_PROTOCOL_VIOLATION {
+						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, "", p)
+						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", cc.ErrorCode)
 						return
 					}
 					trace.ErrorCode = 0
 					return
-				default:
 				}
 			}
-		default:
-			// TODO: Detect spurious retransmissions
-			// handshake packet: should not happen here
-			// trace.Results["received_unexpected_packet_type"] = fmt.Sprintf("0x%x (%T)", packet.Header().PacketType(), packet)
+		case <-s.Timeout().C:
+			return
 		}
 	}
 }

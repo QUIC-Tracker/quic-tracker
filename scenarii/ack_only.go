@@ -18,6 +18,8 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"time"
 )
 
 const (
@@ -30,37 +32,53 @@ type AckOnlyScenario struct {
 }
 
 func NewAckOnlyScenario() *AckOnlyScenario {
-	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false}}
+	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false, nil}}
 }
 func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(AO_TLSHandshakeFailed, err.Error(), p)
+	s.timeout = time.NewTimer(10 * time.Second)
+	connAgents := s.CompleteHandshake(conn, trace, AO_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
+	connAgents.Get("AckAgent").Stop()
+	connAgents.Get("AckAgent").Join()
 
-	conn.SendHTTPGETRequest(preferredUrl, 4)
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
+	conn.SendHTTPGETRequest(preferredUrl, 0)
 
 	var ackOnlyPackets []uint64
 
-	for p := range conn.IncomingPackets {
-		if p.ShouldBeAcknowledged() {
-			protectedPacket := m.NewProtectedPacket(conn)
-			protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame())
-			conn.SendProtectedPacket(protectedPacket)
-			ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
-		}
-
-		if framer, ok := p.(m.Framer); ok && !p.ShouldBeAcknowledged() && framer.Contains(m.AckType){
-			ack := framer.GetFirst(m.AckType).(*m.AckFrame)
-			if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
-				trace.MarkError(AO_SentAOInResponseOfAO, "", p)
+	for {
+		select {
+		case i := <-incPackets:
+			p := i.(m.Packet)
+			if p.PNSpace() != m.PNSpaceAppData {
 				break
 			}
+			if p.ShouldBeAcknowledged() {
+				ackFrame := conn.GetAckFrame(m.PNSpaceAppData)
+				if ackFrame == nil {
+					break
+				}
+				protectedPacket := m.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(m.PNSpaceAppData))
+				conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
+				ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
+			} else if framer, ok := p.(m.Framer); ok && framer.Contains(m.AckType) {
+				ack := framer.GetFirst(m.AckType).(*m.AckFrame)
+				if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
+					trace.MarkError(AO_SentAOInResponseOfAO, "", p)
+					return
+				}
+			}
+		case <-s.Timeout().C:
+			return
 		}
 	}
-	conn.CloseConnection(false, 0, "")
 }
-
 
 func containsAll(a []uint64, b []uint64) bool { // Checks a \in b
 	for _, i := range a {

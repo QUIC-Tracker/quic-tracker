@@ -68,8 +68,11 @@ func (t *Trace) MarkError(error uint8, message string, packet Packet) {
 	if message != "" {
 		t.Results["error"] = message
 	}
+	if packet == nil {
+		return
+	}
 	for _, tp := range t.Stream {
-		if packet != nil && tp.Pointer == packet.Pointer() {
+		if tp.Pointer == packet.Pointer() {
 			tp.IsOfInterest = true
 			return
 		}

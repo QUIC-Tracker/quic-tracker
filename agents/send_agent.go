@@ -69,6 +69,8 @@ func (a *SendingAgent) Run(conn *Connection) {
 	}
 
 	go func() {
+		defer a.Logger.Println("Agent terminated")
+		defer close(a.closed)
 		for {
 			select {
 			case i := <-frameQueue:

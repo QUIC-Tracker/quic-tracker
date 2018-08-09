@@ -20,11 +20,13 @@ import (
 	m "github.com/mpiraux/master-thesis"
 	"fmt"
 	_ "github.com/davecgh/go-spew/spew"
+
+	"time"
 )
 
 const (
 	MS_TLSHandshakeFailed      = 1
-	MS_NoTPReceived		       = 2
+	MS_NoTPReceived            = 2 // We don't distinguish the two first cases anymore
 	MS_NotAllStreamsWereClosed = 3
 )
 
@@ -33,50 +35,44 @@ type MultiStreamScenario struct {
 }
 
 func NewMultiStreamScenario() *MultiStreamScenario {
-	return &MultiStreamScenario{AbstractScenario{"multi_stream", 1, false}}
+	return &MultiStreamScenario{AbstractScenario{"multi_stream", 1, false, nil}}
 }
 func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxData = 1024 * 1024
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
 
 	allClosed := true
-	var p m.Packet; var err error
-	if p, err = CompleteHandshake(conn); err != nil {
-		trace.MarkError(MS_TLSHandshakeFailed, err.Error(), p)
+	connAgents := s.CompleteHandshake(conn, trace, MS_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
-	if conn.TLSTPHandler.EncryptedExtensionsTransportParameters == nil {
-		trace.MarkError(MS_NoTPReceived, "", p)
-		return
+	for i := uint16(0); i <= conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
+		conn.SendHTTPGETRequest(preferredUrl, uint64(i*4))
 	}
 
-	conn.SendHTTPGETRequest(preferredUrl, 4)
-
-	protectedPacket := m.NewProtectedPacket(conn)
-	for i := uint16(2); i <= conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && len(protectedPacket.Frames) < 4; i++ {
-		streamId := uint64(i * 4)
-		streamFrame := m.NewStreamFrame(streamId, conn.Streams.Get(streamId), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), true)
-		protectedPacket.Frames = append(protectedPacket.Frames, streamFrame)
-	}
-
-	conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
-
+forLoop:
 	for {
-		<-incPackets
-		for streamId, stream := range conn.Streams {
-			if streamId != 0 && !stream.ReadClosed {
-				allClosed = false
-				break
+		select {
+		case <-incPackets:
+			for _, stream := range conn.Streams {
+				if !stream.ReadClosed {
+					allClosed = false
+					break
+				}
 			}
-		}
 
-		if allClosed {
-			conn.CloseConnection(false, 0, "")
-			return
+			if allClosed {
+				conn.CloseConnection(false, 0, "")
+				break forLoop
+			}
+		case <-s.Timeout().C:
+			break forLoop
 		}
 	}
 

@@ -18,14 +18,17 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"time"
+	"github.com/mpiraux/master-thesis/agents"
 )
 
 const (
 	VN_NotAnsweringToVN               = 1
-	VN_DidNotEchoVersion              = 2  // draft-07 and below were stating that VN packets should echo the version of the client. It is not used anymore
-	VN_LastTwoVersionsAreActuallySeal = 3  // draft-05 and below used AEAD to seal cleartext packets, VN packets should not be sealed, but some implementations did anyway.
+	VN_DidNotEchoVersion              = 2 // draft-07 and below were stating that VN packets should echo the version of the client. It is not used anymore
+	VN_LastTwoVersionsAreActuallySeal = 3 // draft-05 and below used AEAD to seal cleartext packets, VN packets should not be sealed, but some implementations did anyway.
 	VN_Timeout                        = 4
-	VN_UnusedFieldIsIdentical		  = 5  // See https://github.com/quicwg/base-drafts/issues/963
+	VN_UnusedFieldIsIdentical         = 5 // See https://github.com/quicwg/base-drafts/issues/963
 )
 
 const ForceVersionNegotiation = 0x1a2a3a4a
@@ -33,14 +36,18 @@ const ForceVersionNegotiation = 0x1a2a3a4a
 type VersionNegotiationScenario struct {
 	AbstractScenario
 }
+
 func NewVersionNegotiationScenario() *VersionNegotiationScenario {
-	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false}}
+	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false, nil}}
 }
 func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+	s.timeout = time.NewTimer(10 * time.Second)
+	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	defer connAgents.StopAll()
+
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
-	conn.RetransmissionTicker.Stop()
 	conn.Version = ForceVersionNegotiation
 	trace.ErrorCode = VN_Timeout
 	initial := conn.GetInitialPacket()
@@ -50,26 +57,29 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 	vnCount := 0
 	var unusedField byte
 	for {
-		p := (<-incPackets).(m.Packet)
-
-		switch p := p.(type) {
-		case *m.VersionNegotationPacket:
-			vnCount++
-			if vnCount > 1 && unusedField != p.UnusedField {
-				trace.ErrorCode = 0
-				break
-			} else if vnCount == threshold {
-				trace.ErrorCode = VN_UnusedFieldIsIdentical
-				break
+		select {
+		case i := <-incPackets:
+			switch p := i.(type) {
+			case *m.VersionNegotationPacket:
+				vnCount++
+				if vnCount > 1 && unusedField != p.UnusedField {
+					trace.ErrorCode = 0
+					return
+				} else if vnCount == threshold {
+					trace.ErrorCode = VN_UnusedFieldIsIdentical
+					return
+				}
+				unusedField = p.UnusedField
+				trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
+				newInitial := m.NewInitialPacket(conn)
+				newInitial.Frames = initial.Frames
+				conn.SendPacket(initial, m.EncryptionLevelInitial)
+			case m.Packet:
+				trace.MarkError(VN_NotAnsweringToVN, "", p)
+				trace.Results["received_packet_type"] = p.Header().PacketType()
 			}
-			unusedField = p.UnusedField
-			trace.Results["supported_versions"] = p.SupportedVersions  // TODO: Compare versions announced ?
-			newInitial := m.NewInitialPacket(conn)
-			newInitial.Frames = initial.Frames
-			conn.SendPacket(initial, m.EncryptionLevelInitial)
-		default:
-			trace.MarkError(VN_NotAnsweringToVN, "", p)
-			trace.Results["received_packet_type"] = p.Header().PacketType()
+			case <-s.Timeout().C:
+				return
 		}
 	}
 }

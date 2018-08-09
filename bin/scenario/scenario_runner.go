@@ -25,10 +25,17 @@ import (
 	"encoding/json"
 	"strings"
 	"flag"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 )
 
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	hostFilename := flag.String("hosts", "", "The file containing the hosts to test.")
 	scenarioName := flag.String("scenario", "", "The particular scenario to test. Tests all of them if not set.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdin if not set.")
@@ -55,7 +62,7 @@ func main() {
 		s.NewHandshakeScenario(),
 		s.NewHandshakev6Scenario(),
 		s.NewTransportParameterScenario(),
-		s.NewHandshakeRetransmissionScenario(),
+		s.NewAddressValidationScenario(),
 		s.NewPaddingScenario(),
 		s.NewFlowControlScenario(),
 		s.NewAckOnlyScenario(),

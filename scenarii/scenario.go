@@ -18,6 +18,9 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"github.com/mpiraux/master-thesis/agents"
+	"time"
 )
 
 type Scenario interface {
@@ -25,12 +28,14 @@ type Scenario interface {
 	Version() int
 	IPv6() bool
 	Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool)
+	Timeout() *time.Timer
 }
 
 type AbstractScenario struct {
 	name    string
 	version int
 	ipv6    bool
+	timeout *time.Timer
 }
 func (s *AbstractScenario) Name() string {
 	return s.name
@@ -41,52 +46,34 @@ func (s *AbstractScenario) Version() int {
 func (s *AbstractScenario) IPv6() bool {
 	return s.ipv6
 }
+func (s *AbstractScenario) Timeout() *time.Timer {
+	return s.timeout
+}
+func (s *AbstractScenario) CompleteHandshake(conn *m.Connection, trace *m.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
+	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent)}
+	connAgents.Add(handshakeAgent)
 
-func CompleteHandshake(conn *m.Connection) (m.Packet, error) {  // Completes the handshake and returns the last packet received
-	// TODO: Move this to the HandshakeAgent
+	handshakeStatus := make(chan interface{}, 10)
+	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeAgent.InitiateHandshake()
 
-	/*conn.SendInitialProtectedPacket(conn.GetInitialPacket())
-
-	ongoingHandhake := true
-	var err error
-	var p m.Packet
-	for p = range conn.IncomingPackets {
-		switch p.(type) {
-		case *m.InitialPacket, *m.HandshakePacket, *m.RetryPacket:
-			var response m.Packet
-			ongoingHandhake, response, err = conn.ProcessServerHello(p.(m.Framer))
-			if err != nil {
-				return p, err
-			}
-			if response != nil {
-				switch p.(type) {
-				case *m.InitialPacket, *m.RetryPacket:
-					conn.SendInitialProtectedPacket(response)
-				default:
-					conn.SendHandshakeProtectedPacket(response)
-				}
-			}
-		case *m.VersionNegotationPacket:
-			err := conn.ProcessVersionNegotation(p.(*m.VersionNegotationPacket))
-			if err != nil {
-				return p, err
-			}
-			conn.SendHandshakeProtectedPacket(conn.GetInitialPacket())
-		default:
-			if ongoingHandhake {
-				return p, errors.New("received incorrect packet type during handshake")
-			}
+	select {
+	case i := <-handshakeStatus:
+		status := i.(agents.HandshakeStatus)
+		if !status.Completed {
+			trace.MarkError(handshakeErrorCode, status.Error.Error(), status.Packet)
+			connAgents.StopAll()
+			return nil
 		}
-
-		if !ongoingHandhake {
-			return p, nil
-		}
+	case <-s.Timeout().C:
+		trace.MarkError(handshakeErrorCode, "handshake timeout", nil)
+		connAgents.StopAll()
+		return nil
 	}
+	return connAgents
+}
 
-	if ongoingHandhake {
-		return p, errors.New("could not complete handshake")
-	}
-
-	return p, nil*/
+func CompleteHandshake(conn *m.Connection) (m.Packet, error) {
 	return nil, nil
 }

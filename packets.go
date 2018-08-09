@@ -111,7 +111,7 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	for {
 		var version uint32
 		err := binary.Read(buffer, binary.BigEndian, &version)
-		if err == io.EOF {
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			break
 		} else if err != nil {
 			panic(err)
@@ -188,8 +188,8 @@ func (p *FramePacket) GetAll(frameType FrameType) []Frame {
 }
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
-		switch frame.(type) {
-		case *AckFrame, *PaddingFrame, *ConnectionCloseFrame, *ApplicationCloseFrame:
+		switch frame.FrameType() {
+		case AckType, PaddingFrameType, ConnectionCloseType, ApplicationCloseType:
 		default:
 			return true
 		}

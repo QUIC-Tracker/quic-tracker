@@ -18,12 +18,15 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
+	"time"
+	"fmt"
 )
 
 const (
 	SGW_TLSHandshakeFailed              = 1
 	SGW_EmptyStreamFrameNoFinBit        = 2
-	SGW_RetransmittedAck                = 3
+	SGW_RetransmittedAck                = 3 // This could affect performance, but we don't check it anymore
 	SGW_WrongStreamIDReceived           = 4
 	SGW_UnknownError                    = 5
 	SGW_DidNotCloseTheConnection        = 6
@@ -38,120 +41,71 @@ type SimpleGetAndWaitScenario struct {
 }
 
 func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
-	return &SimpleGetAndWaitScenario{AbstractScenario{"http_get_and_wait", 1, false}}
+	return &SimpleGetAndWaitScenario{AbstractScenario{"http_get_and_wait", 1, false, nil}}
 }
 
 func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-
-	/*errors := make(map[uint]bool)
-	var errorMessages []string
-	receivedRequestedData := false
-
-	defer func() {
-		if trace.ErrorCode != SGW_TLSHandshakeFailed && !receivedRequestedData {
-			// the peer did not close the connection
-			errors[SGW_DidntReceiveTheRequestedData] = true
-			message := "nothing has been received on Stream 4"
-			errorMessages = append(errorMessages, message)
-			trace.ErrorCode = SGW_DidntReceiveTheRequestedData
-			trace.Results["error"] = message
-		}
-		if receivedRequestedData && conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams < 1 {
-			errors[SGW_AnsweredOnUnannouncedStream] = true
-			message := fmt.Sprintf("the host sent data on stream 4 despite setting initial_max_stream_bidi to %d", conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams)
-			errorMessages = append(errorMessages, message)
-		}
-		// end of the test, the connection has well been closed
-		if len(errors) > 1 {
-			trace.ErrorCode = SGW_MultipleErrors
-			trace.Results["error"] = errorMessages
-		} else if len(errors) == 0 {
-			trace.ErrorCode = 0
-		}
-	}()
-
+	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxBidiStreams = 0
 	conn.TLSTPHandler.MaxUniStreams = 0
-	var p m.Packet; var err error
-	if p, err = CompleteHandshake(conn); err != nil {
-		errors[SGW_TLSHandshakeFailed] = true
-		trace.MarkError(SGW_TLSHandshakeFailed, err.Error(), p)
+
+	connAgents := s.CompleteHandshake(conn, trace, SGW_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
-	if conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams < 1 {
-		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, fmt.Sprintf("the remote initial_max_stream_id_bidi is %d", conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams), p)
+	if conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams == 0 {
+		trace.MarkError(SGW_TooLowStreamIdBidiToSendRequest, "cannot open bidi stream", nil)
 	}
 
-	requestPacketNumber := conn.PacketNumber[m.PNSpaceAppData] + 1
-	conn.SendHTTPGETRequest(preferredUrl, 4)
+	errors := make(map[uint8]string)
+	incomingPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incomingPackets)
 
-	receivedStreamOffsets := map[uint64]map[uint64]bool{
-		0: make(map[uint64]bool),
-		4: make(map[uint64]bool),
-	}
+	conn.SendHTTPGETRequest(preferredUrl, 0)
 
-	receivedAckBlocks := make(map[m.PNSpace][][]m.AckBlock)
+	var connectionCloseReceived bool
 
-	for p := range conn.IncomingPackets {
-		switch p := p.(type) {
-		case *m.ProtectedPacket:
-			for _, f := range p.Frames {
-				switch f2 := f.(type) {
-				case *m.StreamFrame:
-					if f2.StreamId == 4 {
-						receivedRequestedData = true
-					}
-					if _, ok := receivedStreamOffsets[f2.StreamId]; !ok {
-						// We received a frame on a forbidden stream
-						if _, ok := errors[SGW_WrongStreamIDReceived]; !ok {
-							errors[SGW_WrongStreamIDReceived] = true
-							message := fmt.Sprintf("received StreamID %d", f2.StreamId)
-							errorMessages = append(errorMessages, message)
+forLoop:
+	for {
+		select {
+		case i := <-incomingPackets:
+			switch p := i.(type) {
+			case *m.ProtectedPacket:
+				for _, f := range p.GetFrames() {
+					switch f := f.(type) {
+					case *m.StreamFrame:
+						if f.StreamId != 0 {
+							errors[SGW_WrongStreamIDReceived] = fmt.Sprintf("received StreamID %d", f.StreamId)
 							trace.MarkError(SGW_WrongStreamIDReceived, "", p)
 						}
-					} else if _, ok := receivedStreamOffsets[f2.StreamId][f2.Offset]; !ok {
-						receivedStreamOffsets[f2.StreamId][f2.Offset] = true
-					}
-					if f2.FrameLength == 0 && !f2.FinBit {
-						if _, ok := errors[SGW_EmptyStreamFrameNoFinBit]; !ok {
-							errors[SGW_EmptyStreamFrameNoFinBit] = true
-							message := fmt.Sprintf("received an empty Stream Frame with no Fin bit set for stream %d", f2.StreamId)
-							errorMessages = append(errorMessages, message)
-							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, message, p)
+						if f.Length == 0 && !f.FinBit {
+							errors[SGW_EmptyStreamFrameNoFinBit] = fmt.Sprintf("received an empty STREAM frame with no FIN bit set for stream %d", f.StreamId)
+							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, "", p)
 						}
+					case *m.ConnectionCloseFrame, *m.ApplicationCloseFrame:
+						connectionCloseReceived = true
 					}
-				case *m.AckFrame:
-					if f2.LargestAcknowledged == (conn.ExpectedPacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(requestPacketNumber) {
-						duplicated := false // the frame is a duplicate if we already received this largest acknowledged without any ack block
-
-						// check if we already receive these ack blocks
-						for _, blocks := range receivedAckBlocks[p.PNSpace()] {
-							if reflect.DeepEqual(blocks, f2.AckBlocks) {
-								// in this case, the ack blocks are the same and the largest acknowledged is the same
-								duplicated = true
-								break
-							}
-						}
-
-						if duplicated {
-							if _, ok := errors[SGW_RetransmittedAck]; !ok {
-								errors[SGW_RetransmittedAck] = true
-								message := fmt.Sprintf("received retransmitted ack for packet %d with the same ack blocks", requestPacketNumber)
-								errorMessages = append(errorMessages, message)
-								trace.MarkError(SGW_RetransmittedAck, message, p)
-							}
-						} else {
-							// record the received ack blocks
-							receivedAckBlocks[p.PNSpace()] = append(receivedAckBlocks[p.PNSpace()], f2.AckBlocks)
-						}
-					}
-				case *m.ConnectionCloseFrame:
-					return
 				}
-
 			}
-		default:
+		case <-s.Timeout().C:
+			break forLoop
 		}
-	}*/
+	}
+
+	if conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams == 0 {
+		if conn.Streams.Get(0).ReadOffset > 0 {
+			errors[SGW_AnsweredOnUnannouncedStream] = "data was received on stream 0 despite not being announced in TP"
+		} else if !connectionCloseReceived {
+			errors[SGW_DidNotCloseTheConnection] = ""
+		}
+	} else if !conn.Streams.Get(0).ReadClosed || conn.Streams.Get(0).ReadOffset == 0 {
+		errors[SGW_DidntReceiveTheRequestedData] = "the response to the request was not complete"
+	}
+
+	if len(errors) > 1 {
+		trace.ErrorCode = SGW_MultipleErrors
+		trace.Results["error"] = errors
+	}
 }

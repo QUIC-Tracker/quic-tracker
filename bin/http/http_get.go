@@ -75,7 +75,7 @@ func main() {
 		println(string(out))
 	}()
 
-	Agents := agents.AttachAgentsToConnection(conn, agents.DefaultAgents...)
+	Agents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: Agents.Get("TLSAgent").(*agents.TLSAgent)}
 	Agents.Add(handshakeAgent)
 

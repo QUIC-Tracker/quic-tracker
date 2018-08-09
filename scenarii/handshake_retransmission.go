@@ -18,6 +18,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
+
 )
 
 const (
@@ -33,7 +34,7 @@ type HandshakeRetransmissionScenario struct {
 	AbstractScenario
 }
 func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
-	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 2, false}}
+	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 3, false, nil}}
 }
 func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	// TODO: Integrate this scenario with the HandshakeAgent
@@ -51,7 +52,7 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 	ongoingHandshake := true
 	isStateless := false
 	pathChallengeReceived := 0
-	handshakePacketReceived := 0
+	packetReceived := 0
 	handshakePacketReceivedBeforePC := 0
 	var packetFinished m.Packet = nil
 
@@ -94,11 +95,11 @@ outerLoop:
 					}
 				}
 
-				handshakePacketReceived++
+				packetReceived++
 
 				if handshake.Contains(m.PathChallengeType) {
 					pathChallengeReceived++
-					if pathChallenge := handshake.GetFirst(m.PathChallengeType); trace.ErrorCode != HR_NoPathChallengeConfirmation && !ongoingHandshake && (handshakePacketReceived < 3 || handshakePacketReceived == pathChallengeReceived) {
+					if pathChallenge := handshake.GetFirst(m.PathChallengeType); trace.ErrorCode != HR_NoPathChallengeConfirmation && !ongoingHandshake && (packetReceived < 3 || packetReceived == pathChallengeReceived) {
 						trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 
 						handshakeResponse := m.NewHandshakePacket(conn)
@@ -113,7 +114,7 @@ outerLoop:
 							conn.SendHTTPGETRequest(preferredUrl, 4)
 						}
 					}
-				} else if pathChallengeReceived == 0 || handshakePacketReceived <= 3 {
+				} else if pathChallengeReceived == 0 || packetReceived <= 3 {
 					handshakePacketReceivedBeforePC++
 					if !ongoingHandshake && handshake.ShouldBeAcknowledged() {
 						if packetFinished != nil {
@@ -149,11 +150,11 @@ outerLoop:
 		}
 	}
 
-	if !isStateless && handshakePacketReceived <= 1 {
+	if !isStateless && packetReceived <= 1 {
 		trace.ErrorCode = HR_DidNotRetransmitHandshake
-	} else if handshakePacketReceived > 3 && pathChallengeReceived == 0 {
+	} else if packetReceived > 3 && pathChallengeReceived == 0 {
 		trace.ErrorCode = HR_NoPathChallengeReceived
-	} else if handshakePacketReceived >= 3 && handshakePacketReceivedBeforePC > 0 {
+	} else if packetReceived >= 3 && handshakePacketReceivedBeforePC > 0 {
 		trace.ErrorCode = HR_NoPathChallengeInAllPackets
 	} else if conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = 0

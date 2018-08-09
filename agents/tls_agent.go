@@ -9,12 +9,13 @@ import (
 type TLSStatus struct {
 	Completed bool
 	Packet
-	Error error
+	Error     error
 }
 
 type TLSAgent struct {
 	BaseAgent
-	TLSStatus broadcast.Broadcaster //type: TLSStatus
+	TLSStatus  broadcast.Broadcaster //type: TLSStatus
+	DisableFrameSending bool
 }
 
 func (a *TLSAgent) Run(conn *Connection) {
@@ -38,12 +39,15 @@ func (a *TLSAgent) Run(conn *Connection) {
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
+		defer close(a.closed)
 
-	outerLoop:
 		for {
 			select {
 			case i := <-incomingPackets:
 				packet := i.(Packet)
+				if _, ok := packet.(Framer); !ok {
+					break
+				}
 				cryptoStream := conn.CryptoStreams.Get(packet.PNSpace())
 				cryptoChan := cryptoChans[packet.PNSpace()]
 
@@ -86,7 +90,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 							}
 						}
 
-						if len(responseData) > 0 {
+						if len(responseData) > 0 && !a.DisableFrameSending {
 							var responseEncryptionLevel EncryptionLevel
 							if packet.EncryptionLevel() == EncryptionLevelInitial {
 								responseEncryptionLevel = EncryptionLevelHandshake
@@ -121,7 +125,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 					// The packet does not impact the TLS agent
 				}
 			case <-a.close:
-				break outerLoop
+				return
 			}
 		}
 	}()

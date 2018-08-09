@@ -128,5 +128,8 @@ func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
 			sampleOffset = len(packetBytes) - sampleLength
 		}
 	}
+	if sampleOffset <= 0 || sampleOffset+sampleLength > len(packetBytes) {
+		sampleOffset = 4
+	}
 	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
 }

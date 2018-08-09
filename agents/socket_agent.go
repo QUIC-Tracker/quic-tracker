@@ -4,6 +4,8 @@ import m "github.com/mpiraux/master-thesis"
 
 type SocketAgent struct {
 	BaseAgent
+	TotalDataReceived int
+	DatagramsReceived int
 }
 
 func (a *SocketAgent) Run(conn *m.Connection) {
@@ -19,6 +21,8 @@ func (a *SocketAgent) Run(conn *m.Connection) {
 				close(recChan)
 				break
 			}
+			a.TotalDataReceived += i
+			a.DatagramsReceived += 1
 			a.Logger.Printf("Received %d bytes from UDP socket\n", i)
 			payload := make([]byte, i)
 			copy(payload, recBuf[:i])
@@ -28,7 +32,7 @@ func (a *SocketAgent) Run(conn *m.Connection) {
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
-
+		defer close(a.closed)
 		for {
 			select {
 			case p, open := <-recChan:
@@ -38,6 +42,7 @@ func (a *SocketAgent) Run(conn *m.Connection) {
 
 				conn.IncomingPayloads.Submit(p)
 			case <-a.close:
+				conn.UdpConnection.Close()
 				// TODO: Close this agent gracefully
 				return
 			}

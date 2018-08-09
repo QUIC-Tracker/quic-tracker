@@ -20,7 +20,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
-	outerLoop:
+		defer close(a.closed)
 		for {
 		packetSelect:
 			select {
@@ -100,7 +100,8 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
 							off = len(udpPayload)
 						case Retry:
-							panic("TODO PR#1498")
+							a.Logger.Println("TODO PR#1498")
+							break packetSelect
 						default:
 							a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
 							break packetSelect
@@ -113,7 +114,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					}
 				}
 			case <-a.close:
-				break outerLoop
+				return
 			}
 		}
 	}()

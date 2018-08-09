@@ -29,12 +29,13 @@ const (
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
 	MaximumVersion         = 0xff00000d
-	MinimumVersion         = 0xff00000c
+	MinimumVersion         = 0xff00000d
 )
 
 // errors
 
 const (
+	ERR_STREAM_ID_ERROR = 0x4
 	ERR_PROTOCOL_VIOLATION = 0xA
 )
 

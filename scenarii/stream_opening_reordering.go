@@ -19,6 +19,8 @@ package scenarii
 import (
 	m "github.com/mpiraux/master-thesis"
 	"fmt"
+
+	"time"
 )
 
 const (
@@ -31,16 +33,21 @@ type StreamOpeningReorderingScenario struct {
 }
 
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
-	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false}}
+	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false, nil}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
-	if p, err := CompleteHandshake(conn); err != nil {
-		trace.MarkError(SOR_TLSHandshakeFailed, "", p)
+	s.timeout = time.NewTimer(10 * time.Second)
+
+	connAgents := s.CompleteHandshake(conn, trace, SOR_TLSHandshakeFailed)
+	if connAgents == nil {
 		return
 	}
+	defer connAgents.CloseConnection(false, 0, "")
 
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
+
+	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
 	pp1 := m.NewProtectedPacket(conn)
 	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
@@ -51,14 +58,8 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 	conn.SendPacket(pp2, m.EncryptionLevel1RTT)
 	conn.SendPacket(pp1, m.EncryptionLevel1RTT)
 
-	for {
-		<-incPackets
-		if conn.Streams.Get(4).ReadClosed {
-			break
-		}
-	}
+	<-s.Timeout().C
 
-	conn.CloseConnection(false, 0, "")
 	if !conn.Streams.Get(4).ReadClosed {
 		trace.ErrorCode = SOR_HostDidNotRespond
 	}

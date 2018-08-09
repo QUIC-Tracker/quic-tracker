@@ -33,6 +33,8 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 	conn.EncryptionLevelsAvailable.Register(eLAvailable)
 
 	go func() {
+		defer a.Logger.Println("Agent terminated")
+		defer close(a.closed)
 		for {
 			select {
 			case <-retransmissionTicker.C:
@@ -57,6 +59,9 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
 						a.retransmissionBuffer[p.PNSpace()] = make(map[uint64]RetransmittableFrames)
 					}
+				case *VersionNegotationPacket:
+					a.Logger.Printf("Received a VN packet, emptying Initial retransmit buffer")
+					a.retransmissionBuffer[PNSpaceInitial] = make(map[uint64]RetransmittableFrames)
 				}
 			case i := <-outgoingPackets:
 				switch p := i.(type) {

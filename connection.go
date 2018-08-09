@@ -19,7 +19,6 @@ package masterthesis
 import (
 	"crypto/rand"
 	"net"
-	"time"
 	"os"
 	"fmt"
 	"errors"
@@ -29,6 +28,7 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/dustin/go-broadcast"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Connection struct {
@@ -126,6 +126,14 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	copy(c.ClientRandom, clientHello[11:11+32])
 	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)
 
+	spew.Dump(c.Tls.ZeroRTTSecret())
+
+	if len(c.Tls.ZeroRTTSecret()) > 0 {
+		c.Logger.Printf("0-RTT secret is available, installing crypto state")
+		c.CryptoStates[EncryptionLevel0RTT] = NewProtectedCryptoState(c.Tls, nil, c.Tls.ZeroRTTSecret())
+		c.EncryptionLevelsAvailable.Submit(DirectionalEncryptionLevel{EncryptionLevel0RTT, false})
+	}
+
 	var initialLength int
 	if c.UseIPv6 {
 		initialLength = MinimumInitialLengthv6
@@ -135,7 +143,8 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	initialPacket := NewInitialPacket(c)
 	initialPacket.Frames = append(initialPacket.Frames, cryptoFrame)
-	paddingLength := initialLength - (initialPacket.header.Length() + len(initialPacket.EncodePayload()) + c.CryptoStates[EncryptionLevelInitial].Write.Overhead())
+	payloadLen := len(initialPacket.EncodePayload())
+	paddingLength := initialLength - (len(initialPacket.header.Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + c.CryptoStates[EncryptionLevelInitial].Write.Overhead())
 	for i := 0; i < paddingLength; i++ {
 		initialPacket.Frames = append(initialPacket.Frames, new(PaddingFrame))
 	}
@@ -184,7 +193,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	}
 	return frame
 }
-func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionSecret []byte) {  // TODO:
+func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionTicket []byte) {
 	var prevVersion uint32
 	if c.Version == 0 {
 		prevVersion = QuicVersion
@@ -193,7 +202,16 @@ func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionSecret 
 	}
 	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionSecret)
+	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionTicket)
+	c.PacketNumber = make(map[PNSpace]uint64)
+	c.AckQueue = make(map[PNSpace][]uint64)
+	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
+		c.PacketNumber[space] = 0
+		c.AckQueue[space] = nil
+	}
+
+	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
+	c.CryptoStreams = make(map[PNSpace]*Stream)
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
 	c.Streams = make(map[uint64]*Stream)
 }
@@ -216,10 +234,9 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	udpConn.SetDeadline(time.Now().Add(10 * time.Second))
 	return udpConn, nil
 }
-func NewDefaultConnection(address string, serverName string, resumptionSecret []byte, useIPv6 bool) (*Connection, error) {
+func NewDefaultConnection(address string, serverName string, resumptionTicket []byte, useIPv6 bool) (*Connection, error) {
 	scid := make([]byte, 8, 8)
 	dcid := make([]byte, 8, 8)
 	rand.Read(scid)
@@ -241,13 +258,13 @@ func NewDefaultConnection(address string, serverName string, resumptionSecret []
 		return nil, err
 	}
 
-	c := NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionSecret)
+	c := NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionTicket)
 	c.UseIPv6 = useIPv6
 	c.Host = udpAddr
 	return c, nil
 }
 
-func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, DCID[]byte , udpConn *net.UDPConn, resumptionSecret []byte) *Connection {
+func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, DCID[]byte , udpConn *net.UDPConn, resumptionTicket []byte) *Connection {
 	c := new(Connection)
 	c.ServerName = serverName
 	c.UdpConnection = udpConn
@@ -262,19 +279,9 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.EncryptionLevelsAvailable = broadcast.NewBroadcaster(10)
 	c.FrameQueue = broadcast.NewBroadcaster(1000)
 
-	c.PacketNumber = make(map[PNSpace]uint64)
-	c.AckQueue = make(map[PNSpace][]uint64)
-	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
-		c.PacketNumber[space] = 0
-		c.AckQueue[space] = nil
-	}
-
-	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
-	c.CryptoStreams = make(map[PNSpace]*Stream)
-
 	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.Lshortfile)
 
-	c.TransitionTo(version, ALPN, resumptionSecret)
+	c.TransitionTo(version, ALPN, resumptionTicket)
 
 	return c
 }

@@ -41,10 +41,11 @@ type QuicTransportParameters struct {  // A set of QUIC transport parameters val
 	MaxBidiStreams       uint16
 	MaxUniStreams        uint16
 	IdleTimeout          uint16
-	OmitConnectionId     bool
+	PreferredAddress     string
 	MaxPacketSize        uint16
 	StatelessResetToken  []byte
 	AckDelayExponent     uint8
+	DisableMigration 	 bool
 	AdditionalParameters TransportParameterList
 	ToJSON               map[string]interface{}
 }
@@ -158,6 +159,9 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 		case IdleTimeout:
 			receivedParameters.IdleTimeout = binary.BigEndian.Uint16(p.Value)
 			receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
+		case PreferredAddress:
+			receivedParameters.PreferredAddress = string(p.Value)
+			receivedParameters.ToJSON["preferredAddress"] = receivedParameters.PreferredAddress
 		case MaxPacketSize:
 			receivedParameters.MaxPacketSize = binary.BigEndian.Uint16(p.Value)
 			receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
@@ -170,6 +174,9 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 		case InitialMaxUniStreams:
 			receivedParameters.MaxUniStreams = binary.BigEndian.Uint16(p.Value)
 			receivedParameters.ToJSON["initial_max_uni_streams"] = receivedParameters.MaxUniStreams
+		case DisableMigration:
+			receivedParameters.DisableMigration = true
+			receivedParameters.ToJSON["disable_migration"] = true
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)
 			receivedParameters.ToJSON[string(p.ParameterType)] = p.Value

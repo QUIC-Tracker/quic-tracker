@@ -41,6 +41,7 @@ func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	defer connAgents.StopAll()
 
 	incPackets := make(chan interface{}, 1000)
@@ -86,8 +87,8 @@ forLoop:
 func sendUnsupportedInitial(conn *m.Connection) {
 	initialPacket := conn.GetInitialPacket()
 	for _, f := range initialPacket.Frames { // Advertise support of TLS 1.3 draft-00 only
-		if streamFrame, ok := f.(*m.StreamFrame); ok {
-			streamFrame.StreamData = bytes.Replace(streamFrame.StreamData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
+		if frame, ok := f.(*m.CryptoFrame); ok {
+			frame.CryptoData = bytes.Replace(frame.CryptoData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
 	conn.SendPacket(initialPacket, m.EncryptionLevelInitial)

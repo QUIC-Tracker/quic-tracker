@@ -28,7 +28,6 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/dustin/go-broadcast"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Connection struct {
@@ -125,8 +124,6 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	c.ClientRandom = make([]byte, 32, 32)
 	copy(c.ClientRandom, clientHello[11:11+32])
 	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)
-
-	spew.Dump(c.Tls.ZeroRTTSecret())
 
 	if len(c.Tls.ZeroRTTSecret()) > 0 {
 		c.Logger.Printf("0-RTT secret is available, installing crypto state")

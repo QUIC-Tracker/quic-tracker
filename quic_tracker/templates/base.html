@@ -18,6 +18,8 @@
     {% if code != 0 %}
         {% if code == 255 %}
             No UDP connection could be established
+        {% elif code == 254 %}
+            The test crashed. Please contact the administrators or consult the logs
         {% elif code in scenario.error_codes %}
             {{ scenario.error_codes[code]|safe }}
         {% else %}

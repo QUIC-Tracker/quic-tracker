@@ -37,6 +37,7 @@ type AbstractScenario struct {
 	ipv6    bool
 	timeout *time.Timer
 }
+
 func (s *AbstractScenario) Name() string {
 	return s.name
 }
@@ -76,4 +77,26 @@ func (s *AbstractScenario) CompleteHandshake(conn *m.Connection, trace *m.Trace,
 
 func CompleteHandshake(conn *m.Connection) (m.Packet, error) {
 	return nil, nil
+}
+
+func GetAllScenarii() map[string]Scenario {
+	return map[string]Scenario{
+		"zero_rtt":                  NewZeroRTTScenario(),
+		"connection_migration":      NewConnectionMigrationScenario(),
+		"unsupported_tls_version":   NewUnsupportedTLSVersionScenario(),
+		"stream_opening_reordering": NewStreamOpeningReorderingScenario(),
+		"multi_stream":              NewMultiStreamScenario(),
+		"new_connection_id":         NewNewConnectionIDScenario(),
+		"version_negotiation":       NewVersionNegotiationScenario(),
+		"handshake":                 NewHandshakeScenario(),
+		"handshake_v6":              NewHandshakev6Scenario(),
+		"transport_parameters":      NewTransportParameterScenario(),
+		"address_validation":        NewAddressValidationScenario(),
+		"padding":                   NewPaddingScenario(),
+		"flow_control":              NewFlowControlScenario(),
+		"ack_only":                  NewAckOnlyScenario(),
+		"stop_sending":              NewStopSendingOnReceiveStreamScenario(),
+		"http_get_and_wait":         NewSimpleGetAndWaitScenario(),
+		"http_get_on_uni_stream":    NewGetOnStream2Scenario(),
+	}
 }

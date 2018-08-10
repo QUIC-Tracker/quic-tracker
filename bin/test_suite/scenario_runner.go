@@ -36,13 +36,13 @@ func main() {
 	flag.Parse()
 
 	if *host == "" || *url == "" || *scenarioName == "" {
-		println("Parameters hostname, url and scenario are required")
+		println("Parameters host, url and scenario are required")
 		os.Exit(-1)
 	}
 
 	scenario, ok := s.GetAllScenarii()[*scenarioName]
 	if !ok {
-		println("Unknown scenario name", scenario)
+		println("Unknown scenario", *scenarioName)
 	}
 
 	trace := m.NewTrace(scenario.Name(), scenario.Version(), *host)

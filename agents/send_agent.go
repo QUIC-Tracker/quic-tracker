@@ -139,6 +139,9 @@ func (a *SendingAgent) Run(conn *Connection) {
 				timers[eL].Reset(0)
 			case i := <- newEncryptionLevelAvailable:
 				dEL := i.(DirectionalEncryptionLevel)
+				if dEL.Read {
+					continue
+				}
 				eL := dEL.EncryptionLevel
 				encryptionLevelsAvailable[dEL] = true
 

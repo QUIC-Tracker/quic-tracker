@@ -46,7 +46,7 @@ func (s *AddressValidationScenario) Run(conn *m.Connection, trace *m.Trace, pref
 	tlsAgent := connAgents.Get("TLSAgent").(*agents.TLSAgent)
 	tlsAgent.DisableFrameSending = true
 
-	handshakeAgent := &agents.HandshakeAgent{TLSAgent: tlsAgent}
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: tlsAgent, SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 	handshakeStatus := make(chan interface{}, 10)
 	handshakeAgent.HandshakeStatus.Register(handshakeStatus)

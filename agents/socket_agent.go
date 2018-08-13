@@ -1,15 +1,20 @@
 package agents
 
-import m "github.com/mpiraux/master-thesis"
+import (
+	m "github.com/mpiraux/master-thesis"
+	"github.com/dustin/go-broadcast"
+)
 
 type SocketAgent struct {
 	BaseAgent
 	TotalDataReceived int
 	DatagramsReceived int
+	SocketStatus broadcast.Broadcaster //type: err
 }
 
 func (a *SocketAgent) Run(conn *m.Connection) {
 	a.Init("SocketAgent", conn.SourceCID)
+	a.SocketStatus = broadcast.NewBroadcaster(10)
 	recChan := make(chan []byte)
 
 	go func() {
@@ -19,6 +24,7 @@ func (a *SocketAgent) Run(conn *m.Connection) {
 			if err != nil {
 				a.Logger.Println("Closing UDP socket because of error", err.Error())
 				close(recChan)
+				a.SocketStatus.Submit(err)
 				break
 			}
 			a.TotalDataReceived += i

@@ -52,7 +52,7 @@ func (s *AbstractScenario) Timeout() *time.Timer {
 }
 func (s *AbstractScenario) CompleteHandshake(conn *m.Connection, trace *m.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
-	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent)}
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 
 	handshakeStatus := make(chan interface{}, 10)
@@ -95,6 +95,7 @@ func GetAllScenarii() map[string]Scenario {
 		"padding":                   NewPaddingScenario(),
 		"flow_control":              NewFlowControlScenario(),
 		"ack_only":                  NewAckOnlyScenario(),
+		"ack_ecn":                   NewAckECNScenario(),
 		"stop_sending":              NewStopSendingOnReceiveStreamScenario(),
 		"http_get_and_wait":         NewSimpleGetAndWaitScenario(),
 		"http_get_on_uni_stream":    NewGetOnStream2Scenario(),

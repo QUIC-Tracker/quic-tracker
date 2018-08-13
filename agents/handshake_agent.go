@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"encoding/hex"
 	"errors"
+	"strings"
 )
 
 type HandshakeStatus struct {
@@ -21,6 +22,7 @@ func (s HandshakeStatus) String() string {
 type HandshakeAgent struct {
 	BaseAgent
 	TLSAgent         *TLSAgent
+	SocketAgent      *SocketAgent
 	HandshakeStatus  broadcast.Broadcaster //type: HandshakeStatus
 	sendInitial		 chan bool
 }
@@ -35,6 +37,9 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 
 	tlsStatus := make(chan interface{}, 10)
 	a.TLSAgent.TLSStatus.Register(tlsStatus)
+
+	socketStatus := make(chan interface{}, 10)
+	a.SocketAgent.SocketStatus.Register(socketStatus)
 
 	firstInitialReceived := false
 
@@ -77,6 +82,10 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				s := i.(TLSStatus)
 				a.HandshakeStatus.Submit(HandshakeStatus{s.Completed, s.Packet, s.Error})
 				return
+			case i := <-socketStatus:
+				if strings.Contains(i.(error).Error(), "connection refused") {
+					a.HandshakeStatus.Submit(HandshakeStatus{false, nil , i.(error)})
+				}
 			case <-a.close:
 				return
 			}

@@ -40,7 +40,7 @@ func NewHandshakeScenario() *HandshakeScenario {
 func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
-	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent)}
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 
 	handshakeStatus := make(chan interface{}, 10)

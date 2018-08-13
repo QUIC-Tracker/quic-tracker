@@ -190,8 +190,8 @@ def dissector(traces_id, trace_idx):
         next_id, next_trace_idx = None, None
 
     return render_template('dissector.html', trace=trace, scenario=scenarii[trace['scenario']],
-                           pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'pcap' in trace else None,
-                           decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if 'decrypted_pcap' in trace else None,
+                           pcap_link=url_for('trace_pcap', traces_id=traces_id, trace_idx=trace_idx) if trace.get('pcap') else None,
+                           decrypted_pcap_link=url_for('trace_decrypted_pcap', traces_id=traces_id, trace_idx=trace_idx) if trace.get('decrypted_pcap') else None,
                            previous=url_for('dissector', traces_id=previous_id, trace_idx=previous_trace_idx) if previous_trace_idx is not None else '',
                            next=url_for('dissector', traces_id=next_id, trace_idx=next_trace_idx) if next_trace_idx is not None else '',
                            secrets_link=url_for('trace_secrets', traces_id=traces_id, trace_idx=trace_idx) if trace.get('exporter_secret') else None)

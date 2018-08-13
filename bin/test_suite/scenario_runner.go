@@ -66,13 +66,9 @@ func main() {
 
 		conn.Close()
 		trace.Complete(conn)
-		err = trace.AddPcap(pcap)
+		err = trace.AddPcap(conn, pcap)
 		if err != nil {
 			trace.Results["pcap_completed_error"] = err.Error()
-		}
-		trace.DecryptedPcap, err = m.DecryptPcap(trace)
-		if err != nil {
-			trace.Results["pcap_decrypt_error"] = err.Error()
 		}
 	} else {
 		trace.ErrorCode = 255

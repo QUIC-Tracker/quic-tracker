@@ -54,8 +54,8 @@ func NewTrace(scenarioName string, scenarioVersion int, host string) *Trace {
 	return &trace
 }
 
-func (t *Trace) AddPcap(c *exec.Cmd) error {
-	content, err := StopPcapCapture(c)
+func (t *Trace) AddPcap(conn *Connection, cmd *exec.Cmd) error {
+	content, err := StopPcapCapture(conn, cmd)
 	if err != nil {
 		return err
 	}

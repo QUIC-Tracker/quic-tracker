@@ -53,7 +53,7 @@ func main() {
 	trace.AttachTo(conn)
 	defer func() {
 		trace.Complete(conn)
-		err = trace.AddPcap(pcap)
+		err = trace.AddPcap(conn, pcap)
 		if err != nil {
 			trace.Results["pcap_error"] = err.Error()
 		}

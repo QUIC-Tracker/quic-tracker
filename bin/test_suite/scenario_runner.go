@@ -51,6 +51,9 @@ func main() {
 
 	if err == nil {
 		pcap, err := m.StartPcapCapture(conn, *netInterface)
+		if err != nil {
+			trace.Results["pcap_start_error"] = err.Error()
+		}
 
 		trace.AttachTo(conn)
 
@@ -65,7 +68,7 @@ func main() {
 		trace.Complete(conn)
 		err = trace.AddPcap(pcap)
 		if err != nil {
-			trace.Results["pcap_error"] = err.Error()
+			trace.Results["pcap_completed_error"] = err.Error()
 		}
 		trace.DecryptedPcap, err = m.DecryptPcap(trace)
 		if err != nil {

@@ -36,7 +36,10 @@ func StartPcapCapture(conn *Connection, netInterface string) (*exec.Cmd, error) 
 func StopPcapCapture(c *exec.Cmd) ([]byte, error) {
 	time.Sleep(1 * time.Second)
 	c.Process.Signal(syscall.SIGTERM)
-	c.Wait()
+	err := c.Wait()
+	if err != nil {
+		return nil, err
+	}
 	defer os.Remove(pcapTempPath)
 	return ioutil.ReadFile(pcapTempPath)
 }

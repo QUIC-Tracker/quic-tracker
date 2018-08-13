@@ -21,8 +21,6 @@ import (
 	"flag"
 	"strings"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -50,12 +48,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer func() {
-		pcap, err := m.StopPcapCapture(pcap)
-		if err == nil {
-			ioutil.WriteFile("/tmp/http_get.pcap", pcap, os.ModePerm)
-		}
-	}()
 
 	trace := m.NewTrace("http_get", 1, *address)
 	trace.AttachTo(conn)

@@ -14,6 +14,15 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+ack_ecn:
+  name: ACK ECN
+  description: This test sets the ECT(0) flag after the handshake completes and verify the host to use ECN in the IP header as well as to send <code>ACK_ECN</code> frames in response.
+  error_codes:
+    1: The handshake did not complete
+    2: The test suite was not able to configure ECN
+    3: The host is not ECN-capable
+    4: The host set ECN in the IP header but did not send <code>ACK_ECN</code> frames
+    5: The host send an <code>ACK_ECN</code> frame but did not set ECN in the IP header
 ack_only:
   name: ACK only
   description: |

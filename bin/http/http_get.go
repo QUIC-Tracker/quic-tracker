@@ -68,7 +68,7 @@ func main() {
 	}()
 
 	Agents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
-	handshakeAgent := &agents.HandshakeAgent{TLSAgent: Agents.Get("TLSAgent").(*agents.TLSAgent)}
+	handshakeAgent := &agents.HandshakeAgent{TLSAgent: Agents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: Agents.Get("SocketAgent").(*agents.SocketAgent)}
 	Agents.Add(handshakeAgent)
 
 	handshakeStatus := make(chan interface{}, 10)

@@ -14,13 +14,13 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-package masterthesis
+package quictracker
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	. "github.com/mpiraux/master-thesis/lib"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 type Header interface {

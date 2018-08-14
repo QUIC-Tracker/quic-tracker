@@ -17,9 +17,9 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"time"
 )
 
@@ -37,7 +37,7 @@ type HandshakeScenario struct {
 func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{"handshake", 2, false, nil}}
 }
-func (s *HandshakeScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}

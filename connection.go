@@ -14,7 +14,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-package masterthesis
+package quictracker
 
 import (
 	"crypto/rand"
@@ -28,7 +28,7 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/dustin/go-broadcast"
-	. "github.com/mpiraux/master-thesis/lib"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 type Connection struct {

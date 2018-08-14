@@ -17,9 +17,9 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"time"
 )
 
@@ -27,7 +27,7 @@ type Scenario interface {
 	Name() string
 	Version() int
 	IPv6() bool
-	Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool)
+	Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool)
 	Timeout() *time.Timer
 }
 
@@ -50,7 +50,7 @@ func (s *AbstractScenario) IPv6() bool {
 func (s *AbstractScenario) Timeout() *time.Timer {
 	return s.timeout
 }
-func (s *AbstractScenario) CompleteHandshake(conn *m.Connection, trace *m.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
+func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
@@ -75,7 +75,7 @@ func (s *AbstractScenario) CompleteHandshake(conn *m.Connection, trace *m.Trace,
 	return connAgents
 }
 
-func CompleteHandshake(conn *m.Connection) (m.Packet, error) {
+func CompleteHandshake(conn *qt.Connection) (qt.Packet, error) {
 	return nil, nil
 }
 

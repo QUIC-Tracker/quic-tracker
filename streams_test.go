@@ -1,4 +1,4 @@
-package masterthesis
+package quictracker
 
 import (
 	"testing"

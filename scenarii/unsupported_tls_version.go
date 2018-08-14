@@ -17,11 +17,11 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bytes"
 
 	"time"
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
 const (
@@ -38,7 +38,7 @@ type UnsupportedTLSVersionScenario struct {
 func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 	return &UnsupportedTLSVersionScenario{AbstractScenario{"unsupported_tls_version", 1, false, nil}}
 }
-func (s *UnsupportedTLSVersionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
@@ -55,15 +55,15 @@ forLoop:
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case *m.VersionNegotationPacket:
+			case *qt.VersionNegotationPacket:
 				if err := conn.ProcessVersionNegotation(p); err != nil {
 					trace.MarkError(UTS_VNDidNotComplete, err.Error(), p)
 					return
 				}
 				sendUnsupportedInitial(conn)
-			case m.Framer:
+			case qt.Framer:
 				for _, frame := range p.GetFrames() {
-					if cc, ok := frame.(*m.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
+					if cc, ok := frame.(*qt.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
 						if cc.ErrorCode != 0x201 {
 							trace.MarkError(UTS_WrongErrorCodeIsUsed, "", p)
 						}
@@ -71,7 +71,7 @@ forLoop:
 						connectionClosed = true
 					}
 				}
-			case m.Packet:
+			case qt.Packet:
 				trace.MarkError(UTS_ReceivedUnexpectedPacketType, "", p)
 			}
 			case <-s.Timeout().C:
@@ -84,12 +84,12 @@ forLoop:
 	}
 }
 
-func sendUnsupportedInitial(conn *m.Connection) {
+func sendUnsupportedInitial(conn *qt.Connection) {
 	initialPacket := conn.GetInitialPacket()
 	for _, f := range initialPacket.Frames { // Advertise support of TLS 1.3 draft-00 only
-		if frame, ok := f.(*m.CryptoFrame); ok {
+		if frame, ok := f.(*qt.CryptoFrame); ok {
 			frame.CryptoData = bytes.Replace(frame.CryptoData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
-	conn.SendPacket(initialPacket, m.EncryptionLevelInitial)
+	conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)
 }

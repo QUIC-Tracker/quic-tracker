@@ -17,10 +17,10 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
 const (
@@ -37,7 +37,7 @@ type ZeroRTTScenario struct {
 func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false, nil}}
 }
-func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 
 	connAgents := s.CompleteHandshake(conn, trace, ZR_TLSHandshakeFailed)
@@ -66,7 +66,7 @@ func (s *ZeroRTTScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	rh, sh := conn.ReceivedPacketHandler, conn.SentPacketHandler
 
 	var err error
-	conn, err = m.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionTicket, s.ipv6)
+	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionTicket, s.ipv6)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	if err != nil {
@@ -95,8 +95,8 @@ forLoop:
 	for {
 		select {
 		case i := <-encryptionLevelsAvailable:
-			eL := i.(m.DirectionalEncryptionLevel)
-			if eL.EncryptionLevel == m.EncryptionLevel0RTT && !eL.Read {
+			eL := i.(qt.DirectionalEncryptionLevel)
+			if eL.EncryptionLevel == qt.EncryptionLevel0RTT && !eL.Read {
 				break forLoop
 			}
 		case <-s.Timeout().C:

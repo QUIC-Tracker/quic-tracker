@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
 
 	"time"
@@ -35,7 +35,7 @@ type StreamOpeningReorderingScenario struct {
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false, nil}}
 }
-func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 
 	connAgents := s.CompleteHandshake(conn, trace, SOR_TLSHandshakeFailed)
@@ -49,14 +49,14 @@ func (s *StreamOpeningReorderingScenario) Run(conn *m.Connection, trace *m.Trace
 
 	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
-	pp1 := m.NewProtectedPacket(conn)
-	pp1.Frames = append(pp1.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
+	pp1 := qt.NewProtectedPacket(conn)
+	pp1.Frames = append(pp1.Frames, qt.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
 
-	pp2 := m.NewProtectedPacket(conn)
-	pp2.Frames = append(pp2.Frames, m.NewStreamFrame(4, conn.Streams.Get(4), []byte{}, true))
+	pp2 := qt.NewProtectedPacket(conn)
+	pp2.Frames = append(pp2.Frames, qt.NewStreamFrame(4, conn.Streams.Get(4), []byte{}, true))
 
-	conn.SendPacket(pp2, m.EncryptionLevel1RTT)
-	conn.SendPacket(pp1, m.EncryptionLevel1RTT)
+	conn.SendPacket(pp2, qt.EncryptionLevel1RTT)
+	conn.SendPacket(pp1, qt.EncryptionLevel1RTT)
 
 	<-s.Timeout().C
 

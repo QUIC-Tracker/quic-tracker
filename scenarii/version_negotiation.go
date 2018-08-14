@@ -17,10 +17,10 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
 const (
@@ -40,7 +40,7 @@ type VersionNegotiationScenario struct {
 func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false, nil}}
 }
-func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
@@ -51,7 +51,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 	conn.Version = ForceVersionNegotiation
 	trace.ErrorCode = VN_Timeout
 	initial := conn.GetInitialPacket()
-	conn.SendPacket(initial, m.EncryptionLevelInitial)
+	conn.SendPacket(initial, qt.EncryptionLevelInitial)
 
 	threshold := 3
 	vnCount := 0
@@ -60,7 +60,7 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case *m.VersionNegotationPacket:
+			case *qt.VersionNegotationPacket:
 				vnCount++
 				if vnCount > 1 && unusedField != p.UnusedField {
 					trace.ErrorCode = 0
@@ -71,10 +71,10 @@ func (s *VersionNegotiationScenario) Run(conn *m.Connection, trace *m.Trace, pre
 				}
 				unusedField = p.UnusedField
 				trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
-				newInitial := m.NewInitialPacket(conn)
+				newInitial := qt.NewInitialPacket(conn)
 				newInitial.Frames = initial.Frames
-				conn.SendPacket(initial, m.EncryptionLevelInitial)
-			case m.Packet:
+				conn.SendPacket(initial, qt.EncryptionLevelInitial)
+			case qt.Packet:
 				trace.MarkError(VN_NotAnsweringToVN, "", p)
 				trace.Results["received_packet_type"] = p.Header().PacketType()
 			}

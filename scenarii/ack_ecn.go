@@ -18,8 +18,8 @@ package scenarii
 
 import (
 	"time"
-	m "github.com/mpiraux/master-thesis"
-	"github.com/mpiraux/master-thesis/agents"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
 const (
@@ -37,7 +37,7 @@ type AckECNScenario struct {
 func NewAckECNScenario() *AckECNScenario {
 	return &AckECNScenario{AbstractScenario{"ack_ecn", 1, false, nil}}
 }
-func (s *AckECNScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 
 	connAgents := s.CompleteHandshake(conn, trace, AE_TLSHandshakeFailed)
@@ -66,8 +66,8 @@ func (s *AckECNScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl st
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case m.Framer:
-				if p.Contains(m.AckECNType) {
+			case qt.Framer:
+				if p.Contains(qt.AckECNType) {
 					if trace.ErrorCode == AE_NonECN {
 						trace.ErrorCode = AE_NonECNButACKECN
 					} else if trace.ErrorCode == AE_NoACKECNReceived {

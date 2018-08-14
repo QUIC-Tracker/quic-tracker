@@ -18,8 +18,8 @@ package main
 
 import (
 	"os"
-	m "github.com/mpiraux/master-thesis"
-	s "github.com/mpiraux/master-thesis/scenarii"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	s "github.com/QUIC-Tracker/quic-tracker/scenarii"
 	"flag"
 	"strings"
 	"time"
@@ -45,12 +45,12 @@ func main() {
 		println("Unknown scenario", *scenarioName)
 	}
 
-	trace := m.NewTrace(scenario.Name(), scenario.Version(), *host)
+	trace := qt.NewTrace(scenario.Name(), scenario.Version(), *host)
 
-	conn, err := m.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6())  // Raw IPv6 are not handled correctly
+	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6()) // Raw IPv6 are not handled correctly
 
 	if err == nil {
-		pcap, err := m.StartPcapCapture(conn, *netInterface)
+		pcap, err := qt.StartPcapCapture(conn, *netInterface)
 		if err != nil {
 			trace.Results["pcap_start_error"] = err.Error()
 		}

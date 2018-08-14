@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bytes"
 	"fmt"
 
@@ -41,7 +41,7 @@ type NewConnectionIDScenario struct {
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
 	return &NewConnectionIDScenario{AbstractScenario{"new_connection_id", 1, false, nil}}
 }
-func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 	s.timeout = time.NewTimer(10 * time.Second)
 
@@ -68,7 +68,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 	for {
 		select {
 		case i := <-incPackets:
-			p := i.(m.Packet)
+			p := i.(qt.Packet)
 			if expectingResponse {
 				if !bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
 					trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
@@ -78,9 +78,9 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 				break
 			}
 
-			if pp, ok := p.(*m.ProtectedPacket); ok {
-				for _, frame := range pp.GetAll(m.NewConnectionIdType) {
-					nci := frame.(*m.NewConnectionIdFrame)
+			if pp, ok := p.(*qt.ProtectedPacket); ok {
+				for _, frame := range pp.GetAll(qt.NewConnectionIdType) {
+					nci := frame.(*qt.NewConnectionIdFrame)
 
 					if nci.Length < 4 || nci.Length > 18 {
 						err := fmt.Sprintf("Connection ID length must be comprised between 4 and 18, it was %d", nci.Length)
@@ -93,7 +93,7 @@ func (s *NewConnectionIDScenario) Run(conn *m.Connection, trace *m.Trace, prefer
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
-						conn.FrameQueue.Submit(m.QueuedFrame{&m.NewConnectionIdFrame{0, uint8(len(scid)), scid, resetToken}, m.EncryptionLevelBest})
+						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{0, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
 						conn.SendHTTPGETRequest(preferredUrl, 0)
 						expectingResponse = true
 					}

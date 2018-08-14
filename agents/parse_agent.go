@@ -1,8 +1,8 @@
 package agents
 
 import (
-	. "github.com/mpiraux/master-thesis"
-	. "github.com/mpiraux/master-thesis/lib"
+	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	"unsafe"
 	"bytes"
 )

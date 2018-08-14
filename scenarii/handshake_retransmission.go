@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 )
 
@@ -36,7 +36,7 @@ type HandshakeRetransmissionScenario struct {
 func NewHandshakeRetransmissionScenario() *HandshakeRetransmissionScenario {
 	return &HandshakeRetransmissionScenario{AbstractScenario{"handshake_retransmission", 3, false, nil}}
 }
-func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *HandshakeRetransmissionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	// TODO: Integrate this scenario with the HandshakeAgent
 
 	/*
@@ -54,7 +54,7 @@ func (s *HandshakeRetransmissionScenario) Run(conn *m.Connection, trace *m.Trace
 	pathChallengeReceived := 0
 	packetReceived := 0
 	handshakePacketReceivedBeforePC := 0
-	var packetFinished m.Packet = nil
+	var packetFinished qt.Packet = nil
 
 outerLoop:
 	for {
@@ -67,10 +67,10 @@ outerLoop:
 		totalDataReceived += len(rec)
 
 		for _, packet := range packets {
-			if handshake, ok := packet.(*m.HandshakePacket); ok {
+			if handshake, ok := packet.(*qt.HandshakePacket); ok {
 				var isRetransmit bool
 				for _, frame := range handshake.Frames { // TODO Distinguish retransmits-only packets from packets bundling retransmitted and new frames ?
-					if streamFrame, ok := frame.(*m.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
+					if streamFrame, ok := frame.(*qt.StreamFrame); ok && streamFrame.StreamId == 0 && streamFrame.Offset == 0 {
 						isRetransmit = true
 						break
 					}
@@ -84,7 +84,7 @@ outerLoop:
 				}
 
 				if ongoingHandshake {
-					var response m.Packet
+					var response qt.Packet
 					ongoingHandshake, response, err = conn.ProcessServerHello(handshake)
 					if err != nil {
 						trace.MarkError(HR_TLSHandshakeFailed, err.Error(), response)
@@ -97,13 +97,13 @@ outerLoop:
 
 				packetReceived++
 
-				if handshake.Contains(m.PathChallengeType) {
+				if handshake.Contains(qt.PathChallengeType) {
 					pathChallengeReceived++
-					if pathChallenge := handshake.GetFirst(m.PathChallengeType); trace.ErrorCode != HR_NoPathChallengeConfirmation && !ongoingHandshake && (packetReceived < 3 || packetReceived == pathChallengeReceived) {
+					if pathChallenge := handshake.GetFirst(qt.PathChallengeType); trace.ErrorCode != HR_NoPathChallengeConfirmation && !ongoingHandshake && (packetReceived < 3 || packetReceived == pathChallengeReceived) {
 						trace.Results["amplification_factor"] = float64(totalDataReceived) / float64(len(initial.Encode(initial.EncodePayload())))
 
-						handshakeResponse := m.NewHandshakePacket(conn)
-						handshakeResponse.Frames = append(handshakeResponse.Frames, m.PathResponse{pathChallenge.(*m.PathChallenge).Data}, conn.GetAckFrame(packet.PNSpace()))
+						handshakeResponse := qt.NewHandshakePacket(conn)
+						handshakeResponse.Frames = append(handshakeResponse.Frames, qt.PathResponse{pathChallenge.(*qt.PathChallenge).Data}, conn.GetAckFrame(packet.PNSpace()))
 						conn.SendHandshakeProtectedPacket(handshakeResponse)
 
 						trace.ErrorCode = HR_NoPathChallengeConfirmation  // Assume true unless proven otherwise
@@ -122,12 +122,12 @@ outerLoop:
 							packetFinished = nil
 							conn.IgnorePathChallenge = false
 						}
-						protectedPacket := m.NewProtectedPacket(conn)
+						protectedPacket := qt.NewProtectedPacket(conn)
 						protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 						conn.SendProtectedPacket(protectedPacket)
 					}
 				}
-			} else if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+			} else if vn, ok := packet.(*qt.VersionNegotationPacket); ok {
 				if err := conn.ProcessVersionNegotation(vn); err != nil {
 					trace.MarkError(HR_VNDidNotComplete, err.Error(), vn)
 					break outerLoop
@@ -135,13 +135,13 @@ outerLoop:
 				initial = conn.GetInitialPacket()
 				conn.SendHandshakeProtectedPacket(initial)
 				totalDataReceived = 0
-			} else if pp, ok := packet.(*m.ProtectedPacket); ok && (isStateless || pathChallengeReceived > 0){
+			} else if pp, ok := packet.(*qt.ProtectedPacket); ok && (isStateless || pathChallengeReceived > 0){
 				if pp.ShouldBeAcknowledged() {
-					protectedPacket := m.NewProtectedPacket(conn)
+					protectedPacket := qt.NewProtectedPacket(conn)
 					protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(packet.PNSpace()))
 					conn.SendProtectedPacket(protectedPacket)
 				}
-			} else if _, ok := packet.(*m.RetryPacket); ok {
+			} else if _, ok := packet.(*qt.RetryPacket); ok {
 				isStateless = true
 				break outerLoop
 			} else {

@@ -14,12 +14,12 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-package masterthesis
+package quictracker
 
 import (
 	"crypto/cipher"
 	"github.com/mpiraux/pigotls"
-	. "github.com/mpiraux/master-thesis/lib"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2

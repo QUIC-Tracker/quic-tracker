@@ -20,8 +20,8 @@ import (
 	"flag"
 	"os"
 	"sort"
-	"github.com/mpiraux/master-thesis/scenarii"
-	m "github.com/mpiraux/master-thesis"
+	"github.com/QUIC-Tracker/quic-tracker/scenarii"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bufio"
 	"strings"
 	"os/exec"
@@ -76,7 +76,7 @@ func main() {
 	}
 
 	var results Results
-	result := make(chan *m.Trace)
+	result := make(chan *qt.Trace)
 
 	go func() {
 		for t := range result {
@@ -146,7 +146,7 @@ func main() {
 					println(err.Error())
 				}
 
-				var trace m.Trace
+				var trace qt.Trace
 				outputFile, err = os.Open(outputFile.Name())
 				if err != nil {
 					println(err)
@@ -187,13 +187,13 @@ func main() {
 	println(string(out))
 }
 
-func GetCrashTrace(scenario scenarii.Scenario, host string) *m.Trace {
-	trace := m.NewTrace(scenario.Name(), scenario.Version(), host)
+func GetCrashTrace(scenario scenarii.Scenario, host string) *qt.Trace {
+	trace := qt.NewTrace(scenario.Name(), scenario.Version(), host)
 	trace.ErrorCode = 254
 	return trace
 }
 
-type Results []m.Trace
+type Results []qt.Trace
 func (a Results) Less(i, j int) bool {
 	if a[i].Scenario == a[j].Scenario {
 		return a[i].Host < a[j].Host

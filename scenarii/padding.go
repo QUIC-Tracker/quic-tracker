@@ -1,10 +1,10 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
-	. "github.com/mpiraux/master-thesis/lib"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	"time"
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
 const (
@@ -19,7 +19,7 @@ type PaddingScenario struct {
 func NewPaddingScenario() *PaddingScenario {
 	return &PaddingScenario{AbstractScenario{"padding", 1, false, nil}}
 }
-func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
@@ -27,19 +27,19 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	sendEmptyInitialPacket := func() {
 		var initialLength int
 		if conn.UseIPv6 {
-			initialLength = m.MinimumInitialLengthv6
+			initialLength = qt.MinimumInitialLengthv6
 		} else {
-			initialLength = m.MinimumInitialLength
+			initialLength = qt.MinimumInitialLength
 		}
 
-		initialPacket := m.NewInitialPacket(conn)
+		initialPacket := qt.NewInitialPacket(conn)
 		payloadLen := len(initialPacket.EncodePayload())
-		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoStates[m.EncryptionLevelInitial].Write.Overhead())
+		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoStates[qt.EncryptionLevelInitial].Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
-			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
+			initialPacket.Frames = append(initialPacket.Frames, new(qt.PaddingFrame))
 		}
 
-		conn.SendPacket(initialPacket, m.EncryptionLevelInitial)
+		conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)
 	}
 
 	incPackets := make(chan interface{}, 1000)
@@ -49,8 +49,8 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 	select {
 	case i := <-incPackets:
-		packet := i.(m.Packet)
-		if vn, ok := packet.(*m.VersionNegotationPacket); ok {
+		packet := i.(qt.Packet)
+		if vn, ok := packet.(*qt.VersionNegotationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err != nil {
 				trace.MarkError(P_VNDidNotComplete, err.Error(), vn)
 				return

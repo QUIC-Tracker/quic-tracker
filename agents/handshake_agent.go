@@ -1,7 +1,7 @@
 package agents
 
 import (
-	. "github.com/mpiraux/master-thesis"
+	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/dustin/go-broadcast"
 	"fmt"
 	"encoding/hex"

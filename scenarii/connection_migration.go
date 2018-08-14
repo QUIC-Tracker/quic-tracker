@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
 )
@@ -36,7 +36,7 @@ type ConnectionMigrationScenario struct {
 func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false, nil}}
 }
-func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := s.CompleteHandshake(conn, trace, CM_TLSHandshakeFailed)
 	if connAgents == nil {
@@ -51,7 +51,7 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	connAgents.Get("SocketAgent").Join()
 	connAgents.Get("SendingAgent").Join()
 
-	newUdpConn, err := m.EstablishUDPConnection(conn.Host)
+	newUdpConn, err := qt.EstablishUDPConnection(conn.Host)
 	if err != nil {
 		trace.ErrorCode = CM_UDPConnectionFailed
 		return
@@ -63,8 +63,8 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	connAgents.Get("SocketAgent").Run(conn)
 	connAgents.Get("SendingAgent").Run(conn)
 
-	conn.EncryptionLevelsAvailable.Submit(m.DirectionalEncryptionLevel{m.EncryptionLevelHandshake, false})  // TODO: Find a way around this
-	conn.EncryptionLevelsAvailable.Submit(m.DirectionalEncryptionLevel{m.EncryptionLevel1RTT, false})
+	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevelHandshake, false})  // TODO: Find a way around this
+	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevel1RTT, false})
 
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
@@ -75,12 +75,12 @@ func (s *ConnectionMigrationScenario) Run(conn *m.Connection, trace *m.Trace, pr
 	for {
 		select {
 		case i := <-incPackets:
-			p := i.(m.Packet)
+			p := i.(qt.Packet)
 			if trace.ErrorCode == CM_HostDidNotMigrate {
 				trace.ErrorCode = CM_HostDidNotValidateNewPath
 			}
 
-			if fp, ok := p.(m.Framer); ok && fp.Contains(m.PathChallengeType) {
+			if fp, ok := p.(qt.Framer); ok && fp.Contains(qt.PathChallengeType) {
 				trace.ErrorCode = 0
 			}
 

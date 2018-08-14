@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
 	_ "github.com/davecgh/go-spew/spew"
 
@@ -37,7 +37,7 @@ type MultiStreamScenario struct {
 func NewMultiStreamScenario() *MultiStreamScenario {
 	return &MultiStreamScenario{AbstractScenario{"multi_stream", 1, false, nil}}
 }
-func (s *MultiStreamScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxData = 1024 * 1024
 	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10

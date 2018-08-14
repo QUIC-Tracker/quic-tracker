@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
 )
@@ -34,7 +34,7 @@ type AckOnlyScenario struct {
 func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false, nil}}
 }
-func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := s.CompleteHandshake(conn, trace, AO_TLSHandshakeFailed)
 	if connAgents == nil {
@@ -54,21 +54,21 @@ func (s *AckOnlyScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 	for {
 		select {
 		case i := <-incPackets:
-			p := i.(m.Packet)
-			if p.PNSpace() != m.PNSpaceAppData {
+			p := i.(qt.Packet)
+			if p.PNSpace() != qt.PNSpaceAppData {
 				break
 			}
 			if p.ShouldBeAcknowledged() {
-				ackFrame := conn.GetAckFrame(m.PNSpaceAppData)
+				ackFrame := conn.GetAckFrame(qt.PNSpaceAppData)
 				if ackFrame == nil {
 					break
 				}
-				protectedPacket := m.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(m.PNSpaceAppData))
-				conn.SendPacket(protectedPacket, m.EncryptionLevel1RTT)
+				protectedPacket := qt.NewProtectedPacket(conn)
+				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(qt.PNSpaceAppData))
+				conn.SendPacket(protectedPacket, qt.EncryptionLevel1RTT)
 				ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
-			} else if framer, ok := p.(m.Framer); ok && framer.Contains(m.AckType) {
-				ack := framer.GetFirst(m.AckType).(*m.AckFrame)
+			} else if framer, ok := p.(qt.Framer); ok && framer.Contains(qt.AckType) {
+				ack := framer.GetFirst(qt.AckType).(*qt.AckFrame)
 				if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
 					trace.MarkError(AO_SentAOInResponseOfAO, "", p)
 					return

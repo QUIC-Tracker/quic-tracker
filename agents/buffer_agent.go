@@ -1,6 +1,6 @@
 package agents
 
-import . "github.com/mpiraux/master-thesis"
+import . "github.com/QUIC-Tracker/quic-tracker"
 
 type BufferAgent struct {
 	BaseAgent

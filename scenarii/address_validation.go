@@ -17,8 +17,8 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
-	"github.com/mpiraux/master-thesis/agents"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"time"
 	"fmt"
 )
@@ -35,7 +35,7 @@ type AddressValidationScenario struct {
 func NewAddressValidationScenario() *AddressValidationScenario {
 	return &AddressValidationScenario{AbstractScenario{"address_validation", 1, false, nil}}
 }
-func (s *AddressValidationScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
@@ -67,10 +67,10 @@ forLoop:
 		case i := <-incomingPackets:
 			var isRetransmit bool
 			switch p := i.(type) {
-			case *m.InitialPacket:
-				if p.Contains(m.CryptoType) {
-					for _, f := range p.GetAll(m.CryptoType) {
-						if f.(*m.CryptoFrame).Offset == 0 {
+			case *qt.InitialPacket:
+				if p.Contains(qt.CryptoType) {
+					for _, f := range p.GetAll(qt.CryptoType) {
+						if f.(*qt.CryptoFrame).Offset == 0 {
 							isRetransmit = true
 						}
 					}
@@ -85,7 +85,7 @@ forLoop:
 			}
 
 			if socketAgent.DatagramsReceived > 3 {
-				trace.MarkError(AV_SentMoreThan3Datagrams, fmt.Sprintf("%d datagrams received", socketAgent.DatagramsReceived), i.(m.Packet))
+				trace.MarkError(AV_SentMoreThan3Datagrams, fmt.Sprintf("%d datagrams received", socketAgent.DatagramsReceived), i.(qt.Packet))
 			}
 		case i := <-handshakeStatus:
 			status := i.(agents.HandshakeStatus)

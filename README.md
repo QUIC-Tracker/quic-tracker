@@ -17,7 +17,7 @@ The test suite comprises a minimal Go implementation of QUIC which is currently 
 You should have Go 1.9, tcpdump, libpcap libraries and header installed before starting.
 
 ```
-go get github.com/mpiraux/master-thesis
+go get github.com/QUIC-Tracker/quic-tracker
 cd $GOPATH/src/github.com/mpiraux/pigotls
 make
 ```

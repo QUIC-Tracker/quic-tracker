@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
 )
@@ -38,7 +38,7 @@ type FlowControlScenario struct {
 func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false, nil}}
 }
-func (s *FlowControlScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxStreamData = 80
 
@@ -59,7 +59,7 @@ forLoop:
 	for {
 		select {
 		case i := <-incPackets:
-			p := i.(m.Packet)
+			p := i.(qt.Packet)
 			if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
 				trace.MarkError(FC_HostSentMoreThanLimit, "", p)
 			}
@@ -72,8 +72,8 @@ forLoop:
 			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
 				conn.TLSTPHandler.MaxData *= 2
 				conn.TLSTPHandler.MaxStreamData *= 2
-				conn.FrameQueue.Submit(m.QueuedFrame{m.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, m.EncryptionLevel1RTT})
-				conn.FrameQueue.Submit(m.QueuedFrame{m.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamData)}, m.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, qt.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamData)}, qt.EncryptionLevel1RTT})
 				shouldResume = true
 			}
 			case <-s.Timeout().C:

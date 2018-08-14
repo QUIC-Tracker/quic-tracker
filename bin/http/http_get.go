@@ -17,7 +17,7 @@
 package main
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	m "github.com/QUIC-Tracker/quic-tracker"
 	"flag"
 	"strings"
 	"fmt"
@@ -25,7 +25,7 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"github.com/mpiraux/master-thesis/agents"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"github.com/davecgh/go-spew/spew"
 )
 

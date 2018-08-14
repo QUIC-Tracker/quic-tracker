@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"time"
 	"fmt"
@@ -44,7 +44,7 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 	return &SimpleGetAndWaitScenario{AbstractScenario{"http_get_and_wait", 1, false, nil}}
 }
 
-func (s *SimpleGetAndWaitScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxBidiStreams = 0
 	conn.TLSTPHandler.MaxUniStreams = 0
@@ -72,10 +72,10 @@ forLoop:
 		select {
 		case i := <-incomingPackets:
 			switch p := i.(type) {
-			case *m.ProtectedPacket:
+			case *qt.ProtectedPacket:
 				for _, f := range p.GetFrames() {
 					switch f := f.(type) {
-					case *m.StreamFrame:
+					case *qt.StreamFrame:
 						if f.StreamId != 0 {
 							errors[SGW_WrongStreamIDReceived] = fmt.Sprintf("received StreamID %d", f.StreamId)
 							trace.MarkError(SGW_WrongStreamIDReceived, "", p)
@@ -84,7 +84,7 @@ forLoop:
 							errors[SGW_EmptyStreamFrameNoFinBit] = fmt.Sprintf("received an empty STREAM frame with no FIN bit set for stream %d", f.StreamId)
 							trace.MarkError(SGW_EmptyStreamFrameNoFinBit, "", p)
 						}
-					case *m.ConnectionCloseFrame, *m.ApplicationCloseFrame:
+					case *qt.ConnectionCloseFrame, *qt.ApplicationCloseFrame:
 						connectionCloseReceived = true
 					}
 				}

@@ -17,7 +17,7 @@
 package scenarii
 
 import (
-	m "github.com/mpiraux/master-thesis"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	"encoding/binary"
 
 	"time"
@@ -37,10 +37,10 @@ type TransportParameterScenario struct {
 func NewTransportParameterScenario() *TransportParameterScenario {
 	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 3, false, nil}}
 }
-func (s *TransportParameterScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl string, debug bool) {
+func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	for i := uint16(0xff00); i <= 0xff0f; i++ {
-		p := m.TransportParameter{ParameterType: m.TransportParametersType(i)}
+		p := qt.TransportParameter{ParameterType: qt.TransportParametersType(i)}
 		p.Value = make([]byte, 2, 2)
 		binary.BigEndian.PutUint16(p.Value, i)
 		conn.TLSTPHandler.AdditionalParameters.AddParameter(p)

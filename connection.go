@@ -28,6 +28,7 @@ import (
 	"log"
 	"encoding/hex"
 	"github.com/dustin/go-broadcast"
+	. "github.com/mpiraux/master-thesis/lib"
 )
 
 type Connection struct {

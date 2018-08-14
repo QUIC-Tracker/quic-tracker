@@ -22,6 +22,7 @@ import (
 	"io"
 	"fmt"
 	"errors"
+	. "github.com/mpiraux/master-thesis/lib"
 )
 
 type Frame interface {

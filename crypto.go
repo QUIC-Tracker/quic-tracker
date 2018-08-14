@@ -19,6 +19,7 @@ package masterthesis
 import (
 	"crypto/cipher"
 	"github.com/mpiraux/pigotls"
+	. "github.com/mpiraux/master-thesis/lib"
 )
 
 var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2
@@ -108,7 +109,7 @@ func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
 	k := tls.HkdfExpandLabel(secret, "key", nil, tls.AEADKeySize())
 	iv := tls.HkdfExpandLabel(secret, "iv", nil, tls.AEADIvSize())
 
-	aead, err := newWrappedAESGCM(k, iv)
+	aead, err := NewWrappedAESGCM(k, iv)
 	if err != nil {
 		panic(err)
 	}

@@ -2,6 +2,7 @@ package agents
 
 import (
 	. "github.com/mpiraux/master-thesis"
+	. "github.com/mpiraux/master-thesis/lib"
 	"unsafe"
 	"bytes"
 )

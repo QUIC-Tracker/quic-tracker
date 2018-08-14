@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	. "github.com/mpiraux/master-thesis/lib"
 )
 
 type Header interface {

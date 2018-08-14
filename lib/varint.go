@@ -1,4 +1,4 @@
-package masterthesis
+package lib
 
 /*This file has been adapted from https://github.com/lucas-clemente/quic-go and
 is subject to following license and copyright.

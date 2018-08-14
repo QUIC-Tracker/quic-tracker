@@ -2,7 +2,7 @@ package scenarii
 
 import (
 	m "github.com/mpiraux/master-thesis"
-
+	. "github.com/mpiraux/master-thesis/lib"
 	"time"
 	"github.com/mpiraux/master-thesis/agents"
 )
@@ -34,7 +34,7 @@ func (s *PaddingScenario) Run(conn *m.Connection, trace *m.Trace, preferredUrl s
 
 		initialPacket := m.NewInitialPacket(conn)
 		payloadLen := len(initialPacket.EncodePayload())
-		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(m.VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoStates[m.EncryptionLevelInitial].Write.Overhead())
+		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoStates[m.EncryptionLevelInitial].Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
 			initialPacket.Frames = append(initialPacket.Frames, new(m.PaddingFrame))
 		}

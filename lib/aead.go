@@ -1,4 +1,4 @@
-package masterthesis
+package lib
 
 /*This file originates from https://github.com/ekr/minq and is subject to the
 following license and copyright
@@ -117,7 +117,7 @@ func (a *aeadWrapper) Open(dst []byte, nonce []byte, ciphertext []byte, aad []by
 	return ret, err
 }
 
-func newWrappedAESGCM(key []byte, iv []byte) (cipher.AEAD, error) {
+func NewWrappedAESGCM(key []byte, iv []byte) (cipher.AEAD, error) {
 	a, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

@@ -10,7 +10,8 @@ import (
 type Header interface {
 	PacketType() PacketType
 	DestinationConnectionID() ConnectionID
-	PacketNumber() uint32
+	PacketNumber() PacketNumber
+	TruncatedPN() TruncatedPN
 	EncryptionLevel() EncryptionLevel
 	Encode() []byte
 	Length() int
@@ -20,7 +21,7 @@ func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 	typeByte, _ := buffer.ReadByte()
 	buffer.UnreadByte()
 	if typeByte & 0x80 == 0x80 {
-		h = ReadLongHeader(buffer)
+		h = ReadLongHeader(buffer, conn)
 	} else {
 		h = ReadShortHeader(buffer, conn)
 	}
@@ -34,9 +35,8 @@ type LongHeader struct {
 	SourceCID      ConnectionID
 	PayloadLength  uint64
 	Token		   []byte
-	packetNumber   uint32
-	LengthBeforePN int
-	length         int
+	packetNumber   PacketNumber
+	truncatedPN    TruncatedPN
 }
 func (h *LongHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
@@ -52,18 +52,23 @@ func (h *LongHeader) Encode() []byte {
 		buffer.Write(h.Token)
 	}
 	WriteVarInt(buffer, h.PayloadLength)
-	buffer.Write(EncodePacketNumber(h.packetNumber))
+	buffer.Write(h.truncatedPN.Encode())
 	return buffer.Bytes()
 }
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
 func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
-func (h *LongHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
+func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
-func (h *LongHeader) Length() int { return h.length }
-func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
+func (h *LongHeader) Length() int {
+	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + VarIntLen(h.PayloadLength) + h.truncatedPN.Length
+	if h.packetType == Initial {
+		length += 1 + len(h.Token)
+	}
+	return length
+}
+func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	h := new(LongHeader)
-	h.length = buffer.Len()
-	h.LengthBeforePN = buffer.Len()
 	typeByte, _ := buffer.ReadByte()
 	h.packetType = PacketType(typeByte - 0x80)
 	binary.Read(buffer, binary.BigEndian, &h.Version)
@@ -80,22 +85,22 @@ func ReadLongHeader(buffer *bytes.Reader) *LongHeader {
 		buffer.Read(h.Token)
 	}
 	h.PayloadLength, _ = ReadVarInt(buffer)
-	h.LengthBeforePN -= buffer.Len()
-	h.packetNumber = DecodePacketNumber(buffer)
-	h.length -= buffer.Len()
+	h.truncatedPN = ReadTruncatedPN(buffer)
+	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
 	return h
 }
 func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *LongHeader {
 	h := new(LongHeader)
 	h.packetType = packetType
+	h.Version = conn.Version
 	h.SourceCID = conn.SourceCID
 	if packetType == ZeroRTTProtected {
 		h.DestinationCID = conn.OriginalDestinationCID
 	} else {
 		h.DestinationCID = conn.DestinationCID
 	}
-	h.packetNumber = uint32(conn.nextPacketNumber(space))
-	h.Version = conn.Version
+	h.packetNumber = conn.nextPacketNumber(space)
+	h.truncatedPN = h.packetNumber.Truncate(conn.LargestPNsAcknowledged[h.packetType.PNSpace()])
 	return h
 }
 
@@ -119,15 +124,28 @@ var packetTypeToString = map[PacketType]string{
 	ShortHeaderPacket: "1-RTT Protected",
 }
 
+var packetTypeToPNSPace = map[PacketType]PNSpace {
+	Initial: PNSpaceInitial,
+	Retry: PNSpaceNoSpace,
+	Handshake: PNSpaceHandshake,
+	ZeroRTTProtected: PNSpaceAppData,
+
+	ShortHeaderPacket: PNSpaceAppData,
+}
+
 func (t PacketType) String() string {
 	return packetTypeToString[t]
+}
+
+func (t PacketType) PNSpace() PNSpace {
+	return packetTypeToPNSPace[t]
 }
 
 type ShortHeader struct {
 	KeyPhase       KeyPhaseBit
 	DestinationCID ConnectionID
-	packetNumber   uint32
-	length 		   int
+	truncatedPN    TruncatedPN
+	packetNumber   PacketNumber
 }
 func (h *ShortHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
@@ -138,18 +156,18 @@ func (h *ShortHeader) Encode() []byte {
 	typeByte |= 0x30
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
-	buffer.Write(EncodePacketNumber(h.packetNumber))
+	buffer.Write(h.truncatedPN.Encode())
 
 	return buffer.Bytes()
 }
 func (h *ShortHeader) PacketType() PacketType { return ShortHeaderPacket }
 func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
-func (h *ShortHeader) PacketNumber() uint32 { return h.packetNumber }
+func (h *ShortHeader) PacketNumber() PacketNumber { return h.packetNumber }
+func (h *ShortHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *ShortHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
-func (h *ShortHeader) Length() int { return h.length }
+func (h *ShortHeader) Length() int { return 1 + len(h.DestinationCID) + h.truncatedPN.Length }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
-	h.length = buffer.Len()
 	typeByte, _ := buffer.ReadByte()
 	h.KeyPhase = (typeByte & 0x40) == 0x40
 
@@ -157,62 +175,21 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 		fmt.Printf("SH fixed bits not respected: expected %b, got %b\n", 0x30, typeByte & 0x38)
 	}
 
-	h.DestinationCID = make([]byte, len(conn.SourceCID), len(conn.SourceCID))
+	h.DestinationCID = make([]byte, len(conn.SourceCID))
 	buffer.Read(h.DestinationCID)
-	h.packetNumber = DecodePacketNumber(buffer)
-	h.length -= buffer.Len()
+	h.truncatedPN = ReadTruncatedPN(buffer)
+	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[PNSpaceAppData])
 	return h
 }
 func NewShortHeader(keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	h.KeyPhase = keyPhase
 	h.DestinationCID = conn.DestinationCID
-	h.packetNumber = uint32(conn.nextPacketNumber(PNSpaceAppData))
+	h.packetNumber = conn.nextPacketNumber(PNSpaceAppData)
+	h.truncatedPN = h.packetNumber.Truncate(conn.LargestPNsAcknowledged[PNSpaceAppData])
 	return h
 }
 
 type KeyPhaseBit bool
 const KeyPhaseZero KeyPhaseBit = false
 const KeyPhaseOne KeyPhaseBit = true
-
-func EncodePacketNumber(packetNumber uint32) []byte {
-	if packetNumber <= 0x7f {
-		return []byte{byte(packetNumber)}
-	} else if packetNumber <= 0x3fff {
-		return Uint16ToBEBytes(uint16(0x8000 | packetNumber))
-	} else if packetNumber <= 0x3fffffff {
-		return Uint32ToBEBytes(uint32(0xc0000000 | packetNumber))
-	} else {
-		panic("Could not encode packet number")
-	}
-}
-func DecodePacketNumber(buffer *bytes.Reader) uint32 {
-	firstByte, _ := buffer.ReadByte()
-	if firstByte & 0x80 == 0 {
-		return uint32(firstByte)
-	} else if firstByte & 0xc0 == 0x80 {
-		twoBytes := make([]byte, 2)
-		buffer.UnreadByte()
-		buffer.Read(twoBytes)
-		return uint32(0x3fff & binary.BigEndian.Uint16(twoBytes))
-	} else if firstByte & 0xc0 == 0xc0 {
-		fourBytes := make([]byte, 4)
-		buffer.UnreadByte()
-		buffer.Read(fourBytes)
-		return uint32(0x3fffffff & binary.BigEndian.Uint32(fourBytes))
-	} else {
-		panic("Could not decode packet number")
-	}
-}
-func PacketNumberLen(packetNumber uint32) int {
-	switch {
-	case packetNumber <= 0x7f:
-		return 1
-	case packetNumber <= 0x3fff:
-		return 2
-	case packetNumber <= 0x3fffffff:
-		return 4
-	default:
-		panic("could not determine packet number length")
-	}
-}

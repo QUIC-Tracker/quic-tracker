@@ -111,7 +111,7 @@ func WriteVarInt(b *bytes.Buffer, i uint64) {
 }
 
 // VarIntLen determines the number of bytes that will be needed to write a number
-func VarIntLen(i uint64) uint {
+func VarIntLen(i uint64) int {
 	if i <= maxVarInt1 {
 		return 1
 	}

@@ -47,7 +47,9 @@ type Connection struct {
 	DestinationCID         ConnectionID
 	Version                uint32
 
-	PacketNumber         map[PNSpace]uint64
+	PacketNumber           map[PNSpace]PacketNumber // Stores the next PN to be sent
+	LargestPNsReceived     map[PNSpace]PacketNumber // Stores the largest PN received
+	LargestPNsAcknowledged map[PNSpace]PacketNumber // Stores the largest PN we have sent that were acknowledged by the peer
 
 	AckQueue             map[PNSpace][]uint64 // Stores the packet numbers to be acked TODO: This should be a channel actually
 	Logger               *log.Logger
@@ -55,7 +57,7 @@ type Connection struct {
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
 }
-func (c *Connection) nextPacketNumber(space PNSpace) uint64 {  // TODO: This should be thread safe
+func (c *Connection) nextPacketNumber(space PNSpace) PacketNumber {  // TODO: This should be thread safe
 	pn := c.PacketNumber[space]
 	c.PacketNumber[space]++
 	return pn
@@ -68,11 +70,7 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
-			h.PayloadLength = uint64(PacketNumberLen(h.packetNumber) + len(payload) + cryptoState.Write.Overhead())
-			h.LengthBeforePN = 6 + len(h.DestinationCID) + len(h.SourceCID) + int(VarIntLen(h.PayloadLength))
-			if h.packetType == Initial {
-				h.LengthBeforePN += int(VarIntLen(uint64(len(h.Token)))) + len(h.Token)
-			}
+			h.PayloadLength = uint64(h.TruncatedPN().Length + len(payload) + cryptoState.Write.Overhead())
 		}
 
 		header := packet.EncodeHeader()
@@ -81,7 +79,7 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 
 		sample, sampleOffset := GetPacketSample(packet.Header(), packetBytes)
 
-		copy(packetBytes[sampleOffset-4:sampleOffset], cryptoState.PacketWrite.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])[:PacketNumberLen(packet.Header().PacketNumber())])
+		copy(packetBytes[sampleOffset-4:sampleOffset], cryptoState.PacketWrite.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])[:packet.Header().TruncatedPN().Length])
 
 		c.UdpConnection.Write(packetBytes)
 
@@ -185,7 +183,9 @@ func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionTicket 
 	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
 	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionTicket)
-	c.PacketNumber = make(map[PNSpace]uint64)
+	c.PacketNumber = make(map[PNSpace]PacketNumber)
+	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
+	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
 	c.AckQueue = make(map[PNSpace][]uint64)
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0

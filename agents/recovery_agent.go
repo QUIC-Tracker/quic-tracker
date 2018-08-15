@@ -8,7 +8,7 @@ import (
 type RecoveryAgent struct {
 	BaseAgent
 	conn                 *Connection
-	retransmissionBuffer map[PNSpace]map[uint64]RetransmittableFrames
+	retransmissionBuffer map[PNSpace]map[PacketNumber]RetransmittableFrames
 	TimerValue           time.Duration
 }
 
@@ -16,10 +16,10 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 	a.Init("RecoveryAgent", conn.SourceCID)
 	a.conn = conn
 
-	a.retransmissionBuffer = map[PNSpace]map[uint64]RetransmittableFrames{
-		PNSpaceInitial:   make(map[uint64]RetransmittableFrames),
-		PNSpaceHandshake: make(map[uint64]RetransmittableFrames),
-		PNSpaceAppData:   make(map[uint64]RetransmittableFrames),
+	a.retransmissionBuffer = map[PNSpace]map[PacketNumber]RetransmittableFrames{
+		PNSpaceInitial:   make(map[PacketNumber]RetransmittableFrames),
+		PNSpaceHandshake: make(map[PacketNumber]RetransmittableFrames),
+		PNSpaceAppData:   make(map[PacketNumber]RetransmittableFrames),
 	}
 	retransmissionTicker := time.NewTicker(100 * time.Millisecond)
 
@@ -57,27 +57,26 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					}
 					if !p.Contains(AckType) && p.PNSpace() == PNSpaceInitial { // Some implementations do not send ACK in this PNSpace
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
-						a.retransmissionBuffer[p.PNSpace()] = make(map[uint64]RetransmittableFrames)
+						a.retransmissionBuffer[p.PNSpace()] = make(map[PacketNumber]RetransmittableFrames)
 					}
 				case *VersionNegotationPacket:
 					a.Logger.Printf("Received a VN packet, emptying Initial retransmit buffer")
-					a.retransmissionBuffer[PNSpaceInitial] = make(map[uint64]RetransmittableFrames)
+					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 				}
 			case i := <-outgoingPackets:
 				switch p := i.(type) {
 				case Framer:
 					frames := p.GetRetransmittableFrames()
 					if len(frames) > 0 {
-						fullPacketNumber := (a.conn.PacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(p.Header().PacketNumber())
-						a.retransmissionBuffer[p.PNSpace()][fullPacketNumber] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
+						a.retransmissionBuffer[p.PNSpace()][p.Header().PacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
 					}
 				}
 			case i := <-eLAvailable:
 				eL := i.(DirectionalEncryptionLevel)
 				if eL.EncryptionLevel == EncryptionLevel1RTT { // Handshake has completed, empty the retransmission buffers
 					a.Logger.Printf("Handshake has completed, emptying the two retransmission buffers")
-					a.retransmissionBuffer[PNSpaceInitial] = make(map[uint64]RetransmittableFrames)
-					a.retransmissionBuffer[PNSpaceHandshake] = make(map[uint64]RetransmittableFrames)
+					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
+					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
 				}
 			case <-a.close:
 				return
@@ -89,7 +88,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch { // Triggers fast retransmit and removes frames scheduled to be retransmitted
 	threshold := uint64(1000)
 	var frames RetransmitBatch
-	currentPacketNumber := ack.LargestAcknowledged
+	currentPacketNumber := PacketNumber(ack.LargestAcknowledged)
 	buffer := a.retransmissionBuffer[space]
 	delete(buffer, currentPacketNumber)
 	for i := uint64(0); i < ack.AckBlocks[0].Block && i < threshold; i++ {

@@ -204,7 +204,7 @@ func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
 func (p *InitialPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelInitial }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
-	p.header = ReadLongHeader(buffer)
+	p.header = ReadLongHeader(buffer, conn)
 	for {
 		frame, err := NewFrame(buffer, conn)
 		if err != nil {
@@ -232,9 +232,9 @@ type RetryPacket struct {
 	OriginalDestinationCID ConnectionID
 	RetryToken []byte
 }
-func ReadRetryPacket(buffer *bytes.Reader) *RetryPacket {
+func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
-	p.header = ReadLongHeader(buffer)
+	p.header = ReadLongHeader(buffer, conn)
 	OCIDL, _ := buffer.ReadByte()
 	p.OriginalDestinationCID = make([]byte, OCIDL)
 	p.RetryToken = make([]byte, buffer.Len())
@@ -261,7 +261,7 @@ func (p *HandshakePacket) PNSpace() PNSpace { return PNSpaceHandshake }
 func (p *HandshakePacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelHandshake }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
-	p.header = ReadLongHeader(buffer)
+	p.header = ReadLongHeader(buffer, conn)
 	for {
 		frame, err := NewFrame(buffer, conn)
 		if err != nil {

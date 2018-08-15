@@ -19,6 +19,12 @@ func (a *ParsingAgent) Run(conn *Connection) {
 	incomingPayloads := make(chan interface{})
 	a.conn.IncomingPayloads.Register(incomingPayloads)
 
+	largestPacketNumbers := map[PNSpace]PacketNumber {
+		PNSpaceInitial: 0,
+		PNSpaceHandshake: 0,
+		PNSpaceAppData: 0,
+	}
+
 	go func() {
 		defer a.Logger.Println("Agent terminated")
 		defer close(a.closed)
@@ -41,9 +47,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 							sample, sampleOffset := GetPacketSample(header, ciphertext)
 							pn := cryptoState.PacketRead.Encrypt(sample, ciphertext[sampleOffset-4:sampleOffset])
-							pnbuf := bytes.NewReader(pn)
-							DecodePacketNumber(pnbuf)
-							pnLength = len(pn) - pnbuf.Len()
+							pnLength = ReadTruncatedPN(bytes.NewReader(pn)).Length
 							copy(ciphertext[sampleOffset-4:sampleOffset], pn[:pnLength])
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
@@ -109,6 +113,13 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						}
 
 						a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), len(cleartext))
+
+						switch packet.(type) {
+						case Framer:
+							if packet.Header().PacketNumber() > largestPacketNumbers[packet.PNSpace()] {
+								largestPacketNumbers[packet.PNSpace()] = packet.Header().PacketNumber()
+							}
+						}
 
 						a.conn.IncomingPackets.Submit(packet)
 						a.SaveCleartextPacket(cleartext, packet.Pointer())

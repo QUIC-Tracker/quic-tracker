@@ -43,8 +43,8 @@ const (
 	maxVarInt8 = 4611686018427387903
 )
 
-// ReadVarInt reads a number in the QUIC varint format
-func ReadVarInt(b io.ByteReader) (uint64, error) {
+// ReadVarIntValue reads a number in the QUIC varint format
+func ReadVarIntValue(b io.ByteReader) (uint64, error) {
 	firstByte, err := b.ReadByte()
 	if err != nil {
 		return 0, err

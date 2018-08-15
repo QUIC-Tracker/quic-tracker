@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 type Header interface {
@@ -33,7 +32,8 @@ type LongHeader struct {
 	Version        uint32
 	DestinationCID ConnectionID
 	SourceCID      ConnectionID
-	PayloadLength  uint64
+	PayloadLength  VarInt
+	TokenLength    VarInt
 	Token		   []byte
 	packetNumber   PacketNumber
 	truncatedPN    TruncatedPN
@@ -48,10 +48,10 @@ func (h *LongHeader) Encode() []byte {
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
 	binary.Write(buffer, binary.BigEndian, h.SourceCID)
 	if h.packetType == Initial {
-		WriteVarInt(buffer, uint64(len(h.Token)))
+		buffer.Write(h.TokenLength.Encode())
 		buffer.Write(h.Token)
 	}
-	WriteVarInt(buffer, h.PayloadLength)
+	buffer.Write(h.PayloadLength.Encode())
 	buffer.Write(h.truncatedPN.Encode())
 	return buffer.Bytes()
 }
@@ -61,9 +61,9 @@ func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
 func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
 func (h *LongHeader) Length() int {
-	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + VarIntLen(h.PayloadLength) + h.truncatedPN.Length
+	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + h.PayloadLength.Length + h.truncatedPN.Length
 	if h.packetType == Initial {
-		length += 1 + len(h.Token)
+		length += h.TokenLength.Length + len(h.Token)
 	}
 	return length
 }
@@ -80,8 +80,8 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	h.SourceCID = make([]byte, SCIL, SCIL)
 	binary.Read(buffer, binary.BigEndian, &h.SourceCID)
 	if h.packetType == Initial {
-		tokenLength, _ := ReadVarInt(buffer)
-		h.Token = make([]byte, tokenLength)
+		h.TokenLength, _ = ReadVarInt(buffer)
+		h.Token = make([]byte, h.TokenLength.Value)
 		buffer.Read(h.Token)
 	}
 	h.PayloadLength, _ = ReadVarInt(buffer)
@@ -99,6 +99,7 @@ func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *Long
 	} else {
 		h.DestinationCID = conn.DestinationCID
 	}
+	h.TokenLength = NewVarInt(0)
 	h.packetNumber = conn.nextPacketNumber(space)
 	h.truncatedPN = h.packetNumber.Truncate(conn.LargestPNsAcknowledged[h.packetType.PNSpace()])
 	return h

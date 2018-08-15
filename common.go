@@ -5,6 +5,7 @@ import (
 	"github.com/mpiraux/pigotls"
 	"math"
 	"bytes"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 var QuicVersion uint32 = 0xff00000d // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
@@ -28,12 +29,10 @@ const (
 type PacketNumber uint64
 
 func (p PacketNumber) Truncate(largestAcknowledged PacketNumber) TruncatedPN {
-	println(p, "truncated with", largestAcknowledged)
 	if p < largestAcknowledged {
 		panic("PNs should be truncated with a lower PN")
 	}
 	length := (int(math.Log2(float64(p - largestAcknowledged + 1))) / 8) + 1  // See: https://tools.ietf.org/html/draft-ietf-quic-transport-13#section-4.8
-	println("chose length", length)
 	switch length {
 	case 1:
 		mask := uint32(0x7f)
@@ -98,6 +97,30 @@ func (t TruncatedPN) Join(p PacketNumber) PacketNumber {
 		mask = uint64(0x3fffffff)
 	}
 	return PacketNumber((uint64(p) & ^mask) | (uint64(t.Value) & mask))
+}
+
+type VarInt struct {
+	Value uint64
+	Length int
+}
+func NewVarInt(value uint64) VarInt {
+	return VarInt{value, VarIntLen(value)}
+}
+func ReadVarInt(buffer *bytes.Reader) (VarInt, error) {
+	v := VarInt{Length: buffer.Len()}
+	i, err := ReadVarIntValue(buffer)
+	if err != nil {
+		return VarInt{}, err
+	}
+	v.Length -= buffer.Len()
+	v.Value = i
+	return v, nil
+}
+
+func (v VarInt) Encode() []byte {
+	buffer := new(bytes.Buffer)
+	WriteVarInt(buffer, v.Value)
+	return buffer.Bytes()
 }
 
 type PNSpace int

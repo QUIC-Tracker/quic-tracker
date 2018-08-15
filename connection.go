@@ -70,7 +70,7 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
-			h.PayloadLength = uint64(h.TruncatedPN().Length + len(payload) + cryptoState.Write.Overhead())
+			h.PayloadLength = NewVarInt(uint64(h.TruncatedPN().Length + len(payload) + cryptoState.Write.Overhead()))
 		}
 
 		header := packet.EncodeHeader()

@@ -19,12 +19,6 @@ func (a *ParsingAgent) Run(conn *Connection) {
 	incomingPayloads := make(chan interface{})
 	a.conn.IncomingPayloads.Register(incomingPayloads)
 
-	largestPacketNumbers := map[PNSpace]PacketNumber {
-		PNSpaceInitial: 0,
-		PNSpaceHandshake: 0,
-		PNSpaceAppData: 0,
-	}
-
 	go func() {
 		defer a.Logger.Println("Agent terminated")
 		defer close(a.closed)
@@ -116,8 +110,8 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 						switch packet.(type) {
 						case Framer:
-							if packet.Header().PacketNumber() > largestPacketNumbers[packet.PNSpace()] {
-								largestPacketNumbers[packet.PNSpace()] = packet.Header().PacketNumber()
+							if packet.Header().PacketNumber() > conn.LargestPNsReceived[packet.PNSpace()] {
+								conn.LargestPNsReceived[packet.PNSpace()] = packet.Header().PacketNumber()
 							}
 						}
 

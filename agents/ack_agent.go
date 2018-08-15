@@ -16,12 +16,6 @@ func (a *AckAgent) Run(conn *Connection) {
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)
 
-	expectedPacketNumber := map[PNSpace]uint64 {
-		PNSpaceInitial: 0,
-		PNSpaceHandshake: 0,
-		PNSpaceAppData: 0,
-	}
-
 	go func() {
 		defer a.Logger.Println("Agent terminated")
 		defer close(a.closed)
@@ -30,17 +24,15 @@ func (a *AckAgent) Run(conn *Connection) {
 			case i := <-incomingPackets:
 				p := i.(Packet)
 				if p.PNSpace() != PNSpaceNoSpace {
-					fullPacketNumber := (expectedPacketNumber[p.PNSpace()] & 0xffffffff00000000) | uint64(p.Header().PacketNumber())
-
+					pn := p.Header().PacketNumber()
 					for _, number := range conn.AckQueue[p.PNSpace()] {
-						if number == fullPacketNumber {
-							a.Logger.Printf("Received duplicate packet number %d in PN space %s\n", fullPacketNumber, p.PNSpace().String())
+						if number == pn {
+							a.Logger.Printf("Received duplicate packet number %d in PN space %s\n", pn, p.PNSpace().String())
 							// TODO: This should be flagged somewhere
 						}
 					}
 
-					conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], fullPacketNumber)
-					expectedPacketNumber[p.PNSpace()] = fullPacketNumber + 1
+					conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], pn)
 
 					if framePacket, ok := p.(Framer); ok {
 						if pathChallenge := framePacket.GetFirst(PathChallengeType); !a.DisablePathResponse && pathChallenge != nil {

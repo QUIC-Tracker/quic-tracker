@@ -51,7 +51,7 @@ type Connection struct {
 	LargestPNsReceived     map[PNSpace]PacketNumber // Stores the largest PN received
 	LargestPNsAcknowledged map[PNSpace]PacketNumber // Stores the largest PN we have sent that were acknowledged by the peer
 
-	AckQueue             map[PNSpace][]uint64 // Stores the packet numbers to be acked TODO: This should be a channel actually
+	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	Logger               *log.Logger
 }
 func (c *Connection) ConnectedIp() net.Addr {
@@ -163,7 +163,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 			ackBlock.Block++
 		} else {
 			frame.AckBlocks = append(frame.AckBlocks, ackBlock)
-			ackBlock = AckBlock{previous - number - 1, 0}
+			ackBlock = AckBlock{uint64(previous) - uint64(number) - 1, 0}
 		}
 		previous = number
 	}
@@ -186,7 +186,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionTicket 
 	c.PacketNumber = make(map[PNSpace]PacketNumber)
 	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
-	c.AckQueue = make(map[PNSpace][]uint64)
+	c.AckQueue = make(map[PNSpace][]PacketNumber)
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0
 		c.AckQueue[space] = nil

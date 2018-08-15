@@ -33,7 +33,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)
 
-	var ackOnlyPackets []uint64
+	var ackOnlyPackets []qt.PacketNumber
 
 	for {
 		select {
@@ -50,7 +50,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 				protectedPacket := qt.NewProtectedPacket(conn)
 				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(qt.PNSpaceAppData))
 				conn.SendPacket(protectedPacket, qt.EncryptionLevel1RTT)
-				ackOnlyPackets = append(ackOnlyPackets, uint64(protectedPacket.Header().PacketNumber()))
+				ackOnlyPackets = append(ackOnlyPackets, protectedPacket.Header().PacketNumber())
 			} else if framer, ok := p.(qt.Framer); ok && framer.Contains(qt.AckType) {
 				ack := framer.GetFirst(qt.AckType).(*qt.AckFrame)
 				if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
@@ -64,7 +64,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	}
 }
 
-func containsAll(a []uint64, b []uint64) bool { // Checks a \in b
+func containsAll(a []qt.PacketNumber, b []qt.PacketNumber) bool { // Checks a \in b
 	for _, i := range a {
 		contains := false
 		for _, j := range b {

@@ -53,7 +53,11 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 				case Framer:
 					for _, frame := range p.GetAll(AckType) {
 						a.Logger.Printf("Processing ACK frame in packet %s\n", p.ShortString())
-						a.RetransmitBatch(a.ProcessAck(frame.(*AckFrame), p.PNSpace()))
+						ack := frame.(*AckFrame)
+						if ack.LargestAcknowledged > conn.LargestPNsAcknowledged[p.PNSpace()] {
+							conn.LargestPNsAcknowledged[p.PNSpace()] = ack.LargestAcknowledged
+						}
+						a.RetransmitBatch(a.ProcessAck(ack, p.PNSpace()))
 					}
 					if !p.Contains(AckType) && p.PNSpace() == PNSpaceInitial { // Some implementations do not send ACK in this PNSpace
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
@@ -88,7 +92,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch { // Triggers fast retransmit and removes frames scheduled to be retransmitted
 	threshold := uint64(1000)
 	var frames RetransmitBatch
-	currentPacketNumber := PacketNumber(ack.LargestAcknowledged)
+	currentPacketNumber := ack.LargestAcknowledged
 	buffer := a.retransmissionBuffer[space]
 	delete(buffer, currentPacketNumber)
 	for i := uint64(0); i < ack.AckBlocks[0].Block && i < threshold; i++ {

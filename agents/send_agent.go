@@ -181,14 +181,14 @@ func mergeAckFrames(frames []*AckFrame) *AckFrame {
 		}
 	}
 
-	numbersAcknowledged := make(map[uint64]bool)
+	numbersAcknowledged := make(map[PacketNumber]bool)
 
 	for _, f := range frames {
 		offset := uint64(0)
 		numbersAcknowledged[f.LargestAcknowledged] = true
 		for bidx, b := range f.AckBlocks {
 			for i := uint64(0); i < b.Block; i++ {
-				numbersAcknowledged[f.LargestAcknowledged - i - offset] = true
+				numbersAcknowledged[PacketNumber(uint64(f.LargestAcknowledged) - i - offset)] = true
 			}
 			for i := uint64(0); i <= b.Gap && bidx > 0; i++ {
 				offset += 1
@@ -196,7 +196,7 @@ func mergeAckFrames(frames []*AckFrame) *AckFrame {
 		}
 	}
 
-	packetNumbers := make([]uint64, 0, len(numbersAcknowledged))
+	packetNumbers := make([]PacketNumber, 0, len(numbersAcknowledged))
 
 	for n := range numbersAcknowledged {
 		packetNumbers = append(packetNumbers, n)
@@ -211,7 +211,7 @@ func mergeAckFrames(frames []*AckFrame) *AckFrame {
 			ackBlock.Block++
 		} else {
 			result.AckBlocks = append(result.AckBlocks, ackBlock)
-			ackBlock = AckBlock{previous - number - 1, 0}
+			ackBlock = AckBlock{Gap: uint64(previous) - uint64(number) - 1}
 		}
 		previous = number
 	}

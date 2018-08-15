@@ -28,6 +28,11 @@ const (
 
 type PacketNumber uint64
 
+func ReadPacketNumber (buffer *bytes.Reader) PacketNumber {
+	v, _ := ReadVarIntValue(buffer)
+	return PacketNumber(v)
+}
+
 func (p PacketNumber) Truncate(largestAcknowledged PacketNumber) TruncatedPN {
 	if p < largestAcknowledged {
 		panic("PNs should be truncated with a lower PN")
@@ -166,7 +171,7 @@ func Uint16ToBEBytes(uint16 uint16) []byte {
 
 func Max(a, b int) int { if a < b { return b }; return a}
 
-type PacketNumberQueue []uint64
+type PacketNumberQueue []PacketNumber
 func (a PacketNumberQueue) Less(i, j int) bool { return a[i] > a[j] }
 func (a PacketNumberQueue) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a PacketNumberQueue) Len() int           { return len(a) }

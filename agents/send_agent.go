@@ -6,6 +6,10 @@ import (
 	"sort"
 )
 
+// The SendingAgent is responsible of bundling the frames queued for sending into packets. If the frames queued for a
+// given encryption level are smaller than a given MTU, it will wait a window of 20ms before sending them in the hope
+// that more will be queued. Frames that require an unavailable encryption level are queued until it is made available.
+// It also merge the ACK frames inside a given packet before sending.
 type SendingAgent struct {
 	BaseAgent
 	MTU uint16

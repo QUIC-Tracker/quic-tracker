@@ -4,6 +4,8 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker"
 )
 
+// The AckAgent is in charge of queuing ACK frames in response to receiving packets that need to be acknowledged as well
+// as answering to PATH_CHALLENGE frames. Both can be disabled independently for a finer control on its behaviour.
 type AckAgent struct {
 	BaseAgent
 	DisableAcks         bool

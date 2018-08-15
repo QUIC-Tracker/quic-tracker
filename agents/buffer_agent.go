@@ -2,6 +2,8 @@ package agents
 
 import . "github.com/QUIC-Tracker/quic-tracker"
 
+// The BufferAgent is in charge of waiting for a given decryption level to become available before putting
+// ciphertexts that require this level back into the decryption queue.
 type BufferAgent struct {
 	BaseAgent
 }

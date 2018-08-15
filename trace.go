@@ -7,6 +7,7 @@ import (
 	"unsafe"
 )
 
+// Contains the result of a test run against a given host.
 type Trace struct {
 	Commit              string                 `json:"commit"`
 	Scenario            string                 `json:"scenario"`

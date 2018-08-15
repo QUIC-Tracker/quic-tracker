@@ -7,6 +7,9 @@ import (
 	"bytes"
 )
 
+// The ParsingAgent is responsible for decrypting and parsing the payloads received in UDP datagrams. It also decrypts
+// the packet number if needed. Payloads that require a decryption level that is not available are put back into the
+// UnprocessedPayloads queue.
 type ParsingAgent struct {
 	BaseAgent
 	conn *Connection

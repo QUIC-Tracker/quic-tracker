@@ -1,6 +1,10 @@
 A test suite for QUIC
 =====================
 
+.. image:: https://godoc.org/github.com/QUIC-Tracker/quic-tracker?status.svg
+    :target: https://godoc.org/github.com/QUIC-Tracker/quic-tracker
+    :alt: Documentation status
+
 
 The test suite comprises a minimal Go implementation of QUIC which is
 currently draft-13 and TLS-1.3-draft-28 compatible, as well as several

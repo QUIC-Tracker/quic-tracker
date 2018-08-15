@@ -9,20 +9,12 @@ import (
 	"fmt"
 )
 
-type Acknowledger interface {
+type Packet interface {
+	Header() Header
 	ShouldBeAcknowledged() bool // Indicates whether or not the packet type should be acknowledged by the mean of sending an ack
-}
-
-type PacketEncoder interface {
 	EncodeHeader() []byte
 	EncodePayload() []byte
 	Encode([]byte) []byte
-}
-
-type Packet interface {
-	Header() Header
-	Acknowledger
-	PacketEncoder
 	Pointer() unsafe.Pointer
 	PNSpace() PNSpace
 	EncryptionLevel() EncryptionLevel
@@ -31,8 +23,6 @@ type Packet interface {
 
 type abstractPacket struct {
 	header Header
-	Acknowledger
-	PacketEncoder
 }
 func (p abstractPacket) Header() Header {
 	return p.header

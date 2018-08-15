@@ -2,6 +2,7 @@ package agents
 
 import . "github.com/QUIC-Tracker/quic-tracker"
 
+// The ClosingAgent is responsible for queuing an (CONNECTION|APPLICATION)_CLOSE frame and to wait for it to be sent out.
 type ClosingAgent struct {
 	BaseAgent
 	QuicLayer bool

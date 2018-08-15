@@ -1,3 +1,10 @@
+//
+// This package contains pieces of behaviours that constitutes a QUIC client.
+//
+// Each agent is responsible for a limited part of the behaviour of a QUIC client. This allows modularity when defining
+// test scenarii with specific needs. Each agent is described in its type documentation. For more information on the
+// architecture of QUIC-Tracker, please consult the package quictracker documentation.
+//
 package agents
 
 import (
@@ -17,6 +24,7 @@ type Agent interface {
 	Join()
 }
 
+// All agents should embed this structure
 type BaseAgent struct {
 	name   string
 	Logger *log.Logger
@@ -26,6 +34,7 @@ type BaseAgent struct {
 
 func (a *BaseAgent) Name() string { return a.name }
 
+// All agents that embed this structure must call Init() as soon as their Run() method is called
 func (a *BaseAgent) Init(name string, SCID ConnectionID) {
 	a.name = name
 	a.Logger = log.New(os.Stdout, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(SCID), a.Name()), log.Lshortfile)
@@ -46,6 +55,7 @@ func (a *BaseAgent) Join() {
 	<-a.closed
 }
 
+// Represents a set of agents that are attached to a particular connection
 type ConnectionAgents struct {
 	conn   *Connection
 	agents map[string]Agent
@@ -77,6 +87,8 @@ func (c *ConnectionAgents) StopAll() {
 	}
 }
 
+// This function sends an (CONNECTION|APPLICATION)_CLOSE frame and wait for it to be sent out. Then it stops all the
+// agents attached to this connection.
 func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint16, reasonPhrase string) {
 	a := &ClosingAgent{QuicLayer: quicLayer, ErrorCode: errorCode, ReasonPhrase: reasonPhrase}
 	c.Add(a)
@@ -84,6 +96,7 @@ func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint16, rea
 	c.StopAll()
 }
 
+// Returns the agents needed for a basic QUIC connection to operate
 func GetDefaultAgents() []Agent {
 	return []Agent{
 		&SocketAgent{},

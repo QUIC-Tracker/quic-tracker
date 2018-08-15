@@ -16,6 +16,9 @@ const (
 	ECNStatusCE               = 3
 )
 
+// The SocketAgent is responsible for receiving the UDP payloads off the socket and putting them in the decryption queue.
+// If configured using ConfigureECN(), it will also mark the packet as with ECN(0) and report the ECN status of
+// the corresponding IP packet received.
 type SocketAgent struct {
 	BaseAgent
 	conn              *Connection
@@ -102,7 +105,7 @@ func (a *SocketAgent) ConfigureECN() error {
 		if err != nil {
 			a.ecn = err == nil
 		}
-		err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TOS, 2) //INET_ECN_ECT_0
+		err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TOS, 2) //INET_ECN_ECT_0  // TODO: This should actually be the responsability of the SendingAgent
 		a.ecn = err == nil
 	}
 	return s.Control(f)

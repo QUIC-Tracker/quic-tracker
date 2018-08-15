@@ -1,3 +1,14 @@
+//
+// This package contains all the test scenarii that are part of the test suite. Each of them is executed in a separate
+// connection. For executing scenarii, use the scripts in the bin/test_suite package.
+//
+// When adding a new scenario, one should comply with the following requirements:
+//
+// 	Its Name() must match its source code file without the extension.
+// 	It must be registered in the GetAllScenarii() function.
+// 	It must define an upper bound on its completion time. It should use the Timeout() function to achieve this.
+//
+//
 package scenarii
 
 import (
@@ -15,6 +26,7 @@ type Scenario interface {
 	Timeout() *time.Timer
 }
 
+// Each scenario should embed this structure
 type AbstractScenario struct {
 	name    string
 	version int
@@ -34,6 +46,8 @@ func (s *AbstractScenario) IPv6() bool {
 func (s *AbstractScenario) Timeout() *time.Timer {
 	return s.timeout
 }
+// Useful helper for scenarii that requires the handshake to complete before executing their test and don't want to
+// discern the cause of its failure.
 func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
@@ -57,10 +71,6 @@ func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trac
 		return nil
 	}
 	return connAgents
-}
-
-func CompleteHandshake(conn *qt.Connection) (qt.Packet, error) {
-	return nil, nil
 }
 
 func GetAllScenarii() map[string]Scenario {

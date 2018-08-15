@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// The RecoveryAgent is responsible of retransmitting frames that are part of packets considered as lost. It currently
+// implements a simpler version of the Fast Retransmit mechanism and a linear Retransmission Timeout alarm.
 type RecoveryAgent struct {
 	BaseAgent
 	conn                 *Connection

@@ -12,6 +12,9 @@ type TLSStatus struct {
 	Error     error
 }
 
+// The TLSAgent is responsible of interacting with the TLS-1.3 stack. It waits on the CRYPTO streams for new data and
+// feed it to the TLS stack. Any response is queued in a corresponding CRYPTO frame, unless disabled using
+// DisableFrameSending. The TLSAgent will broadcast when new encryption or decryption levels are available.
 type TLSAgent struct {
 	BaseAgent
 	TLSStatus  broadcast.Broadcaster //type: TLSStatus

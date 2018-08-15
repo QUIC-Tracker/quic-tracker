@@ -19,6 +19,9 @@ func (s HandshakeStatus) String() string {
 	return fmt.Sprintf("HandshakeStatus{Completed=%t, Error=%s}", s.Completed, s.Error)
 }
 
+// The HandshakeAgent is responsible for initiating the QUIC handshake and respond to the version negotiation process if
+// the server requires it. It reports the status of the handshake through the HandshakeStatus attribute. The status
+// should only be published once, reporting a failure or a success.
 type HandshakeAgent struct {
 	BaseAgent
 	TLSAgent         *TLSAgent

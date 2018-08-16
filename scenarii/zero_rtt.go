@@ -63,7 +63,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	connAgents.Get("RecoveryAgent").Join()
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
-	defer connAgents.StopAll()
+	defer connAgents.CloseConnection(false, 0, "")
 
 	incPackets = make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)

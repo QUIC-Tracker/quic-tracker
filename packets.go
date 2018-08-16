@@ -224,7 +224,7 @@ type RetryPacket struct {
 }
 func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
-	p.header = ReadLongHeader(buffer, conn)
+	p.header = ReadLongHeader(buffer, conn)  // TODO: Implement a separate, invariants-only long header
 	OCIDL, _ := buffer.ReadByte()
 	p.OriginalDestinationCID = make([]byte, OCIDL)
 	p.RetryToken = make([]byte, buffer.Len())

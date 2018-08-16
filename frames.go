@@ -91,7 +91,7 @@ const (
 	StreamType                     = 0x10
 	CryptoType                     = 0x18
 	NewTokenType                   = 0x19
-	AckECNType                     = 0x20
+	AckECNType                     = 0x1a
 )
 
 type PaddingFrame byte

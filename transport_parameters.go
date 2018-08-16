@@ -3,35 +3,40 @@ package quictracker
 import (
 	"encoding/binary"
 	"github.com/bifurcation/mint/syntax"
+	"fmt"
 )
 
 type TransportParametersType uint16
 const (
-	InitialMaxStreamData  TransportParametersType = 0x0000
-	InitialMaxData                                = 0x0001
-	InitialMaxBidiStreams                         = 0x0002
-	IdleTimeout                                   = 0x0003
-	PreferredAddress                              = 0x0004  // TODO: Handle this parameter
-	MaxPacketSize                                 = 0x0005
-	StatelessResetToken                           = 0x0006
-	AckDelayExponent                              = 0x0007
-	InitialMaxUniStreams                          = 0x0008
-	DisableMigration                              = 0x0009  // TODO: Handle this parameter
+	InitialMaxStreamDataBidiLocal TransportParametersType = 0x0000
+	InitialMaxData                                        = 0x0001
+	InitialMaxBidiStreams                                 = 0x0002
+	IdleTimeout                                           = 0x0003
+	PreferredAddress                                      = 0x0004  // TODO: Handle this parameter
+	MaxPacketSize                                         = 0x0005
+	StatelessResetToken                                   = 0x0006
+	AckDelayExponent                                      = 0x0007
+	InitialMaxUniStreams                                  = 0x0008
+	DisableMigration                             	      = 0x0009  // TODO: Handle this parameter
+	InitialMaxStreamDataBidiRemote						  = 0x000a
+	InitialMaxStreamDataUni								  = 0x000b
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
-	MaxStreamData        uint32
-	MaxData              uint32
-	MaxBidiStreams       uint16
-	MaxUniStreams        uint16
-	IdleTimeout          uint16
-	PreferredAddress     string
-	MaxPacketSize        uint16
-	StatelessResetToken  []byte
-	AckDelayExponent     uint8
-	DisableMigration 	 bool
-	AdditionalParameters TransportParameterList
-	ToJSON               map[string]interface{}
+	MaxStreamDataBidiLocal  uint32
+	MaxData                 uint32
+	MaxBidiStreams          uint16
+	MaxUniStreams           uint16
+	IdleTimeout             uint16
+	PreferredAddress        string
+	MaxPacketSize           uint16
+	StatelessResetToken     []byte
+	AckDelayExponent        uint8
+	DisableMigration        bool
+	MaxStreamDataBidiRemote uint32
+	MaxStreamDataUni        uint32
+	AdditionalParameters    TransportParameterList
+	ToJSON                  map[string]interface{}
 }
 
 type TransportParameter struct {
@@ -75,7 +80,7 @@ type TLSTransportParameterHandler struct {
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
 	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters:
-		QuicTransportParameters{MaxStreamData: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10}}
+		QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter
@@ -106,7 +111,7 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 		}
 	}
 
-	addParameter(InitialMaxStreamData, h.QuicTransportParameters.MaxStreamData)
+	addParameter(InitialMaxStreamDataBidiLocal, h.QuicTransportParameters.MaxStreamDataBidiLocal)
 	addParameter(InitialMaxData, h.QuicTransportParameters.MaxData)
 	addParameter(InitialMaxBidiStreams, h.QuicTransportParameters.MaxBidiStreams)
 	addParameter(InitialMaxUniStreams, h.QuicTransportParameters.MaxUniStreams)
@@ -131,9 +136,9 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 
 	for _, p := range h.EncryptedExtensionsTransportParameters.Parameters {
 		switch p.ParameterType {
-		case InitialMaxStreamData:
-			receivedParameters.MaxStreamData = binary.BigEndian.Uint32(p.Value)
-			receivedParameters.ToJSON["initial_max_stream_data"] = receivedParameters.MaxStreamData
+		case InitialMaxStreamDataBidiLocal:
+			receivedParameters.MaxStreamDataBidiLocal = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_data_bidi_local"] = receivedParameters.MaxStreamDataBidiLocal
 		case InitialMaxData:
 			receivedParameters.MaxData = binary.BigEndian.Uint32(p.Value)
 			receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
@@ -161,9 +166,15 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 		case DisableMigration:
 			receivedParameters.DisableMigration = true
 			receivedParameters.ToJSON["disable_migration"] = true
+		case InitialMaxStreamDataBidiRemote:
+			receivedParameters.MaxStreamDataBidiRemote = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_data_bidi_remote"] = receivedParameters.MaxStreamDataBidiRemote
+		case InitialMaxStreamDataUni:
+			receivedParameters.MaxStreamDataUni = binary.BigEndian.Uint32(p.Value)
+			receivedParameters.ToJSON["initial_max_stream_data_uni"] = receivedParameters.MaxStreamDataUni
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)
-			receivedParameters.ToJSON[string(p.ParameterType)] = p.Value
+			receivedParameters.ToJSON[fmt.Sprintf("%x", p.ParameterType)] = p.Value
 		}
 	}
 

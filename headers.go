@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 )
 
 type Header interface {
@@ -13,7 +14,7 @@ type Header interface {
 	TruncatedPN() TruncatedPN
 	EncryptionLevel() EncryptionLevel
 	Encode() []byte
-	Length() int
+	HeaderLength() int
 }
 func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 	var h Header
@@ -32,9 +33,9 @@ type LongHeader struct {
 	Version        uint32
 	DestinationCID ConnectionID
 	SourceCID      ConnectionID
-	PayloadLength  VarInt
 	TokenLength    VarInt
-	Token		   []byte
+	Token          []byte
+	Length         VarInt
 	packetNumber   PacketNumber
 	truncatedPN    TruncatedPN
 }
@@ -51,7 +52,7 @@ func (h *LongHeader) Encode() []byte {
 		buffer.Write(h.TokenLength.Encode())
 		buffer.Write(h.Token)
 	}
-	buffer.Write(h.PayloadLength.Encode())
+	buffer.Write(h.Length.Encode())
 	buffer.Write(h.truncatedPN.Encode())
 	return buffer.Bytes()
 }
@@ -60,8 +61,8 @@ func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.Destinati
 func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
 func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
-func (h *LongHeader) Length() int {
-	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + h.PayloadLength.Length + h.truncatedPN.Length
+func (h *LongHeader) HeaderLength() int {
+	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + h.Length.Length + h.truncatedPN.Length
 	if h.packetType == Initial {
 		length += h.TokenLength.Length + len(h.Token)
 	}
@@ -84,7 +85,7 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 		h.Token = make([]byte, h.TokenLength.Value)
 		buffer.Read(h.Token)
 	}
-	h.PayloadLength, _ = ReadVarInt(buffer)
+	h.Length, _ = ReadVarInt(buffer)
 	h.truncatedPN = ReadTruncatedPN(buffer)
 	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
 	return h
@@ -155,18 +156,19 @@ func (h *ShortHeader) Encode() []byte {
 		typeByte |= 0x40
 	}
 	typeByte |= 0x30
+	typeByte |= uint8(rand.Int()) & 0x7
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
 	buffer.Write(h.truncatedPN.Encode())
 
 	return buffer.Bytes()
 }
-func (h *ShortHeader) PacketType() PacketType { return ShortHeaderPacket }
+func (h *ShortHeader) PacketType() PacketType                { return ShortHeaderPacket }
 func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
-func (h *ShortHeader) PacketNumber() PacketNumber { return h.packetNumber }
-func (h *ShortHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
-func (h *ShortHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
-func (h *ShortHeader) Length() int { return 1 + len(h.DestinationCID) + h.truncatedPN.Length }
+func (h *ShortHeader) PacketNumber() PacketNumber            { return h.packetNumber }
+func (h *ShortHeader) TruncatedPN() TruncatedPN              { return h.truncatedPN }
+func (h *ShortHeader) EncryptionLevel() EncryptionLevel      { return packetTypeToEncryptionLevel[h.PacketType()] }
+func (h *ShortHeader) HeaderLength() int                     { return 1 + len(h.DestinationCID) + h.truncatedPN.Length }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()

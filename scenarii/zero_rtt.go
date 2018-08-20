@@ -5,6 +5,7 @@ import (
 
 	"time"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
+	"github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -32,15 +33,19 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
-	select {
-	case <-incPackets:
-		if len(conn.Tls.ResumptionTicket()) > 0 {
-			break
+forLoop1:
+	for {
+		select {
+		case <-incPackets:
+			if len(conn.Tls.ResumptionTicket()) > 0 {
+				spew.Dump(conn.Tls.ResumptionTicket())
+				break forLoop1
+			}
+		case <-s.Timeout().C:
+			trace.MarkError(ZR_NoResumptionSecret, "", nil)
+			connAgents.CloseConnection(false, 0, "")
+			return
 		}
-	case <-s.Timeout().C:
-		trace.MarkError(ZR_NoResumptionSecret, "", nil)
-		connAgents.CloseConnection(false, 0, "")
-		return
 	}
 	connAgents.CloseConnection(false, 0, "")
 
@@ -75,13 +80,13 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
 	handshakeAgent.InitiateHandshake()
 
-forLoop:
+forLoop2:
 	for {
 		select {
 		case i := <-encryptionLevelsAvailable:
 			eL := i.(qt.DirectionalEncryptionLevel)
 			if eL.EncryptionLevel == qt.EncryptionLevel0RTT && !eL.Read {
-				break forLoop
+				break forLoop2
 			}
 		case <-s.Timeout().C:
 			trace.ErrorCode = ZR_ZeroRTTFailed

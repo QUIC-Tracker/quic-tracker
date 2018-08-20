@@ -34,17 +34,17 @@ func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Tra
 	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
 	pp1 := qt.NewProtectedPacket(conn)
-	pp1.Frames = append(pp1.Frames, qt.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
+	pp1.Frames = append(pp1.Frames, qt.NewStreamFrame(0, conn.Streams.Get(0), []byte(fmt.Sprintf("GET %s\r\n", preferredUrl)), false))
 
 	pp2 := qt.NewProtectedPacket(conn)
-	pp2.Frames = append(pp2.Frames, qt.NewStreamFrame(4, conn.Streams.Get(4), []byte{}, true))
+	pp2.Frames = append(pp2.Frames, qt.NewStreamFrame(0, conn.Streams.Get(0), []byte{}, true))
 
 	conn.SendPacket(pp2, qt.EncryptionLevel1RTT)
 	conn.SendPacket(pp1, qt.EncryptionLevel1RTT)
 
 	<-s.Timeout().C
 
-	if !conn.Streams.Get(4).ReadClosed {
+	if !conn.Streams.Get(0).ReadClosed {
 		trace.ErrorCode = SOR_HostDidNotRespond
 	}
 }

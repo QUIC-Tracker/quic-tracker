@@ -68,7 +68,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 				trace.ErrorCode = 0
 			}
 
-			if conn.Streams.Get(4).ReadClosed {
+			if conn.Streams.Get(0).ReadClosed {
 				conn.CloseConnection(false, 0, "")
 			}
 		case <-s.Timeout().C:

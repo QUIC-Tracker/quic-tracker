@@ -9,17 +9,17 @@ import (
 
 // Contains the result of a test run against a given host.
 type Trace struct {
-	Commit              string                 `json:"commit"`
-	Scenario            string                 `json:"scenario"`
+	Commit              string                 `json:"commit"`     // The git commit that versions the code that produced the trace
+	Scenario            string                 `json:"scenario"`   // The id of the scenario that produced the trace
 	ScenarioVersion     int                    `json:"scenario_version"`
-	Host                string                 `json:"host"`
-	Ip                  string                 `json:"ip"`
-	Results             map[string]interface{} `json:"results"`
-	StartedAt           int64                  `json:"started_at"`
-	Duration            uint64                 `json:"duration"`
-	ErrorCode           uint8                  `json:"error_code"`
-	Stream              []TracePacket          `json:"stream"`
-	Pcap                []byte                 `json:"pcap"`
+	Host                string                 `json:"host"`       // The host against which the scenario was run
+	Ip                  string                 `json:"ip"`         // The IP that was resolved for the given host
+	Results             map[string]interface{} `json:"results"`    // A dictionary that allows to report scenario-specific results
+	StartedAt           int64                  `json:"started_at"` // The time at which the scenario started in epoch seconds
+	Duration            uint64                 `json:"duration"`   // Its duration in epoch milliseconds
+	ErrorCode           uint8                  `json:"error_code"` // A scenario-specific error code that reports its verdict
+	Stream              []TracePacket          `json:"stream"`     // A clear-text copy of the packets that were sent and received
+	Pcap                []byte                 `json:"pcap"`       // The packet capture file associated with the trace
 	DecryptedPcap       []byte                 `json:"decrypted_pcap"`
 	ClientRandom        []byte                 `json:"client_random"`
 	ExporterSecret      []byte                 `json:"exporter_secret"`

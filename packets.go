@@ -7,6 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"unsafe"
 	"fmt"
+	"encoding/hex"
 )
 
 type Packet interface {
@@ -49,6 +50,9 @@ type VersionNegotationPacket struct {
 	SupportedVersions []SupportedVersion
 }
 type SupportedVersion uint32
+func (v SupportedVersion) String() string {
+	return hex.EncodeToString(Uint32ToBEBytes(uint32(v)))
+}
 func (p *VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
 func (p *VersionNegotationPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)

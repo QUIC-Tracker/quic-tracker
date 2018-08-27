@@ -140,6 +140,7 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	}
 	if version == 0 {
 		c.Logger.Println("No appropriate version was found in the VN packet")
+		c.Logger.Printf("Versions received: %v\n", vn.SupportedVersions)
 		return errors.New("no appropriate version found")
 	}
 	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)

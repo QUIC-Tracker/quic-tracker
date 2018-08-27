@@ -104,7 +104,6 @@ forLoop2:
 			case <-incPackets:
 				if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0
-					return
 				}
 			case <-s.Timeout().C:
 				return

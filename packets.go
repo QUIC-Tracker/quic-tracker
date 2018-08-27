@@ -218,6 +218,10 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 func NewInitialPacket(conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
 	p.header = NewLongHeader(Initial, conn, PNSpaceInitial)
+	if len(conn.Token) > 0 {
+		p.header.(*LongHeader).Token = conn.Token
+		p.header.(*LongHeader).TokenLength = NewVarInt(uint64(len(conn.Token)))
+	}
 	return p
 }
 
@@ -228,9 +232,10 @@ type RetryPacket struct {
 }
 func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
-	p.header = ReadLongHeader(buffer, conn)
+	p.header = ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
 	OCIDL, _ := buffer.ReadByte()
 	p.OriginalDestinationCID = make([]byte, OCIDL)
+	buffer.Read(p.OriginalDestinationCID)
 	p.RetryToken = make([]byte, buffer.Len())
 	buffer.Read(p.RetryToken)
 	return p

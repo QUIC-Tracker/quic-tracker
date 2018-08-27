@@ -159,7 +159,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 				packetBuffer[eL] = nil
 				timers[eL].Reset(0)
 			case <-a.close:
-				return
+					return
 			}
 		}
 	}()

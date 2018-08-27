@@ -51,8 +51,10 @@ func (h *LongHeader) Encode() []byte {
 		buffer.Write(h.TokenLength.Encode())
 		buffer.Write(h.Token)
 	}
-	buffer.Write(h.PayloadLength.Encode())
-	buffer.Write(h.truncatedPN.Encode())
+	if h.packetType != Retry {
+		buffer.Write(h.PayloadLength.Encode())
+		buffer.Write(h.truncatedPN.Encode())
+	}
 	return buffer.Bytes()
 }
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
@@ -60,7 +62,7 @@ func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.Destinati
 func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
 func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
-func (h *LongHeader) Length() int {
+func (h *LongHeader) Length() int {  // TODO: This is broken for Retry packet
 	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + h.PayloadLength.Length + h.truncatedPN.Length
 	if h.packetType == Initial {
 		length += h.TokenLength.Length + len(h.Token)
@@ -84,9 +86,11 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 		h.Token = make([]byte, h.TokenLength.Value)
 		buffer.Read(h.Token)
 	}
-	h.PayloadLength, _ = ReadVarInt(buffer)
-	h.truncatedPN = ReadTruncatedPN(buffer)
-	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
+	if h.packetType != Retry {
+		h.PayloadLength, _ = ReadVarInt(buffer)
+		h.truncatedPN = ReadTruncatedPN(buffer)
+		h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
+	}
 	return h
 }
 func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *LongHeader {

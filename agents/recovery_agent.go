@@ -65,8 +65,11 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
 						a.retransmissionBuffer[p.PNSpace()] = make(map[PacketNumber]RetransmittableFrames)
 					}
+				case *RetryPacket:
+					a.Logger.Println("Received a Retry packet, emptying Initial retransmit buffer")
+					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 				case *VersionNegotationPacket:
-					a.Logger.Printf("Received a VN packet, emptying Initial retransmit buffer")
+					a.Logger.Println("Received a VN packet, emptying Initial retransmit buffer")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 				}
 			case i := <-outgoingPackets:
@@ -80,7 +83,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 			case i := <-eLAvailable:
 				eL := i.(DirectionalEncryptionLevel)
 				if eL.EncryptionLevel == EncryptionLevel1RTT { // Handshake has completed, empty the retransmission buffers
-					a.Logger.Printf("Handshake has completed, emptying the two retransmission buffers")
+					a.Logger.Println("Handshake has completed, emptying the two retransmission buffers")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
 				}

@@ -11,6 +11,7 @@ import (
 	_ "net/http/pprof"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"github.com/davecgh/go-spew/spew"
+	"time"
 )
 
 func main() {
@@ -22,7 +23,10 @@ func main() {
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	url := flag.String("url", "/index.html", "The URL to request")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
+	timeout := flag.Int("timeout", 10, "The number of seconds after which the program will timeout")
 	flag.Parse()
+
+	t := time.NewTimer(time.Duration(*timeout) * time.Second)
 	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6)
 	if err != nil {
 		panic(err)
@@ -59,21 +63,35 @@ func main() {
 	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
 	handshakeAgent.InitiateHandshake()
 
-	s := (<-handshakeStatus).(agents.HandshakeStatus)
-	if s.Completed {
-		conn.FrameQueue.Submit(m.QueuedFrame{m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true), m.EncryptionLevel1RTT})
+	select {
+	case i := <-handshakeStatus:
+		s := i.(agents.HandshakeStatus)
+		if !s.Completed {
+			Agents.StopAll()
+			return
+		}
+	case <-t.C:
+		Agents.StopAll()
+		return
+	}
 
-		incomingPackets := make(chan interface{}, 1000)
-		conn.IncomingPackets.Register(incomingPackets)
+	defer conn.CloseConnection(false, 0, "")
+	conn.FrameQueue.Submit(m.QueuedFrame{m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true), m.EncryptionLevel1RTT})
 
-		for {
-			<-incomingPackets
+	incomingPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incomingPackets)
+
+	for {
+		select {
+		case <-incomingPackets:
 			if conn.Streams.Get(4).ReadClosed {
 				spew.Dump(conn.Streams.Get(4).ReadData)
 				break
 			}
+		case <-t.C:
+			return
 		}
+
 	}
 
-	conn.CloseConnection(false, 0, "")
 }

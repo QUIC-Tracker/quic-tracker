@@ -52,8 +52,10 @@ func (h *LongHeader) Encode() []byte {
 		buffer.Write(h.TokenLength.Encode())
 		buffer.Write(h.Token)
 	}
-	buffer.Write(h.Length.Encode())
-	buffer.Write(h.truncatedPN.Encode())
+	if h.packetType != Retry {
+		buffer.Write(h.Length.Encode())
+		buffer.Write(h.truncatedPN.Encode())
+	}
 	return buffer.Bytes()
 }
 func (h *LongHeader) PacketType() PacketType { return h.packetType }
@@ -85,9 +87,11 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 		h.Token = make([]byte, h.TokenLength.Value)
 		buffer.Read(h.Token)
 	}
-	h.Length, _ = ReadVarInt(buffer)
-	h.truncatedPN = ReadTruncatedPN(buffer)
-	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
+	if h.packetType != Retry {
+		h.Length, _ = ReadVarInt(buffer)
+		h.truncatedPN = ReadTruncatedPN(buffer)
+		h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
+	}
 	return h
 }
 func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *LongHeader {

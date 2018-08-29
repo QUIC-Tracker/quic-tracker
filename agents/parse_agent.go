@@ -102,8 +102,9 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
 							off = len(udpPayload)
 						case Retry:
-							a.Logger.Println("TODO PR#1498")
-							break packetSelect
+							cleartext = ciphertext
+							packet = ReadRetryPacket(bytes.NewReader(cleartext), a.conn)
+							off = len(udpPayload)
 						default:
 							a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
 							break packetSelect

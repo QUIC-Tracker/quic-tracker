@@ -32,27 +32,33 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
-	select {
-	case <-incPackets:
-		if len(conn.Tls.ResumptionTicket()) > 0 {
-			break
+	resumptionTicket := make(chan interface{}, 10)
+	connAgents.Get("TLSAgent").(*agents.TLSAgent).ResumptionTicket.Register(resumptionTicket)
+
+	var ticket []byte
+forLoop1:
+	for {
+		select {
+		case i := <-resumptionTicket:
+			ticket = i.([]byte)
+			break forLoop1
+		case <-s.Timeout().C:
+			trace.MarkError(ZR_NoResumptionSecret, "", nil)
+			connAgents.CloseConnection(false, 0, "")
+			return
 		}
-	case <-s.Timeout().C:
-		trace.MarkError(ZR_NoResumptionSecret, "", nil)
-		connAgents.CloseConnection(false, 0, "")
-		return
 	}
 	connAgents.CloseConnection(false, 0, "")
 
 	<-time.NewTimer(3 * time.Second).C
 
-	resumptionTicket := conn.Tls.ResumptionTicket()
-	rh, sh := conn.ReceivedPacketHandler, conn.SentPacketHandler
+	rh, sh, token := conn.ReceivedPacketHandler, conn.SentPacketHandler, conn.Token
 
 	var err error
-	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, resumptionTicket, s.ipv6)
+	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
+	conn.Token = token
 	if err != nil {
 		trace.MarkError(ZR_ZeroRTTFailed, err.Error(), nil)
 		return
@@ -75,20 +81,10 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
 	handshakeAgent.InitiateHandshake()
 
-forLoop:
-	for {
-		select {
-		case i := <-encryptionLevelsAvailable:
-			eL := i.(qt.DirectionalEncryptionLevel)
-			if eL.EncryptionLevel == qt.EncryptionLevel0RTT && !eL.Read {
-				break forLoop
-			}
-		case <-s.Timeout().C:
-			trace.ErrorCode = ZR_ZeroRTTFailed
-			trace.Results["error"] = "0-RTT encryption was not available after feeding in the ticket"
-			return
-		}
+	if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {
+		return
 	}
+
 	// TODO: Handle stateless connection
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)  // TODO: Verify that this get sent in a 0-RTT packet
@@ -96,13 +92,35 @@ forLoop:
 	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	for {
 		select {
-			case <-incPackets:
+			case i := <-incPackets:
+				switch i.(type) {
+				case *qt.RetryPacket:
+					if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {
+						return
+					}
+					conn.SendHTTPGETRequest(preferredUrl, 0)
+				}
 				if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0
-					return
 				}
 			case <-s.Timeout().C:
 				return
+		}
+	}
+}
+
+func (s *ZeroRTTScenario) waitFor0RTT(trace *qt.Trace, encryptionLevelsAvailable chan interface{}) bool {
+	for {
+		select {
+		case i := <-encryptionLevelsAvailable:
+			eL := i.(qt.DirectionalEncryptionLevel)
+			if eL.EncryptionLevel == qt.EncryptionLevel0RTT && !eL.Read {
+				return true
+			}
+		case <-s.Timeout().C:
+			trace.ErrorCode = ZR_ZeroRTTFailed
+			trace.Results["error"] = "0-RTT encryption was not available after feeding in the ticket"
+			return false
 		}
 	}
 }

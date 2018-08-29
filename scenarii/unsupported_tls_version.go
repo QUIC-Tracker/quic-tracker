@@ -45,10 +45,15 @@ forLoop:
 					return
 				}
 				sendUnsupportedInitial(conn)
+			case *qt.RetryPacket:
+				conn.DestinationCID = p.Header().(*qt.LongHeader).SourceCID
+				conn.TransitionTo(qt.QuicVersion, qt.QuicALPNToken)
+				conn.Token = p.RetryToken
+				sendUnsupportedInitial(conn)
 			case qt.Framer:
 				for _, frame := range p.GetFrames() {
 					if cc, ok := frame.(*qt.ConnectionCloseFrame); ok { // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-11
-						if cc.ErrorCode != 0x201 {
+						if cc.ErrorCode != 0x146 {  // TLS Alert: procotol_version
 							trace.MarkError(UTS_WrongErrorCodeIsUsed, "", p)
 						}
 						trace.Results["connection_reason_phrase"] = cc.ReasonPhrase

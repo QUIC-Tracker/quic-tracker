@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strings"
+	"bytes"
 )
 
 type HandshakeStatus struct {
@@ -64,9 +65,16 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 				case *RetryPacket:
-					// TODO: Reimplement stateless connection
-					panic("not implemented")
-
+					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) {
+						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
+						conn.TransitionTo(QuicVersion, QuicALPNToken)
+						conn.Token = p.RetryToken
+						a.TLSAgent.Stop()
+						a.TLSAgent.Join()
+						a.TLSAgent.Run(conn)
+						a.TLSAgent.TLSStatus.Register(tlsStatus)
+						conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
+					}
 				case Framer:
 					if p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType) {
 						a.Logger.Println("The connection was closed before the handshake completed")

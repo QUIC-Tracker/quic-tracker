@@ -26,6 +26,7 @@ func main() {
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcaps. Lets tcpdump decide if not set.")
 	parallel := flag.Bool("parallel", false, "Runs each scenario against multiple hosts at the same time.")
 	maxInstances := flag.Int("max-instances", 10, "Limits the number of parallel scenario runs.")
+	randomise := flag.Bool("randomise", false, "Randomise the execution order of scenarii")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
 	flag.Parse()
 
@@ -53,7 +54,9 @@ func main() {
 	for scenarioId := range scenariiInstances {
 		scenarioIds = append(scenarioIds, scenarioId)
 	}
-	sort.Strings(scenarioIds)
+	if !*randomise {
+		sort.Strings(scenarioIds)
+	}
 
 	if *scenarioName != "" && scenariiInstances[*scenarioName] == nil {
 		println("Unknown scenario", *scenarioName)

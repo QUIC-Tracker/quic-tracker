@@ -44,20 +44,21 @@ forLoop:
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
-			if conn.Streams.Get(4).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
+			if conn.Streams.Get(0).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 				trace.MarkError(FC_HostSentMoreThanLimit, "", p)
 			}
 
-			if conn.Streams.Get(4).ReadClosed {
+			if conn.Streams.Get(0).ReadClosed {
 				conn.IncomingPackets.Unregister(incPackets)
+				break
 			}
 
-			readOffset := conn.Streams.Get(4).ReadOffset
+			readOffset := conn.Streams.Get(0).ReadOffset
 			if readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) && !shouldResume {
 				conn.TLSTPHandler.MaxData *= 2
 				conn.TLSTPHandler.MaxStreamDataBidiLocal *= 2
 				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, qt.EncryptionLevel1RTT})
-				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{4, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
 				shouldResume = true
 			}
 			case <-s.Timeout().C:
@@ -65,7 +66,7 @@ forLoop:
 		}
 	}
 
-	readOffset := conn.Streams.Get(4).ReadOffset
+	readOffset := conn.Streams.Get(0).ReadOffset
 	if readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 		trace.ErrorCode = 0
 	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)/2 {

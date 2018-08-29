@@ -47,6 +47,9 @@ type Connection struct {
 	DestinationCID         ConnectionID
 	Version                uint32
 
+	Token            []byte
+	ResumptionTicket []byte
+
 	PacketNumber           map[PNSpace]PacketNumber // Stores the next PN to be sent
 	LargestPNsReceived     map[PNSpace]PacketNumber // Stores the largest PN received
 	LargestPNsAcknowledged map[PNSpace]PacketNumber // Stores the largest PN we have sent that were acknowledged by the peer
@@ -140,10 +143,11 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error
 	}
 	if version == 0 {
 		c.Logger.Println("No appropriate version was found in the VN packet")
+		c.Logger.Printf("Versions received: %v\n", vn.SupportedVersions)
 		return errors.New("no appropriate version found")
 	}
 	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
-	c.TransitionTo(QuicVersion, QuicALPNToken, nil)
+	c.TransitionTo(QuicVersion, QuicALPNToken)
 	return nil
 }
 func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack frame based on the packet numbers received
@@ -173,7 +177,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	}
 	return frame
 }
-func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionTicket []byte) {
+func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	var prevVersion uint32
 	if c.Version == 0 {
 		prevVersion = QuicVersion
@@ -182,7 +186,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string, resumptionTicket 
 	}
 	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, resumptionTicket)
+	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, c.ResumptionTicket)
 	c.PacketNumber = make(map[PNSpace]PacketNumber)
 	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
@@ -254,6 +258,8 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.DestinationCID = DCID
 	c.OriginalDestinationCID = DCID
 
+	c.ResumptionTicket = resumptionTicket
+
 	c.IncomingPackets = broadcast.NewBroadcaster(1000)
 	c.OutgoingPackets = broadcast.NewBroadcaster(1000)
 	c.IncomingPayloads = broadcast.NewBroadcaster(1000)
@@ -263,7 +269,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 
 	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.Lshortfile)
 
-	c.TransitionTo(version, ALPN, resumptionTicket)
+	c.TransitionTo(version, ALPN)
 
 	return c
 }

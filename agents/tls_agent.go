@@ -18,12 +18,14 @@ type TLSStatus struct {
 type TLSAgent struct {
 	BaseAgent
 	TLSStatus  broadcast.Broadcaster //type: TLSStatus
+	ResumptionTicket broadcast.Broadcaster //type: []byte
 	DisableFrameSending bool
 }
 
 func (a *TLSAgent) Run(conn *Connection) {
 	a.Init("TLSAgent", conn.SourceCID)
 	a.TLSStatus = broadcast.NewBroadcaster(10)
+	a.ResumptionTicket = broadcast.NewBroadcaster(10)
 
 	encryptionLevels := []DirectionalEncryptionLevel{{EncryptionLevelHandshake, false}, {EncryptionLevelHandshake, true}, {EncryptionLevel1RTT, false}, {EncryptionLevel1RTT, true}}
 	encryptionLevelsAvailable := make(map[DirectionalEncryptionLevel]bool)
@@ -39,6 +41,8 @@ func (a *TLSAgent) Run(conn *Connection) {
 	for space, channel := range cryptoChans {
 		conn.CryptoStreams.Get(space).ReadChan.Register(channel)
 	}
+
+	var resumptionTicketSent bool
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
@@ -122,6 +126,10 @@ func (a *TLSAgent) Run(conn *Connection) {
 								encryptionLevelsAvailable[e] = true
 								conn.EncryptionLevelsAvailable.Submit(e)
 							}
+						}
+
+						if !resumptionTicketSent && len(conn.Tls.ResumptionTicket()) > 0 {
+							a.ResumptionTicket.Submit(conn.Tls.ResumptionTicket())
 						}
 					}
 				default:

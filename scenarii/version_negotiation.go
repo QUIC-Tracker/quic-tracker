@@ -57,7 +57,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 				trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
 				newInitial := qt.NewInitialPacket(conn)
 				newInitial.Frames = initial.Frames
-				conn.SendPacket(initial, qt.EncryptionLevelInitial)
+				conn.SendPacket(newInitial, qt.EncryptionLevelInitial)
 			case qt.Packet:
 				trace.MarkError(VN_NotAnsweringToVN, "", p)
 				trace.Results["received_packet_type"] = p.Header().PacketType()

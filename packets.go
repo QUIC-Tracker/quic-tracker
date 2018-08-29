@@ -234,6 +234,10 @@ func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
 	p.header = ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
 	OCIDL, _ := buffer.ReadByte()
+	OCIDL = 0xf & OCIDL
+	if OCIDL > 0 {
+		OCIDL += 3
+	}
 	p.OriginalDestinationCID = make([]byte, OCIDL)
 	buffer.Read(p.OriginalDestinationCID)
 	p.RetryToken = make([]byte, buffer.Len())

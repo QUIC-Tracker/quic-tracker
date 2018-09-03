@@ -167,7 +167,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 			ackBlock.Block++
 		} else {
 			frame.AckBlocks = append(frame.AckBlocks, ackBlock)
-			ackBlock = AckBlock{uint64(previous) - uint64(number) - 1, 0}
+			ackBlock = AckBlock{uint64(previous) - uint64(number) - 2, 0}
 		}
 		previous = number
 	}

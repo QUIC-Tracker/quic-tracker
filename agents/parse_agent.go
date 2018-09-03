@@ -64,13 +64,13 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 						break packetSelect
 					} else {
-						hLen := header.Length()
+						hLen := header.HeaderLength()
 						var packet Packet
 						var cleartext []byte
 						switch header.PacketType() {
 						case Handshake, Initial:
 							lHeader := header.(*LongHeader)
-							pLen := int(lHeader.PayloadLength.Value) - pnLength
+							pLen := int(lHeader.Length.Value) - pnLength
 
 							if hLen+pLen > len(ciphertext) {
 								a.Logger.Printf("Payload length is past the received bytes, has PN decryption failed ? Aborting")

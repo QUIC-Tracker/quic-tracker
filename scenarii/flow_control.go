@@ -24,7 +24,7 @@ func NewFlowControlScenario() *FlowControlScenario {
 }
 func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
-	conn.TLSTPHandler.MaxStreamData = 80
+	conn.TLSTPHandler.MaxStreamDataBidiLocal = 80
 
 	connAgents := s.CompleteHandshake(conn, trace, FC_TLSHandshakeFailed)
 	if connAgents == nil {
@@ -44,7 +44,7 @@ forLoop:
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
-			if conn.Streams.Get(0).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
+			if conn.Streams.Get(0).ReadOffset > uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 				trace.MarkError(FC_HostSentMoreThanLimit, "", p)
 			}
 
@@ -54,11 +54,11 @@ forLoop:
 			}
 
 			readOffset := conn.Streams.Get(0).ReadOffset
-			if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) && !shouldResume {
+			if readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) && !shouldResume {
 				conn.TLSTPHandler.MaxData *= 2
-				conn.TLSTPHandler.MaxStreamData *= 2
+				conn.TLSTPHandler.MaxStreamDataBidiLocal *= 2
 				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, qt.EncryptionLevel1RTT})
-				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamData)}, qt.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
 				shouldResume = true
 			}
 			case <-s.Timeout().C:
@@ -67,13 +67,13 @@ forLoop:
 	}
 
 	readOffset := conn.Streams.Get(0).ReadOffset
-	if readOffset == uint64(conn.TLSTPHandler.MaxStreamData) {
+	if readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 		trace.ErrorCode = 0
-	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamData)/2 {
+	} else if shouldResume && readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)/2 {
 		trace.ErrorCode = FC_HostDidNotResumeSending
-	} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamData) {
+	} else if readOffset < uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 		trace.ErrorCode = FC_NotEnoughDataAvailable
-	} else if readOffset > uint64(conn.TLSTPHandler.MaxStreamData) {
+	} else if readOffset > uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) {
 		trace.ErrorCode = FC_HostSentMoreThanLimit
 	}
 }

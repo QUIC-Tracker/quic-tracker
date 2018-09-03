@@ -45,9 +45,7 @@ func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 }
 
 func validate(parameters map[string]interface{}) bool {
-	_, present1 := parameters["initial_max_stream_data"]
-	_, present2 := parameters["initial_max_data"]
-	_, present3 := parameters["idle_timeout"]
+	_, present := parameters["idle_timeout"]
 
-	return present1 && present2 && present3
+	return present
 }

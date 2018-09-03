@@ -38,15 +38,15 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
-var QuicVersion uint32 = 0xff00000d // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-13"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff00000e // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-14"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MaximumVersion         = 0xff00000d
-	MinimumVersion         = 0xff00000d
+	MaximumVersion         = 0xff00000e
+	MinimumVersion         = 0xff00000e
 )
 
 // errors

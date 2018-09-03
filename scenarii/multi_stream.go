@@ -24,7 +24,7 @@ func NewMultiStreamScenario() *MultiStreamScenario {
 func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxData = 1024 * 1024
-	conn.TLSTPHandler.MaxStreamData = 1024 * 1024 / 10
+	conn.TLSTPHandler.MaxStreamDataBidiLocal = 1024 * 1024 / 10
 
 	allClosed := true
 	connAgents := s.CompleteHandshake(conn, trace, MS_TLSHandshakeFailed)

@@ -77,7 +77,7 @@ func sendUnsupportedInitial(conn *qt.Connection) {
 	initialPacket := conn.GetInitialPacket()
 	for _, f := range initialPacket.Frames { // Advertise support of TLS 1.3 draft-00 only
 		if frame, ok := f.(*qt.CryptoFrame); ok {
-			frame.CryptoData = bytes.Replace(frame.CryptoData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x1c}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
+			frame.CryptoData = bytes.Replace(frame.CryptoData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x03, 0x04}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
 	conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)

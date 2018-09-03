@@ -39,20 +39,28 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
-			if p.PNSpace() != qt.PNSpaceAppData {
-				break
-			}
 			if p.ShouldBeAcknowledged() {
-				ackFrame := conn.GetAckFrame(qt.PNSpaceAppData)
+				ackFrame := conn.GetAckFrame(p.PNSpace())
 				if ackFrame == nil {
 					break
 				}
-				protectedPacket := qt.NewProtectedPacket(conn)
-				protectedPacket.Frames = append(protectedPacket.Frames, conn.GetAckFrame(qt.PNSpaceAppData))
-				conn.SendPacket(protectedPacket, qt.EncryptionLevel1RTT)
-				ackOnlyPackets = append(ackOnlyPackets, protectedPacket.Header().PacketNumber())
-			} else if framer, ok := p.(qt.Framer); ok && framer.Contains(qt.AckType) {
-				ack := framer.GetFirst(qt.AckType).(*qt.AckFrame)
+				var packet qt.Framer
+				switch p.PNSpace() {
+				case qt.PNSpaceInitial:
+					packet = qt.NewInitialPacket(conn)
+				case qt.PNSpaceHandshake:
+					packet = qt.NewHandshakePacket(conn)
+				case qt.PNSpaceAppData:
+					packet = qt.NewProtectedPacket(conn)
+				}
+
+				packet.AddFrame(ackFrame)
+				conn.SendPacket(packet, packet.EncryptionLevel())
+				if p.PNSpace() == qt.PNSpaceAppData {
+					ackOnlyPackets = append(ackOnlyPackets, packet.Header().PacketNumber())
+				}
+			} else if packet, ok := p.(*qt.ProtectedPacket); ok && packet.Contains(qt.AckType) {
+				ack := packet.GetFirst(qt.AckType).(*qt.AckFrame)
 				if containsAll(ack.GetAckedPackets(), ackOnlyPackets) {
 					trace.MarkError(AO_SentAOInResponseOfAO, "", p)
 					return

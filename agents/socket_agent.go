@@ -5,6 +5,7 @@ import (
 	"github.com/dustin/go-broadcast"
 	"syscall"
 	"unsafe"
+	"github.com/QUIC-Tracker/quic-tracker/compat"
 )
 
 type ECNStatus int
@@ -101,9 +102,11 @@ func (a *SocketAgent) ConfigureECN() error {
 		return err
 	}
 	f := func(fd uintptr) {
-		err = syscall.SetsockoptByte(int(fd), syscall.IPPROTO_IP, syscall.IP_RECVTOS, 1)
+		var u *compat.Utils
+		err = u.SetRECVTOS(int(fd))
 		if err != nil {
-			a.ecn = err == nil
+			a.ecn = false
+			return
 		}
 		err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TOS, 2) //INET_ECN_ECT_0  // TODO: This should actually be the responsability of the SendingAgent
 		a.ecn = err == nil

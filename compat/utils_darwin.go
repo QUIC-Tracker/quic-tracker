@@ -1,5 +1,7 @@
 package compat
 
+import "syscall"
+
 const IP_RECVTOS = 27
 
 type Utils byte

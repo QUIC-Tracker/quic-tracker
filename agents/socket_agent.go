@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"unsafe"
 	"github.com/QUIC-Tracker/quic-tracker/compat"
+	"errors"
 )
 
 type ECNStatus int
@@ -106,10 +107,21 @@ func (a *SocketAgent) ConfigureECN() error {
 		err = u.SetRECVTOS(int(fd))
 		if err != nil {
 			a.ecn = false
+			a.Logger.Printf("Error when setting RECVTOS: %s\n", err.Error())
 			return
 		}
 		err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TOS, 2) //INET_ECN_ECT_0  // TODO: This should actually be the responsability of the SendingAgent
+		if err != nil {
+			a.Logger.Printf("Error when setting TOS: %s\n", err.Error())
+		}
 		a.ecn = err == nil
 	}
-	return s.Control(f)
+	err = s.Control(f)
+	if err != nil {
+		return err
+	}
+	if !a.ecn {
+		return errors.New("could not configure ecn")
+	}
+	return nil
 }

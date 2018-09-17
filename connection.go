@@ -102,11 +102,12 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	}
 	c.Tls.SetQUICTransportParameters(extensionData)
 
-	clientHello, notComplete, err := c.Tls.HandleMessage(nil, pigotls.EpochInitial)
+	tlsOutput, notComplete, err := c.Tls.HandleMessage(nil, pigotls.EpochInitial)
 	if err != nil || !notComplete {
 		println(err.Error())
 		return nil
 	}
+	clientHello := tlsOutput[0].Data
 	c.ClientRandom = make([]byte, 32, 32)
 	copy(c.ClientRandom, clientHello[11:11+32])
 	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)

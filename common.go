@@ -179,6 +179,13 @@ var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
 	PNSpaceAppData: pigotls.Epoch1RTT,
 }
 
+var EpochToPNSpace = map[pigotls.Epoch]PNSpace {
+	pigotls.EpochInitial: PNSpaceInitial,
+	pigotls.EpochHandshake: PNSpaceHandshake,
+	pigotls.Epoch0RTT: PNSpaceAppData,
+	pigotls.Epoch1RTT: PNSpaceAppData,
+}
+
 func (pns PNSpace) String() string {
 	return PNSpaceToString[pns]
 }

@@ -49,6 +49,13 @@ var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{
 	ShortHeaderPacket: EncryptionLevel1RTT,
 }
 
+var EpochToEncryptionLevel = map[pigotls.Epoch]EncryptionLevel {
+	pigotls.EpochInitial: EncryptionLevelInitial,
+	pigotls.Epoch0RTT: EncryptionLevel0RTT,
+	pigotls.EpochHandshake: EncryptionLevelHandshake,
+	pigotls.Epoch1RTT: EncryptionLevel1RTT,
+}
+
 type DirectionalEncryptionLevel struct {
 	EncryptionLevel
 	Read bool

@@ -55,7 +55,6 @@ func (a *TLSAgent) Run(conn *Connection) {
 				if _, ok := packet.(Framer); !ok {
 					break
 				}
-				cryptoStream := conn.CryptoStreams.Get(packet.PNSpace())
 				cryptoChan := cryptoChans[packet.PNSpace()]
 
 				var handshakeData []byte
@@ -75,7 +74,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 				switch packet.(type) {
 				case Framer:
 					if len(handshakeData) > 0 {
-						responseData, notCompleted, err := conn.Tls.HandleMessage(handshakeData, PNSpaceToEpoch[packet.PNSpace()])
+						tlsOutput, notCompleted, err := conn.Tls.HandleMessage(handshakeData, PNSpaceToEpoch[packet.PNSpace()])
 
 						if err != nil {
 							a.Logger.Printf("TLS error occured: %s\n", err.Error())
@@ -97,14 +96,10 @@ func (a *TLSAgent) Run(conn *Connection) {
 							}
 						}
 
-						if len(responseData) > 0 && !a.DisableFrameSending {
-							var responseEncryptionLevel EncryptionLevel
-							if packet.EncryptionLevel() == EncryptionLevelInitial {
-								responseEncryptionLevel = EncryptionLevelHandshake
-							} else {
-								responseEncryptionLevel = packet.EncryptionLevel()
+						if len(tlsOutput) > 0 && !a.DisableFrameSending {
+							for _, m := range tlsOutput {
+								conn.FrameQueue.Submit(QueuedFrame{NewCryptoFrame(conn.CryptoStreams.Get(EpochToPNSpace[m.Epoch]), m.Data), EpochToEncryptionLevel[m.Epoch]})
 							}
-							conn.FrameQueue.Submit(QueuedFrame{NewCryptoFrame(cryptoStream, responseData), responseEncryptionLevel})
 						}
 
 						if !notCompleted && conn.CryptoStates[EncryptionLevel1RTT] == nil {

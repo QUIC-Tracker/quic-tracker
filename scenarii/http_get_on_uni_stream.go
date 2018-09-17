@@ -48,8 +48,8 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case *qt.ProtectedPacket:
-				for _, f := range p.Frames {
+			case qt.Framer:
+				for _, f := range p.GetFrames() {
 					switch f := f.(type) {
 					case *qt.StreamFrame:
 						if f.StreamId == 2 {

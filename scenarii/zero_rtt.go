@@ -70,6 +70,7 @@ forLoop1:
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 	defer connAgents.CloseConnection(false, 0, "")
+	defer trace.Complete(conn)
 
 	incPackets = make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)

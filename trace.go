@@ -5,6 +5,7 @@ import (
 	"time"
 	"strings"
 	"unsafe"
+	"github.com/mpiraux/pigotls"
 )
 
 // Contains the result of a test run against a given host.
@@ -20,10 +21,14 @@ type Trace struct {
 	ErrorCode           uint8                  `json:"error_code"` // A scenario-specific error code that reports its verdict
 	Stream              []TracePacket          `json:"stream"`     // A clear-text copy of the packets that were sent and received
 	Pcap                []byte                 `json:"pcap"`       // The packet capture file associated with the trace
-	DecryptedPcap       []byte                 `json:"decrypted_pcap"`
 	ClientRandom        []byte                 `json:"client_random"`
-	ExporterSecret      []byte                 `json:"exporter_secret"`
-	EarlyExporterSecret []byte                 `json:"early_exporter_secret"`
+	Secrets				map[pigotls.Epoch]Secrets `json:"secrets"`
+}
+
+type Secrets struct {
+	Epoch pigotls.Epoch `json:"epoch"`
+	Read  []byte        `json:"read"`
+	Write []byte        `json:"write"`
 }
 
 func NewTrace(scenarioName string, scenarioVersion int, host string) *Trace {
@@ -74,9 +79,21 @@ func (t *Trace) AttachTo(conn *Connection) {
 }
 
 func (t *Trace) Complete(conn *Connection) {
-	t.ClientRandom = conn.ClientRandom
-	t.ExporterSecret = conn.ExporterSecret
-	t.EarlyExporterSecret = conn.Tls.EarlyExporterSecret()
+	if len(t.ClientRandom) == 0 {
+		t.ClientRandom = conn.Tls.ClientRandom()
+	}
+	if t.Secrets == nil {
+		t.Secrets = make(map[pigotls.Epoch]Secrets)
+	}
+	if _, ok := t.Secrets[pigotls.Epoch0RTT]; !ok && len(conn.Tls.ZeroRTTSecret()) > 0 {
+		t.Secrets[pigotls.Epoch0RTT] = Secrets{Epoch: pigotls.Epoch0RTT, Write: conn.Tls.ZeroRTTSecret()}
+	}
+	if _, ok := t.Secrets[pigotls.EpochHandshake]; !ok && len(conn.Tls.HandshakeReadSecret()) > 0 || len(conn.Tls.HandshakeWriteSecret()) > 0 {
+		t.Secrets[pigotls.EpochHandshake] = Secrets{Epoch: pigotls.EpochHandshake, Read: conn.Tls.HandshakeReadSecret(), Write: conn.Tls.HandshakeWriteSecret()}
+	}
+	if _, ok := t.Secrets[pigotls.Epoch1RTT]; !ok && len(conn.Tls.ProtectedReadSecret()) > 0 || len(conn.Tls.ProtectedWriteSecret()) > 0 {
+		t.Secrets[pigotls.Epoch1RTT] = Secrets{Epoch: pigotls.Epoch1RTT, Read: conn.Tls.ProtectedReadSecret(), Write: conn.Tls.ProtectedWriteSecret()}
+	}
 }
 
 type Direction string

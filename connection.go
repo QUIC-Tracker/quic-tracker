@@ -26,7 +26,6 @@ type Connection struct {
 
 	CryptoStates   map[EncryptionLevel]*CryptoState
 
-	ClientRandom   []byte
 	ExporterSecret []byte
 
 	ReceivedPacketHandler func([]byte, unsafe.Pointer)
@@ -108,8 +107,6 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 		return nil
 	}
 	clientHello := tlsOutput[0].Data
-	c.ClientRandom = make([]byte, 32, 32)
-	copy(c.ClientRandom, clientHello[11:11+32])
 	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)
 
 	if len(c.Tls.ZeroRTTSecret()) > 0 {

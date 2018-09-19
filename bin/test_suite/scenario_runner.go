@@ -48,8 +48,8 @@ func main() {
 		trace.Ip = ip[:strings.LastIndex(ip, ":")]
 		trace.StartedAt = start.Unix()
 
-		conn.Close()
 		trace.Complete(conn)
+		conn.Close()
 		err = trace.AddPcap(conn, pcap)
 		if err != nil {
 			trace.Results["pcap_completed_error"] = err.Error()

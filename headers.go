@@ -188,9 +188,9 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[PNSpaceAppData])
 	return h
 }
-func NewShortHeader(keyPhase KeyPhaseBit, conn *Connection) *ShortHeader {
+func NewShortHeader(conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
-	h.KeyPhase = keyPhase
+	h.KeyPhase = conn.KeyPhaseIndex % 2 == 1
 	h.DestinationCID = conn.DestinationCID
 	h.packetNumber = conn.nextPacketNumber(PNSpaceAppData)
 	h.truncatedPN = h.packetNumber.Truncate(conn.LargestPNsAcknowledged[PNSpaceAppData])

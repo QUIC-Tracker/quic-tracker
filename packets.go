@@ -313,7 +313,7 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 }
 func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewShortHeader(KeyPhaseZero, conn)
+	p.header = NewShortHeader(conn)
 	return p
 }
 

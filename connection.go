@@ -23,6 +23,7 @@ type Connection struct {
 
 	Tls           *pigotls.Connection
 	TLSTPHandler  *TLSTransportParameterHandler
+	KeyPhaseIndex uint
 
 	CryptoStates   map[EncryptionLevel]*CryptoState
 

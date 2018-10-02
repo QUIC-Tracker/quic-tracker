@@ -48,7 +48,6 @@ forLoop1:
 			return
 		}
 	}
-	<-time.NewTimer(20 * time.Millisecond).C  // Ensures that the Finished gets sent before closing
 	connAgents.CloseConnection(false, 0, "")
 
 	<-time.NewTimer(3 * time.Second).C

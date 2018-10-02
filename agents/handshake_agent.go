@@ -39,6 +39,9 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
+	outPackets := make(chan interface{}, 1000)
+	conn.OutgoingPackets.Register(outPackets)
+
 	tlsStatus := make(chan interface{}, 10)
 	a.TLSAgent.TLSStatus.Register(tlsStatus)
 
@@ -46,6 +49,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 	a.SocketAgent.SocketStatus.Register(socketStatus)
 
 	firstInitialReceived := false
+	tlsCompleted := false
+	var tlsPacket Packet
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
@@ -89,10 +94,29 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				default:
 					a.HandshakeStatus.Submit(HandshakeStatus{false, p.(Packet), errors.New("received incorrect packet type during handshake")})
 				}
+			case p := <-outPackets:
+				if !tlsCompleted {
+					break
+				}
+				switch p := p.(type) {
+				case *HandshakePacket:
+					for _, f := range p.GetAll(CryptoType) {
+						cf := f.(*CryptoFrame)
+						if cf.CryptoData[0] == 0x14 { // TLS Finished
+							a.HandshakeStatus.Submit(HandshakeStatus{true, tlsPacket, nil})
+							conn.IncomingPackets.Unregister(incPackets)
+							conn.OutgoingPackets.Unregister(outPackets)
+							return
+						}
+					}
+				}
 			case i := <-tlsStatus:
 				s := i.(TLSStatus)
-				a.HandshakeStatus.Submit(HandshakeStatus{s.Completed, s.Packet, s.Error})
-				return
+				if s.Error != nil {
+					a.HandshakeStatus.Submit(HandshakeStatus{s.Completed, s.Packet, s.Error})
+				}
+				tlsCompleted = s.Completed
+				tlsPacket = s.Packet
 			case i := <-socketStatus:
 				if strings.Contains(i.(error).Error(), "connection refused") {
 					a.HandshakeStatus.Submit(HandshakeStatus{false, nil , i.(error)})

@@ -7,7 +7,7 @@ import (
 )
 
 // The SendingAgent is responsible of bundling the frames queued for sending into packets. If the frames queued for a
-// given encryption level are smaller than a given MTU, it will wait a window of 20ms before sending them in the hope
+// given encryption level are smaller than a given MTU, it will wait a window of 5ms before sending them in the hope
 // that more will be queued. Frames that require an unavailable encryption level are queued until it is made available.
 // It also merge the ACK frames inside a given packet before sending.
 type SendingAgent struct {
@@ -118,7 +118,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 					frameBuffer[qf.EncryptionLevel] = append(frameBuffer[qf.EncryptionLevel], qf.Frame)
 					frameBufferLength[qf.EncryptionLevel] += qf.FrameLength()
 					if encryptionLevelsAvailable[DirectionalEncryptionLevel{qf.EncryptionLevel, false}] || qf.EncryptionLevel == EncryptionLevelBest {
-						timers[qf.EncryptionLevel].Reset(20 * time.Millisecond)
+						timers[qf.EncryptionLevel].Reset(5 * time.Millisecond)
 					}
 				}
 			case <-timers[EncryptionLevelInitial].C:

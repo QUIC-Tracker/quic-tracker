@@ -13,3 +13,4 @@ test.privateoctopus.com:4433	/index.html
 quicker.edm.uhasselt.be:4433	/index.html
 ralith.com:4433	/index.html
 xavamedia.nl:4433	/index.html
+159.65.253.210:1235	/index.html

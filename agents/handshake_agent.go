@@ -70,7 +70,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 				case *RetryPacket:
-					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) {
+					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) {  // TODO: Check the original_connection_id TP too
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						conn.TransitionTo(QuicVersion, QuicALPNToken)
 						conn.Token = p.RetryToken

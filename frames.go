@@ -51,8 +51,8 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 		return Frame(NewNewConnectionIdFrame(buffer)), nil
 	case frameType == StopSendingType:
 		return Frame(NewStopSendingFrame(buffer)), nil
-	case frameType == AckType:
-		return Frame(ReadAckFrame(buffer)), nil
+	case frameType == RetireConnectionIdType:
+		return Frame(ReadRetireConnectionId(buffer)), nil
 	case frameType == PathChallengeType:
 		return Frame(ReadPathChallenge(buffer)), nil
 	case frameType == PathResponseType:
@@ -63,6 +63,8 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 		return Frame(ReadCryptoFrame(buffer, conn)), nil
 	case frameType == NewTokenType:
 		return Frame(ReadNewTokenFrame(buffer, conn)), nil
+	case frameType == AckType:
+		return Frame(ReadAckFrame(buffer)), nil
 	case frameType == AckECNType:
 		return Frame(ReadAckECNFrame(buffer, conn)), nil
 	default:
@@ -85,13 +87,14 @@ const (
 	StreamIdBlockedType            = 0x0a
 	NewConnectionIdType            = 0x0b
 	StopSendingType                = 0x0c
-	AckType                        = 0x0d
+	RetireConnectionIdType		   = 0x0d
 	PathChallengeType              = 0x0e
 	PathResponseType               = 0x0f
 	StreamType                     = 0x10
 	CryptoType                     = 0x18
 	NewTokenType                   = 0x19
-	AckECNType                     = 0x1a
+	AckType                        = 0x1a
+	AckECNType                     = 0x1b
 )
 
 type PaddingFrame byte
@@ -314,16 +317,16 @@ func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamIdBlockedFrame {
 }
 
 type NewConnectionIdFrame struct {
-	Sequence            uint64
 	Length 			    uint8
+	Sequence            uint64
 	ConnectionId        []byte
 	StatelessResetToken [16]byte
 }
 func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
 func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
-	WriteVarInt(buffer, frame.Sequence)
 	buffer.WriteByte(frame.Length)
+	WriteVarInt(buffer, frame.Sequence)
 	buffer.Write(frame.ConnectionId)
 	binary.Write(buffer, binary.BigEndian, frame.StatelessResetToken)
 }
@@ -332,8 +335,8 @@ func (frame NewConnectionIdFrame) FrameLength() uint16 { return 1 + uint16(VarIn
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte()  // Discard frame type
-	frame.Sequence, _ = ReadVarIntValue(buffer)
 	frame.Length, _ = buffer.ReadByte()
+	frame.Sequence, _ = ReadVarIntValue(buffer)
 	frame.ConnectionId = make([]byte, frame.Length, frame.Length)
 	buffer.Read(frame.ConnectionId)
 	binary.Read(buffer, binary.BigEndian, &frame.StatelessResetToken)
@@ -360,82 +363,20 @@ func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	return frame
 }
 
-type AckFrame struct {
-	LargestAcknowledged PacketNumber
-	AckDelay            uint64
-	AckBlockCount       uint64
-	AckBlocks           []AckBlock
+type RetireConnectionId struct {
+	SequenceNumber uint64
 }
-type AckBlock struct {
-	Gap   uint64
-	Block uint64
-}
-func (frame AckFrame) FrameType() FrameType { return AckType }
-func (frame AckFrame) shouldBeRetransmitted() bool { return false }
-func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
+func (frame RetireConnectionId) FrameType() FrameType { return RetireConnectionIdType }
+func (frame RetireConnectionId) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
-	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
-	WriteVarInt(buffer, frame.AckDelay)
-	WriteVarInt(buffer, frame.AckBlockCount)
-	for i, ack := range frame.AckBlocks {
-		if i > 0 {
-			WriteVarInt(buffer, ack.Gap)
-		}
-		WriteVarInt(buffer, ack.Block)
-	}
+	WriteVarInt(buffer, frame.SequenceNumber)
 }
-func (frame AckFrame) FrameLength() uint16 {
-	var length uint16
-	length += 1 + uint16(VarIntLen(uint64(frame.LargestAcknowledged)) + VarIntLen(frame.AckDelay) + VarIntLen(frame.AckBlockCount))
-
-	for i, ack := range frame.AckBlocks {
-		if i > 0 {
-			length += uint16(VarIntLen(ack.Gap))
-		}
-		length += uint16(VarIntLen(ack.Block))
-	}
-	return length
-}
-func (frame AckFrame) GetAckedPackets() []PacketNumber {  // TODO: This is prone to livelock
-	var packets []PacketNumber
-
-	currentPacketNumber := frame.LargestAcknowledged
-	packets = append(packets, currentPacketNumber)
-	for i := uint64(0); i < frame.AckBlocks[0].Block; i++ {
-		currentPacketNumber--
-		packets = append(packets, currentPacketNumber)
-	}
-	for _, ackBlock := range frame.AckBlocks[1:] {
-		for i := uint64(0); i <= ackBlock.Gap; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
-			currentPacketNumber--
-			packets = append(packets, currentPacketNumber)
-		}
-		for i := uint64(0); i < ackBlock.Block; i++ {
-			currentPacketNumber--
-			packets = append(packets, currentPacketNumber)
-		}
-	}
-	return packets
-}
-func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
-	frame := new(AckFrame)
+func (frame RetireConnectionId) shouldBeRetransmitted() bool { return true }
+func (frame RetireConnectionId) FrameLength() uint16 { return 1 + uint16(VarIntLen(frame.SequenceNumber)) }
+func ReadRetireConnectionId(buffer *bytes.Reader) *RetireConnectionId {
+	frame := new(RetireConnectionId)
 	buffer.ReadByte()  // Discard frame byte
-
-	frame.LargestAcknowledged = ReadPacketNumber(buffer)
-	frame.AckDelay, _ = ReadVarIntValue(buffer)
-	frame.AckBlockCount, _ = ReadVarIntValue(buffer)
-
-	firstBlock := AckBlock{}
-	firstBlock.Block, _ = ReadVarIntValue(buffer)
-	frame.AckBlocks = append(frame.AckBlocks, firstBlock)
-
-	var i uint64
-	for i = 0; i < frame.AckBlockCount; i++ {
-		ack := AckBlock{}
-		ack.Gap, _ = ReadVarIntValue(buffer)
-		ack.Block, _ = ReadVarIntValue(buffer)
-		frame.AckBlocks = append(frame.AckBlocks, ack)
-	}
+	frame.SequenceNumber, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -610,19 +551,21 @@ func ReadNewTokenFrame(buffer *bytes.Reader, conn *Connection) *NewTokenFrame {
 	return frame
 }
 
-type AckECNFrame struct {
-	AckFrame
-	ECT0Count uint64
-	ECT1Count uint64
-	ECTCECount uint64
+type AckFrame struct {
+	LargestAcknowledged PacketNumber
+	AckDelay            uint64
+	AckBlockCount       uint64
+	AckBlocks           []AckBlock
 }
-func (frame AckECNFrame) FrameType() FrameType { return AckECNType }
-func (frame AckECNFrame) writeTo(buffer *bytes.Buffer) {
+type AckBlock struct {
+	Gap   uint64
+	Block uint64
+}
+func (frame AckFrame) FrameType() FrameType { return AckType }
+func (frame AckFrame) shouldBeRetransmitted() bool { return false }
+func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
-	WriteVarInt(buffer, frame.ECT0Count)
-	WriteVarInt(buffer, frame.ECT1Count)
-	WriteVarInt(buffer, frame.ECTCECount)
 	WriteVarInt(buffer, frame.AckDelay)
 	WriteVarInt(buffer, frame.AckBlockCount)
 	for i, ack := range frame.AckBlocks {
@@ -632,16 +575,44 @@ func (frame AckECNFrame) writeTo(buffer *bytes.Buffer) {
 		WriteVarInt(buffer, ack.Block)
 	}
 }
-func (frame AckECNFrame) shouldBeRetransmitted() bool { return true }
-func (frame AckECNFrame) FrameLength() uint16 { return frame.AckFrame.FrameLength() + uint16(VarIntLen(frame.ECT0Count) + VarIntLen(frame.ECT1Count) + VarIntLen(frame.ECTCECount))}
-func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
-	frame := new(AckECNFrame)
-	ReadVarIntValue(buffer) // Discards frame type
+func (frame AckFrame) FrameLength() uint16 {
+	var length uint16
+	length += 1 + uint16(VarIntLen(uint64(frame.LargestAcknowledged)) + VarIntLen(frame.AckDelay) + VarIntLen(frame.AckBlockCount))
+
+	for i, ack := range frame.AckBlocks {
+		if i > 0 {
+			length += uint16(VarIntLen(ack.Gap))
+		}
+		length += uint16(VarIntLen(ack.Block))
+	}
+	return length
+}
+func (frame AckFrame) GetAckedPackets() []PacketNumber {  // TODO: This is prone to livelock
+	var packets []PacketNumber
+
+	currentPacketNumber := frame.LargestAcknowledged
+	packets = append(packets, currentPacketNumber)
+	for i := uint64(0); i < frame.AckBlocks[0].Block; i++ {
+		currentPacketNumber--
+		packets = append(packets, currentPacketNumber)
+	}
+	for _, ackBlock := range frame.AckBlocks[1:] {
+		for i := uint64(0); i <= ackBlock.Gap; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
+			currentPacketNumber--
+			packets = append(packets, currentPacketNumber)
+		}
+		for i := uint64(0); i < ackBlock.Block; i++ {
+			currentPacketNumber--
+			packets = append(packets, currentPacketNumber)
+		}
+	}
+	return packets
+}
+func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
+	frame := new(AckFrame)
+	buffer.ReadByte()  // Discard frame byte
 
 	frame.LargestAcknowledged = ReadPacketNumber(buffer)
-	frame.ECT0Count, _ = ReadVarIntValue(buffer)
-	frame.ECT1Count, _ = ReadVarIntValue(buffer)
-	frame.ECTCECount, _ = ReadVarIntValue(buffer)
 	frame.AckDelay, _ = ReadVarIntValue(buffer)
 	frame.AckBlockCount, _ = ReadVarIntValue(buffer)
 
@@ -656,6 +627,38 @@ func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
 		ack.Block, _ = ReadVarIntValue(buffer)
 		frame.AckBlocks = append(frame.AckBlocks, ack)
 	}
+	return frame
+}
 
+type AckECNFrame struct {
+	AckFrame
+	ECT0Count uint64
+	ECT1Count uint64
+	ECTCECount uint64
+}
+func (frame AckECNFrame) FrameType() FrameType { return AckECNType }
+func (frame AckECNFrame) writeTo(buffer *bytes.Buffer) {
+	WriteVarInt(buffer, uint64(frame.FrameType()))
+	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
+	WriteVarInt(buffer, frame.AckDelay)
+	WriteVarInt(buffer, frame.AckBlockCount)
+	for i, ack := range frame.AckBlocks {
+		if i > 0 {
+			WriteVarInt(buffer, ack.Gap)
+		}
+		WriteVarInt(buffer, ack.Block)
+	}
+	WriteVarInt(buffer, frame.ECT0Count)
+	WriteVarInt(buffer, frame.ECT1Count)
+	WriteVarInt(buffer, frame.ECTCECount)
+}
+func (frame AckECNFrame) shouldBeRetransmitted() bool { return true }
+func (frame AckECNFrame) FrameLength() uint16 { return frame.AckFrame.FrameLength() + uint16(VarIntLen(frame.ECT0Count) + VarIntLen(frame.ECT1Count) + VarIntLen(frame.ECTCECount))}
+func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
+	frame := &AckECNFrame{*ReadAckFrame(buffer), 0, 0, 0}
+
+	frame.ECT0Count, _ = ReadVarIntValue(buffer)
+	frame.ECT1Count, _ = ReadVarIntValue(buffer)
+	frame.ECTCECount, _ = ReadVarIntValue(buffer)
 	return frame
 }

@@ -11,7 +11,7 @@ const (
 	TP_NoTPReceived     		= 1
 	TP_TPResentAfterVN  		= 2  // All others error code are now handled by the handshake scenario
 	TP_HandshakeDidNotComplete 	= 3
-	TP_MissingParameters 		= 4
+	TP_MissingParameters 		= 4  // Since draft-15, there are no parameters that MUST be present
 )
 
 type TransportParameterScenario struct {
@@ -38,14 +38,4 @@ func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 
 	trace.Results["transport_parameters"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters
 	trace.Results["decoded_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
-
-	if !validate(conn.TLSTPHandler.ReceivedParameters.ToJSON) {
-		trace.MarkError(TP_MissingParameters, "", nil)
-	}
-}
-
-func validate(parameters map[string]interface{}) bool {
-	_, present := parameters["idle_timeout"]
-
-	return present
 }

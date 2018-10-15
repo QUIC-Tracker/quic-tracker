@@ -73,11 +73,11 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 
 					alternativeConnectionIDs = append(alternativeConnectionIDs, hex.EncodeToString(nci.ConnectionId))
 
-					if !expectingResponse {
+					if !expectingResponse { // TODO: Maybe we should provide CIDs in advance, see https://tools.ietf.org/rfcdiff?url2=draft-ietf-quic-transport-15.txt#part-34
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
-						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{0, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
+						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{uint8(len(scid)), 0, scid, resetToken}, qt.EncryptionLevelBest})
 						conn.SendHTTPGETRequest(preferredUrl, 0)
 						expectingResponse = true
 					}

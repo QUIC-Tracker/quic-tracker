@@ -20,6 +20,8 @@ const (
 	DisableMigration                             	      = 0x0009  // TODO: Handle this parameter
 	InitialMaxStreamDataBidiRemote						  = 0x000a
 	InitialMaxStreamDataUni								  = 0x000b
+	MaxAckDelay											  = 0x000c
+	OriginalConnectionId								  = 0x000d
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
@@ -35,6 +37,8 @@ type QuicTransportParameters struct {  // A set of QUIC transport parameters val
 	DisableMigration        bool
 	MaxStreamDataBidiRemote uint32
 	MaxStreamDataUni        uint32
+	MaxAckDelay				uint8
+	OriginalConnectionId    ConnectionID
 	AdditionalParameters    TransportParameterList
 	ToJSON                  map[string]interface{}
 }
@@ -172,6 +176,12 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 		case InitialMaxStreamDataUni:
 			receivedParameters.MaxStreamDataUni = binary.BigEndian.Uint32(p.Value)
 			receivedParameters.ToJSON["initial_max_stream_data_uni"] = receivedParameters.MaxStreamDataUni
+		case MaxAckDelay:
+			receivedParameters.MaxAckDelay = p.Value[0]
+			receivedParameters.ToJSON["max_ack_delay"] = p.Value
+		case OriginalConnectionId:
+			receivedParameters.OriginalConnectionId = ConnectionID(p.Value)
+			receivedParameters.ToJSON["original_connection_id"] = ConnectionID(p.Value)
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)
 			receivedParameters.ToJSON[fmt.Sprintf("%x", p.ParameterType)] = p.Value

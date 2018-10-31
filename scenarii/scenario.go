@@ -94,5 +94,6 @@ func GetAllScenarii() map[string]Scenario {
 		"http_get_and_wait":         NewSimpleGetAndWaitScenario(),
 		"http_get_on_uni_stream":    NewGetOnStream2Scenario(),
 		"key_update":				 NewKeyUpdateScenario(),
+		"retire_connection_id":      NewRetireConnectionIDScenario(),
 	}
 }

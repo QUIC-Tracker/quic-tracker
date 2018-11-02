@@ -37,8 +37,17 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					cryptoState := a.conn.CryptoStates[header.EncryptionLevel()]
 					var pnLength int
 
+					if lh, ok := header.(*LongHeader); ok && lh.Version == 0x00000000 {
+						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
+
+						a.SaveCleartextPacket(ciphertext, packet.Pointer())
+						a.conn.IncomingPackets.Submit(packet)
+
+						break packetSelect
+					}
+
 					switch header.PacketType() {
-					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN
+					case Initial, Handshake, ZeroRTTProtected: // Decrypt PN
 						if cryptoState != nil && cryptoState.PacketRead != nil && cryptoState.Read != nil {
 							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(ciphertext))
 
@@ -56,72 +65,64 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 					a.Logger.Printf("Successfully decrypted header {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 
-					if lHeader, ok := header.(*LongHeader); ok && lHeader.Version == 0x00000000 {
-						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
+					hLen := header.HeaderLength()
+					var packet Packet
+					var cleartext []byte
+					switch header.PacketType() {
+					case Handshake, Initial:
+						lHeader := header.(*LongHeader)
+						pLen := int(lHeader.Length.Value) - pnLength
 
-						a.SaveCleartextPacket(ciphertext, packet.Pointer())
-						a.conn.IncomingPackets.Submit(packet)
-
-						break packetSelect
-					} else {
-						hLen := header.HeaderLength()
-						var packet Packet
-						var cleartext []byte
-						switch header.PacketType() {
-						case Handshake, Initial:
-							lHeader := header.(*LongHeader)
-							pLen := int(lHeader.Length.Value) - pnLength
-
-							if hLen+pLen > len(ciphertext) {
-								a.Logger.Printf("Payload length is past the received bytes, has PN decryption failed ? Aborting")
-								break packetSelect
-							}
-
-							payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:hLen+pLen], ciphertext[:hLen])
-							if err != nil {
-								a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
-								break packetSelect
-							}
-
-							cleartext = append(append(cleartext, ciphertext[:hLen]...), payload...)
-
-							if lHeader.PacketType() == Initial {
-								packet = ReadInitialPacket(bytes.NewReader(cleartext), a.conn)
-							} else {
-								packet = ReadHandshakePacket(bytes.NewReader(cleartext), a.conn)
-							}
-
-							off += hLen + pLen
-						case ShortHeaderPacket: // Packets with a short header always include a 1-RTT protected payload.
-							payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:], ciphertext[:hLen])
-							if err != nil {
-								a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
-								break packetSelect
-							}
-							cleartext = append(append(cleartext, udpPayload[off:off+hLen]...), payload...)
-							packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
-							off = len(udpPayload)
-						case Retry:
-							cleartext = ciphertext
-							packet = ReadRetryPacket(bytes.NewReader(cleartext), a.conn)
-							off = len(udpPayload)
-						default:
-							a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
+						if hLen+pLen > len(ciphertext) {
+							a.Logger.Printf("Payload length is past the received bytes, has PN decryption failed ? Aborting")
 							break packetSelect
 						}
 
-						a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), len(cleartext))
-
-						switch packet.(type) {
-						case Framer:
-							if packet.Header().PacketNumber() > conn.LargestPNsReceived[packet.PNSpace()] {
-								conn.LargestPNsReceived[packet.PNSpace()] = packet.Header().PacketNumber()
-							}
+						payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:hLen+pLen], ciphertext[:hLen])
+						if err != nil {
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
+							break packetSelect
 						}
 
-						a.conn.IncomingPackets.Submit(packet)
-						a.SaveCleartextPacket(cleartext, packet.Pointer())
+						cleartext = append(append(cleartext, ciphertext[:hLen]...), payload...)
+
+						if lHeader.PacketType() == Initial {
+							packet = ReadInitialPacket(bytes.NewReader(cleartext), a.conn)
+						} else {
+							packet = ReadHandshakePacket(bytes.NewReader(cleartext), a.conn)
+						}
+
+						off += hLen + pLen
+					case ShortHeaderPacket: // Packets with a short header always include a 1-RTT protected payload.
+						payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:], ciphertext[:hLen])
+						if err != nil {
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
+							break packetSelect
+						}
+						cleartext = append(append(cleartext, udpPayload[off:off+hLen]...), payload...)
+						packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
+						off = len(udpPayload)
+					case Retry:
+						cleartext = ciphertext
+						packet = ReadRetryPacket(bytes.NewReader(cleartext), a.conn)
+						off = len(udpPayload)
+					default:
+						a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
+						break packetSelect
 					}
+
+					a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), len(cleartext))
+
+					switch packet.(type) {
+					case Framer:
+						if packet.Header().PacketNumber() > conn.LargestPNsReceived[packet.PNSpace()] {
+							conn.LargestPNsReceived[packet.PNSpace()] = packet.Header().PacketNumber()
+						}
+					}
+
+					a.conn.IncomingPackets.Submit(packet)
+					a.SaveCleartextPacket(cleartext, packet.Pointer())
+
 				}
 			case <-a.close:
 				return

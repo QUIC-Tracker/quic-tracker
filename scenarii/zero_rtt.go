@@ -35,17 +35,20 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	resumptionTicket := make(chan interface{}, 10)
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).ResumptionTicket.Register(resumptionTicket)
 
-	var ticket []byte
-forLoop1:
-	for {
-		select {
-		case i := <-resumptionTicket:
-			ticket = i.([]byte)
-			break forLoop1
-		case <-s.Timeout().C:
-			trace.MarkError(ZR_NoResumptionSecret, "", nil)
-			connAgents.CloseConnection(false, 0, "")
-			return
+	ticket := conn.Tls.ResumptionTicket()
+
+	if len(ticket) <= 0 {
+	getTicket:
+		for {
+			select {
+			case i := <-resumptionTicket:
+				ticket = i.([]byte)
+				break getTicket
+			case <-s.Timeout().C:
+				trace.MarkError(ZR_NoResumptionSecret, "", nil)
+				connAgents.CloseConnection(false, 0, "")
+				return
+			}
 		}
 	}
 	connAgents.CloseConnection(false, 0, "")

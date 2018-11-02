@@ -36,7 +36,7 @@ func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
 
-	for i := uint16(0); i <= conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
+	for i := uint16(0); i < conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
 		conn.SendHTTPGETRequest(preferredUrl, uint64(i*4))
 	}
 

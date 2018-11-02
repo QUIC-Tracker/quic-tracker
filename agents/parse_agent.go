@@ -47,7 +47,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					}
 
 					switch header.PacketType() {
-					case Initial, Handshake, ZeroRTTProtected: // Decrypt PN
+					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN
 						if cryptoState != nil && cryptoState.PacketRead != nil && cryptoState.Read != nil {
 							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(ciphertext))
 

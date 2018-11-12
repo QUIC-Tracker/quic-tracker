@@ -40,8 +40,8 @@ Docker builds exist on `Docker Hub`_.
 
 ::
 
-    docker run quictracker/quictracker /http_get -h
-    docker run quictracker/quictracker /scenario_runner -h
-    docker run quictracker/quictracker /test_suite -h
+    docker run --network="host" quictracker/quictracker /http_get -h
+    docker run --network="host" quictracker/quictracker /scenario_runner -h
+    docker run --network="host" quictracker/quictracker /test_suite -h
 
 .. _Docker Hub: https://hub.docker.com/r/quictracker/quictracker/

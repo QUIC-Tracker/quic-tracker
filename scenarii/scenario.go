@@ -93,7 +93,8 @@ func GetAllScenarii() map[string]Scenario {
 		"stop_sending":              NewStopSendingOnReceiveStreamScenario(),
 		"http_get_and_wait":         NewSimpleGetAndWaitScenario(),
 		"http_get_on_uni_stream":    NewGetOnStream2Scenario(),
-		"key_update":				 NewKeyUpdateScenario(),
+		"key_update":                NewKeyUpdateScenario(),
 		"retire_connection_id":      NewRetireConnectionIDScenario(),
+		"http3_get":                 NewHTTP3GETScenario(),
 	}
 }

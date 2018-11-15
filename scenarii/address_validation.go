@@ -4,12 +4,12 @@ import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
 	"time"
-	"fmt"
 )
 
 const (
-	AV_TLSHandshakeFailed = 1
-	AV_SentMoreThan3Datagrams = 2
+	AV_TLSHandshakeFailed       = 1
+	AV_SentMoreThan3Datagrams   = 2
+	AV_SentMoreThan3TimesAmount = 3
 )
 
 type AddressValidationScenario struct {
@@ -17,7 +17,7 @@ type AddressValidationScenario struct {
 }
 
 func NewAddressValidationScenario() *AddressValidationScenario {
-	return &AddressValidationScenario{AbstractScenario{"address_validation", 1, false, nil}}
+	return &AddressValidationScenario{AbstractScenario{"address_validation", 2, false, nil}}
 }
 func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
@@ -25,7 +25,8 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 
-	connAgents.Get("AckAgent").(*agents.AckAgent).Stop()
+	ackAgent := connAgents.Get("AckAgent").(*agents.AckAgent)
+	ackAgent.DisableAcks = true
 	socketAgent := connAgents.Get("SocketAgent").(*agents.SocketAgent)
 	tlsAgent := connAgents.Get("TLSAgent").(*agents.TLSAgent)
 	tlsAgent.DisableFrameSending = true
@@ -38,10 +39,16 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)
 
+	outgoingPackets := make(chan interface{}, 1000)
+	conn.OutgoingPackets.Register(outgoingPackets)
+
 	handshakeAgent.InitiateHandshake()
 
 	var arrivals []uint64
 	var start time.Time
+	var initialLength int
+	var addressValidated bool
+	ackTimer := time.NewTimer(3 * time.Second)
 
 	trace.ErrorCode = AV_TLSHandshakeFailed
 
@@ -66,10 +73,21 @@ forLoop:
 					start = time.Now()
 				}
 				arrivals = append(arrivals, uint64(time.Now().Sub(start).Seconds()*1000))
+				if len(arrivals) > 1 {
+					trace.Results["arrival_times"] = arrivals
+				}
 			}
 
-			if socketAgent.DatagramsReceived > 3 {
-				trace.MarkError(AV_SentMoreThan3Datagrams, fmt.Sprintf("%d datagrams received", socketAgent.DatagramsReceived), i.(qt.Packet))
+			if !addressValidated && float32(socketAgent.TotalDataReceived) / float32(initialLength) > 3.5 {
+				trace.MarkError(AV_SentMoreThan3TimesAmount, "", i.(qt.Packet))
+				ackTimer.Stop()
+			} else if !addressValidated {
+				ackTimer.Reset(3 * time.Second)
+			}
+		case i := <-outgoingPackets:
+			p := i.(qt.Packet)
+			if p.Header().PacketNumber() == 0 && p.Header().PacketType() == qt.Initial {
+				initialLength = len(p.Encode(p.EncodePayload()))
 			}
 		case i := <-handshakeStatus:
 			status := i.(agents.HandshakeStatus)
@@ -77,15 +95,25 @@ forLoop:
 				trace.MarkError(AV_TLSHandshakeFailed, status.Error.Error(), status.Packet)
 				break forLoop
 			} else {
+				defer connAgents.CloseConnection(false, 0, "")
 				trace.ErrorCode = 0
 			}
+		case <-ackTimer.C:
+			for pns, enc := range map[qt.PNSpace]qt.EncryptionLevel{qt.PNSpaceInitial: qt.EncryptionLevelInitial, qt.PNSpaceHandshake: qt.EncryptionLevelHandshake, qt.PNSpaceAppData: qt.EncryptionLevel1RTT} {
+				f := conn.GetAckFrame(pns)
+				if f != nil {
+					conn.FrameQueue.Submit(qt.QueuedFrame{f, enc})
+				}
+			}
+			addressValidated = true
+			ackAgent.DisableAcks = false
+			tlsAgent.DisableFrameSending = false
+			trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
 		case <-s.Timeout().C:
 			break forLoop
 		}
 	}
 
-	trace.Results["arrival_times"] = arrivals
 	trace.Results["datagrams_received"] = socketAgent.DatagramsReceived
 	trace.Results["total_data_received"] = socketAgent.TotalDataReceived
-	// TODO: Compute amplification factor
 }

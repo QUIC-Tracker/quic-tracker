@@ -27,6 +27,7 @@ func main() {
 	scenario, ok := s.GetAllScenarii()[*scenarioName]
 	if !ok {
 		println("Unknown scenario", *scenarioName)
+		return
 	}
 
 	trace := qt.NewTrace(scenario.Name(), scenario.Version(), *host)

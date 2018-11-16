@@ -24,6 +24,7 @@ func NewHTTP3EncoderStreamScenario() *HTTP3EncoderStreamScenario {
 }
 func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
+	conn.TLSTPHandler.MaxUniStreams = 3
 
 	connAgents := s.CompleteHandshake(conn, trace, H3ES_TLSHandshakeFailed)
 	if connAgents == nil {

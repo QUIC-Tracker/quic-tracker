@@ -21,6 +21,7 @@ func NewHTTP3GETScenario() *HTTP3GETScenario {
 }
 func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
+	conn.TLSTPHandler.MaxUniStreams = 3
 
 	connAgents := s.CompleteHandshake(conn, trace, H3G_TLSHandshakeFailed)
 	if connAgents == nil {

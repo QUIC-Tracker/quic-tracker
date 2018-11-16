@@ -33,6 +33,7 @@ package quictracker
 import (
 	"encoding/binary"
 	"github.com/mpiraux/pigotls"
+	_ "github.com/mpiraux/ls-qpack-go"
 	"math"
 	"bytes"
 	. "github.com/QUIC-Tracker/quic-tracker/lib"

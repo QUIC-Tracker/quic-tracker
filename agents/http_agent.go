@@ -7,7 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-broadcast"
 	"math"
-	"vimagination.zapto.org/errors"
+	"errors"
 )
 
 type HTTPResponse struct {

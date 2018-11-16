@@ -40,6 +40,7 @@ type HTTPAgent struct {
 	BaseAgent
 	conn                 *Connection
 	QPACK                QPACKAgent
+	QPACKEncoderOpts     uint32
 	HTTPResponseReceived broadcast.Broadcaster //type: HTTPResponse
 	FrameReceived        broadcast.Broadcaster //type: HTTPFrameReceived
 	streamData           chan streamData
@@ -85,6 +86,10 @@ func (a *HTTPAgent) Run(conn *Connection) {
 	a.streamDataBuffer = make(map[uint64]*bytes.Buffer)
 	a.responseBuffer = make(map[uint64]*HTTPResponse)
 
+	var settingsReceived bool
+	settingsHeaderTableSize := uint64(4096)
+	settingsQPACKBlockedStreams := uint64(100)
+
 	go func() {
 		defer a.Logger.Println("Agent terminated")
 		defer close(a.closed)
@@ -104,7 +109,6 @@ func (a *HTTPAgent) Run(conn *Connection) {
 								a.peerControlStreamID = s.StreamId
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerControlStream)
 								if s.Length > 1 {
-									spew.Dump(s.StreamData[1:])
 									peerControlStream <- s.StreamData[1:] // Submits the rest as normal control stream data
 								}
 								a.Logger.Printf("Peer opened control stream on stream %d\n", s.StreamId)
@@ -143,6 +147,20 @@ func (a *HTTPAgent) Run(conn *Connection) {
 					response.Body = append(a.responseBuffer[fr.StreamID].Body, f.Payload...)
 					response.totalProcessed += f.WireLength()
 					a.checkResponse(response)
+				case *http3.SETTINGS:
+					if settingsReceived {
+						a.Logger.Printf("Received a SETTINGS frame for the second time!\n")
+						continue
+					}
+					settingsReceived = true
+					for _, s := range f.Settings {
+						if s.Identifier == http3.SETTINGS_HEADER_TABLE_SIZE {
+							settingsHeaderTableSize = s.Value.Value
+						} else if s.Identifier == http3.SETTINGS_QPACK_BLOCKED_STREAMS {
+							settingsQPACKBlockedStreams = s.Value.Value
+						}
+					}
+					a.QPACK.InitEncoder(uint(settingsHeaderTableSize), uint(settingsHeaderTableSize / 4), uint(settingsQPACKBlockedStreams), a.QPACKEncoderOpts)
 				default:
 					spew.Dump(fr)
 				}

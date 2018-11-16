@@ -45,6 +45,7 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 	select {
 	case <-responseReceived:
 		trace.ErrorCode = 0
+		<-s.Timeout().C
 	case <-s.Timeout().C:
 		trace.ErrorCode = H3G_RequestTimeout
 		return

@@ -96,5 +96,6 @@ func GetAllScenarii() map[string]Scenario {
 		"key_update":                NewKeyUpdateScenario(),
 		"retire_connection_id":      NewRetireConnectionIDScenario(),
 		"http3_get":                 NewHTTP3GETScenario(),
+		"http3_encoder_stream":      NewHTTP3EncoderStreamScenario(),
 	}
 }

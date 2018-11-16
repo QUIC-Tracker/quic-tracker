@@ -160,3 +160,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.EncoderStreamID, conn.Streams.Get(a.EncoderStreamID), []byte{'H'}, false), EncryptionLevelBest})
 	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.DecoderStreamID, conn.Streams.Get(a.DecoderStreamID), []byte{'h'}, false), EncryptionLevelBest})
 }
+func (a *QPACKAgent) InitEncoder(headerTableSize uint, dynamicTablesize uint, maxRiskedStreams uint, opts uint32) {
+	a.encoder.Init(headerTableSize, dynamicTablesize, maxRiskedStreams, opts)
+	a.Logger.Printf("Encoder initialized with HTS=%d, DTS=%d, MRS=%d and opts=%d\n", headerTableSize, dynamicTablesize, maxRiskedStreams, opts)
+}

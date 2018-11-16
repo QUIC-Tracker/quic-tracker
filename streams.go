@@ -14,6 +14,15 @@ func (s Streams) Get(streamId uint64) *Stream {  // TODO: This should enforce li
 	}
 	return s[streamId]
 }
+func (s Streams) NumberOfServerStreamsOpen() int {
+	count := 0
+	for streamID, _ := range s {
+		if streamID % 2 == 1 {
+			count++
+		}
+	}
+	return count
+}
 
 type CryptoStreams map[PNSpace]*Stream
 

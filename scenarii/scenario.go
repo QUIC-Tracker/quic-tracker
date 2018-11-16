@@ -46,6 +46,7 @@ func (s *AbstractScenario) IPv6() bool {
 func (s *AbstractScenario) Timeout() *time.Timer {
 	return s.timeout
 }
+
 // Useful helper for scenarii that requires the handshake to complete before executing their test and don't want to
 // discern the cause of its failure.
 func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
@@ -97,5 +98,6 @@ func GetAllScenarii() map[string]Scenario {
 		"retire_connection_id":      NewRetireConnectionIDScenario(),
 		"http3_get":                 NewHTTP3GETScenario(),
 		"http3_encoder_stream":      NewHTTP3EncoderStreamScenario(),
+		"http3_uni_streams_limits":  NewHTTP3UniStreamsLimitsScenario(),
 	}
 }

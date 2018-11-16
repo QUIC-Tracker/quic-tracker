@@ -218,6 +218,10 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 	headers[":authority"] = authority
 	headers[":path"] = path
 
+	if _, ok := headers["User-Agent"]; !ok {
+		headers["User-Agent"] = "QUIC-Tracker/" + GitCommit()
+	}
+
 	var hdrs []HTTPHeader
 	for k, v := range headers {
 		hdrs = append(hdrs, HTTPHeader{k, v})

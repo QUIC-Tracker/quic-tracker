@@ -79,7 +79,7 @@ func (a *HTTPAgent) Run(conn *Connection) {
 	peerControlStream := make(chan interface{}, 1000)
 	peerControlStreamBuffer := new(bytes.Buffer)
 	a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.controlStreamID, conn.Streams.Get(a.controlStreamID), []byte{'C'}, false), EncryptionLevelBest})
-	a.sendFrameOnStream(http3.NewSETTINGS(nil), a.controlStreamID)
+	a.sendFrameOnStream(http3.NewSETTINGS(nil), a.controlStreamID, false)
 
 	a.streamData = make(chan streamData)
 	a.streamDataBuffer = make(map[uint64]*bytes.Buffer)
@@ -159,7 +159,7 @@ func (a *HTTPAgent) Run(conn *Connection) {
 				a.checkResponse(response)
 			case i := <-encodedHeaders:
 				eHdrs := i.(EncodedHeaders)
-				a.sendFrameOnStream(http3.NewHEADERS(eHdrs.Headers), eHdrs.StreamID)
+				a.sendFrameOnStream(http3.NewHEADERS(eHdrs.Headers), eHdrs.StreamID, true)
 				a.Logger.Printf("Sent a %d-byte long block of headers on stream %d\n", len(eHdrs.Headers), eHdrs.StreamID)
 			case <-a.close:
 				return
@@ -167,10 +167,10 @@ func (a *HTTPAgent) Run(conn *Connection) {
 		}
 	}()
 }
-func (a *HTTPAgent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64) {
+func (a *HTTPAgent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64, fin bool) {
 	buf := new(bytes.Buffer)
 	frame.WriteTo(buf)
-	a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, a.conn.Streams.Get(streamID), buf.Bytes(), false), EncryptionLevelBest})
+	a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, a.conn.Streams.Get(streamID), buf.Bytes(), fin), EncryptionLevelBest})
 }
 func (a *HTTPAgent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 	var l VarInt

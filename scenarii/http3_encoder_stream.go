@@ -59,6 +59,7 @@ forLoop:
 			}
 		case <-s.Timeout().C:
 			trace.ErrorCode = H3ES_SETTINGSNotSent
+			return
 		}
 	}
 

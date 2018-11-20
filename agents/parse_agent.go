@@ -2,7 +2,6 @@ package agents
 
 import (
 	. "github.com/QUIC-Tracker/quic-tracker"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	"unsafe"
 	"bytes"
 )
@@ -78,9 +77,9 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							break packetSelect
 						}
 
-						payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:hLen+pLen], ciphertext[:hLen])
-						if err != nil {
-							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
+						payload := cryptoState.Read.Decrypt(ciphertext[hLen:hLen+pLen], uint64(header.PacketNumber()), ciphertext[:hLen])
+						if payload == nil {
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 							break packetSelect
 						}
 
@@ -94,9 +93,9 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 						off += hLen + pLen
 					case ShortHeaderPacket: // Packets with a short header always include a 1-RTT protected payload.
-						payload, err := cryptoState.Read.Open(nil, EncodeArgs(header.PacketNumber()), ciphertext[hLen:], ciphertext[:hLen])
-						if err != nil {
-							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}: %s\n", header.PacketType().String(), header.PacketNumber(), err.Error())
+						payload := cryptoState.Read.Decrypt(ciphertext[hLen:], uint64(header.PacketNumber()), ciphertext[:hLen])
+						if payload == nil {
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 							break packetSelect
 						}
 						cleartext = append(append(cleartext, udpPayload[off:off+hLen]...), payload...)

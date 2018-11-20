@@ -1,9 +1,7 @@
 package quictracker
 
 import (
-	"crypto/cipher"
 	"github.com/mpiraux/pigotls"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2
@@ -62,19 +60,19 @@ type DirectionalEncryptionLevel struct {
 }
 
 type CryptoState struct {
-	Read  cipher.AEAD
-	Write cipher.AEAD
+	Read  *pigotls.AEAD
+	Write *pigotls.AEAD
 	PacketRead *pigotls.Cipher
 	PacketWrite *pigotls.Cipher
 }
 
 func (s *CryptoState) InitRead(tls *pigotls.Connection, readSecret []byte) {
-	s.Read = newProtectedAead(tls, readSecret)
+	s.Read = tls.NewAEAD(readSecret, false)
 	s.PacketRead = tls.NewCipher(tls.HkdfExpandLabel(readSecret, "pn", nil, tls.AEADKeySize()))
 }
 
 func (s *CryptoState) InitWrite(tls *pigotls.Connection, writeSecret []byte) {
-	s.Write = newProtectedAead(tls, writeSecret)
+	s.Write = tls.NewAEAD(writeSecret, true)
 	s.PacketWrite = tls.NewCipher(tls.HkdfExpandLabel(writeSecret, "pn", nil, tls.AEADKeySize()))
 }
 
@@ -94,17 +92,6 @@ func NewProtectedCryptoState(tls *pigotls.Connection, readSecret []byte, writeSe
 		s.InitWrite(tls, writeSecret)
 	}
 	return s
-}
-
-func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
-	k := tls.HkdfExpandLabel(secret, "key", nil, tls.AEADKeySize())
-	iv := tls.HkdfExpandLabel(secret, "iv", nil, tls.AEADIvSize())
-
-	aead, err := NewWrappedAESGCM(k, iv)
-	if err != nil {
-		panic(err)
-	}
-	return aead
 }
 
 func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {

@@ -77,7 +77,7 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 		}
 
 		header := packet.EncodeHeader()
-		protectedPayload := cryptoState.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
+		protectedPayload := cryptoState.Write.Encrypt(payload, uint64(packet.Header().PacketNumber()), header)
 		packetBytes := append(header, protectedPayload...)
 
 		sample, pnOffset := GetPacketSample(packet.Header(), packetBytes)

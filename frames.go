@@ -254,7 +254,7 @@ func (frame PingFrame) FrameType() FrameType { return PingType }
 func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
-func (frame PingFrame) shouldBeRetransmitted() bool { return true }
+func (frame PingFrame) shouldBeRetransmitted() bool { return false }
 func (frame PingFrame) FrameLength() uint16 { return 1 }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 	frame := new(PingFrame)

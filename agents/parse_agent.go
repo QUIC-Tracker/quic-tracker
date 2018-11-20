@@ -51,10 +51,10 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						if cryptoState != nil && cryptoState.PacketRead != nil && cryptoState.Read != nil {
 							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(ciphertext))
 
-							sample, sampleOffset := GetPacketSample(header, ciphertext)
-							pn := cryptoState.PacketRead.Encrypt(sample, ciphertext[sampleOffset-4:sampleOffset])
+							sample, pnOffset := GetPacketSample(header, ciphertext)
+							pn := cryptoState.PacketRead.Encrypt(sample, ciphertext[pnOffset:pnOffset+4])
 							pnLength = ReadTruncatedPN(bytes.NewReader(pn)).Length
-							copy(ciphertext[sampleOffset-4:sampleOffset], pn[:pnLength])
+							copy(ciphertext[pnOffset:pnOffset+4], pn[:pnLength])
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
 							a.Logger.Printf("Packet number of %s packet of length %d bytes could not be decrypted, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
@@ -74,7 +74,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						pLen := int(lHeader.Length.Value) - pnLength
 
 						if hLen+pLen > len(ciphertext) {
-							a.Logger.Printf("Payload length is past the received bytes, has PN decryption failed ? Aborting")
+							a.Logger.Printf("Payload length %d is past the %d received bytes, has PN decryption failed ? Aborting", hLen+pLen, len(ciphertext))
 							break packetSelect
 						}
 

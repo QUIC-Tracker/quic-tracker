@@ -80,9 +80,9 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 		protectedPayload := cryptoState.Write.Seal(nil, EncodeArgs(packet.Header().PacketNumber()), payload, header)
 		packetBytes := append(header, protectedPayload...)
 
-		sample, sampleOffset := GetPacketSample(packet.Header(), packetBytes)
+		sample, pnOffset := GetPacketSample(packet.Header(), packetBytes)
 
-		copy(packetBytes[sampleOffset-4:sampleOffset], cryptoState.PacketWrite.Encrypt(sample, packetBytes[sampleOffset-4:sampleOffset])[:packet.Header().TruncatedPN().Length])
+		copy(packetBytes[pnOffset:pnOffset+4], cryptoState.PacketWrite.Encrypt(sample, packetBytes[pnOffset:pnOffset+4])[:packet.Header().TruncatedPN().Length])
 
 		c.UdpConnection.Write(packetBytes)
 

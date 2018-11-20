@@ -108,20 +108,22 @@ func newProtectedAead(tls *pigotls.Connection, secret []byte) cipher.AEAD {
 }
 
 func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
-	var sampleOffset int
+	var pnOffset int
 	sampleLength := 16
 	switch h := header.(type) {
 	case *LongHeader:
-		sampleOffset = h.HeaderLength() - h.TruncatedPN().Length + 4
+		pnOffset = h.HeaderLength() - h.TruncatedPN().Length
 	case *ShortHeader:
-		sampleOffset = 1 + len(h.DestinationCID) + 4
+		pnOffset = 1 + len(h.DestinationCID)
+	}
 
-		if sampleOffset + sampleLength > len(packetBytes) {
-			sampleOffset = len(packetBytes) - sampleLength
-		}
+	sampleOffset := pnOffset + 4
+	if sampleOffset + sampleLength > len(packetBytes) {
+		sampleOffset = len(packetBytes) - sampleLength
 	}
+
 	if sampleOffset <= 0 || sampleOffset+sampleLength > len(packetBytes) {
-		sampleOffset = 4
+		sampleOffset = 4  // TODO: Is this working ?
 	}
-	return packetBytes[sampleOffset:sampleOffset+sampleLength], sampleOffset
+	return packetBytes[sampleOffset:sampleOffset+sampleLength], pnOffset
 }

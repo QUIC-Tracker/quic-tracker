@@ -15,13 +15,15 @@ exchanged, as well as a pcap file and exporter secrets.
 Installation
 ------------
 
-You should have Go 1.9, tcpdump, libpcap libraries and header installed
-before starting.
+You should have Go 1.9, tcpdump, libpcap libraries and headers as well as 
+openssl headers installed before starting.
 
 ::
 
-    go get github.com/QUIC-Tracker/quic-tracker
+    go get github.com/QUIC-Tracker/quic-tracker  # This will fail because of the missing dependencies that should be build using the 4 lines below
     cd $GOPATH/src/github.com/mpiraux/pigotls
+    make
+    cd $GOPATH/src/github.com/mpiraux/ls-qpack-go
     make
 
 The test suite is run by the scripts in ``bin/test_suite/``. For help

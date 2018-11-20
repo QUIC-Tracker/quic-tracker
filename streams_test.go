@@ -97,10 +97,12 @@ func TestByteIntervalList_Fill(t *testing.T) {
 func TestStreamAddToRead (t *testing.T) {
 	s := NewStream()
 
+	readChan := make(chan interface{}, 10)
+	s.ReadChan.Register(readChan)
 	s.addToRead(&StreamFrame{Offset: 4, Length: 4, StreamData:[]byte{4, 5, 6, 7}})
 
 	select {
-	case _ = <- s.ReadChan:
+	case _ = <- readChan:
 		t.Error("Should not return data")
 	default:
 	}
@@ -112,7 +114,8 @@ func TestStreamAddToRead (t *testing.T) {
 read:
 	for {
 		select {
-		case data := <- s.ReadChan:
+		case i := <- readChan:
+			data := i.([]byte)
 			dataRead = append(dataRead, data...)
 		default:
 			break read
@@ -140,7 +143,8 @@ read:
 read2:
 	for {
 		select {
-		case data := <- s.ReadChan:
+		case i := <- readChan:
+			data := i.([]byte)
 			dataRead = append(dataRead, data...)
 		default:
 			break read2

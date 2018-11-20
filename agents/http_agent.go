@@ -213,16 +213,16 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 		headers = make(map[string]string)
 	}
 
-	headers[":method"] = method
-	headers[":scheme"] = "https"
-	headers[":authority"] = authority
-	headers[":path"] = path
-
-	if _, ok := headers["User-Agent"]; !ok {
-		headers["User-Agent"] = "QUIC-Tracker/" + GitCommit()
+	if _, ok := headers["user-agent"]; !ok {
+		headers["user-agent"] = "QUIC-Tracker/" + GitCommit()
 	}
 
-	var hdrs []HTTPHeader
+	hdrs := []HTTPHeader{
+		HTTPHeader{":method", method},
+		HTTPHeader{":scheme", "https"},
+		HTTPHeader{":authority", authority},
+		HTTPHeader{":path", path},
+	}
 	for k, v := range headers {
 		hdrs = append(hdrs, HTTPHeader{k, v})
 	}

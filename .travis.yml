@@ -1,0 +1,20 @@
+dist: xenial
+language: go
+
+go:
+  - "1.9"
+  - "1.10"
+  - "1.11"
+
+install:
+  - sudo apt-get install -y tcpdump libpcap-dev openssl libssl-dev
+  - go get -t -v ./... || true
+  - cd $GOPATH/src/github.com/mpiraux/pigotls && make
+  - cd $GOPATH/src/github.com/mpiraux/ls-qpack-go && make
+  - cd $GOPATH/src/github.com/QUIC-Tracker/quic-tracker
+
+script:
+  - go test
+  - go build bin/test_suite/test_suite.go
+  - go build bin/test_suite/scenario_runner.go
+  - go build bin/http/http_get.go

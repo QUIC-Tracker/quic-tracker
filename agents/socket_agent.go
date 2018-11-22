@@ -1,12 +1,12 @@
 package agents
 
 import (
+	"errors"
 	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/compat"
 	"github.com/dustin/go-broadcast"
 	"syscall"
 	"unsafe"
-	"github.com/QUIC-Tracker/quic-tracker/compat"
-	"errors"
 )
 
 type ECNStatus int
@@ -41,7 +41,9 @@ func (a *SocketAgent) Run(conn *Connection) {
 	go func() {
 		for {
 			recBuf := make([]byte, MaxUDPPayloadSize)
-			i, err := conn.UdpConnection.Read(recBuf)
+			oob := make([]byte, 128) // Find a reasonable upper-bound
+			i, oobn, _, _, err := conn.UdpConnection.ReadMsgUDP(recBuf, oob)
+
 			if err != nil {
 				a.Logger.Println("Closing UDP socket because of error", err.Error())
 				close(recChan)
@@ -50,22 +52,13 @@ func (a *SocketAgent) Run(conn *Connection) {
 			}
 
 			if a.ecn {
-				s, err := a.conn.UdpConnection.SyscallConn()
+				ecn, err := findECNValue(oob[:oobn])
 				if err != nil {
-					a.Logger.Println("Error when retrieving ECN status", err.Error())
-					break
+					a.Logger.Println(err.Error())
 				}
-				var ecn uint
-				f := func(fd uintptr) {
-					syscall.Syscall6(syscall.SYS_GETSOCKOPT, fd, uintptr(syscall.IPPROTO_IP), uintptr(syscall.IP_TOS), uintptr(unsafe.Pointer(&ecn)), uintptr(unsafe.Sizeof(ecn)), 0)
-				}
-				err = s.Control(f)
-				if err != nil {
-					a.Logger.Println("Error when retrieving ECN status", err.Error())
-					break
-				}
-				a.Logger.Println("ECN value received", ecn & 0x03)
-				a.ECNStatus.Submit(ECNStatus(ecn & 0x03))
+				ecn = ecn & 0x03
+				a.Logger.Printf("Read ECN value %d\n", ecn)
+				a.ECNStatus.Submit(ECNStatus(ecn))
 			}
 
 			a.TotalDataReceived += i
@@ -124,4 +117,21 @@ func (a *SocketAgent) ConfigureECN() error {
 		return errors.New("could not configure ecn")
 	}
 	return nil
+}
+
+type cmsgHdr struct {
+	cLength uint64
+	cLevel int32
+	cType int32
+}
+
+func findECNValue(oob []byte) (byte, error) {
+	for len(oob) > 0 {
+		hdr := (*cmsgHdr)(unsafe.Pointer(&oob[0]))
+		if hdr.cLevel == 0 && hdr.cType == 1 {
+			return oob[hdr.cLength - 1], nil
+		}
+		oob = oob[hdr.cLength:]
+	}
+	return 0, errors.New("could not find ecn control message")
 }

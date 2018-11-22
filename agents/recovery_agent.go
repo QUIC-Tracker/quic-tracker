@@ -53,15 +53,23 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 			case i := <-incomingPackets:
 				switch p := i.(type) {
 				case Framer:
-					for _, frame := range p.GetAll(AckType) {
-						a.Logger.Printf("Processing ACK frame in packet %s\n", p.ShortString())
-						ack := frame.(*AckFrame)
+					ackFrames := append(p.GetAll(AckType), p.GetAll(AckECNType)...)
+					for _, f := range ackFrames {
+						var ack *AckFrame
+						switch frame := f.(type) {
+						case *AckFrame:
+							a.Logger.Printf("Processing ACK frame in packet %s\n", p.ShortString())
+							ack = frame
+						case *AckECNFrame:
+							a.Logger.Printf("Processing ACK_ECN frame in packet %s\n", p.ShortString())
+							ack = &frame.AckFrame
+						}
 						if ack.LargestAcknowledged > conn.LargestPNsAcknowledged[p.PNSpace()] {
 							conn.LargestPNsAcknowledged[p.PNSpace()] = ack.LargestAcknowledged
 						}
 						a.RetransmitBatch(a.ProcessAck(ack, p.PNSpace()))
 					}
-					if !p.Contains(AckType) && p.PNSpace() == PNSpaceInitial { // Some implementations do not send ACK in this PNSpace
+					if len(ackFrames) == 0 && p.PNSpace() == PNSpaceInitial { // Some implementations do not send ACK in this PNSpace
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
 						a.retransmissionBuffer[p.PNSpace()] = make(map[PacketNumber]RetransmittableFrames)
 					}

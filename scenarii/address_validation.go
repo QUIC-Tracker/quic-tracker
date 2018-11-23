@@ -116,4 +116,7 @@ forLoop:
 
 	trace.Results["datagrams_received"] = socketAgent.DatagramsReceived
 	trace.Results["total_data_received"] = socketAgent.TotalDataReceived
+	if trace.ErrorCode == AV_SentMoreThan3TimesAmount {
+		trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
+	}
 }

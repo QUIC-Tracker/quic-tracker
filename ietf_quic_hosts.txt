@@ -13,5 +13,5 @@ test.privateoctopus.com:4433	/index.html
 quicker.edm.uhasselt.be:4433	/index.html
 ralith.com:4433	/index.html
 xavamedia.nl:4433	/index.html
-159.65.253.210:1236	/index.html
+http3-test.litespeedtech.com:4434	/index.html
 quic.tech:4433	/index.html

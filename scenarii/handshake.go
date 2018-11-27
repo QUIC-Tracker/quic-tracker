@@ -45,6 +45,8 @@ func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 				default:
 					trace.MarkError(H_TLSHandshakeFailed, status.Error.Error(), status.Packet)
 				}
+			} else {
+				trace.Results["negotiated_version"] = conn.Version
 			}
 			handshakeAgent.HandshakeStatus.Unregister(handshakeStatus)
 		case <-s.Timeout().C:

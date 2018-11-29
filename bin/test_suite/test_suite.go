@@ -64,11 +64,13 @@ func main() {
 
 	var results Results
 	result := make(chan *qt.Trace)
+	resultsAgg := make(chan bool)
 
 	go func() {
 		for t := range result {
 			results = append(results, *t)
 		}
+		close(resultsAgg)
 	}()
 
 	for _, id := range scenarioIds {
@@ -157,6 +159,7 @@ func main() {
 		file.Seek(0, 0)
 	}
 	close(result)
+	<-resultsAgg
 
 	sort.Sort(results)
 	out, _ := json.Marshal(results)

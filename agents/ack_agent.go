@@ -8,12 +8,15 @@ import (
 // as answering to PATH_CHALLENGE frames. Both can be disabled independently for a finer control on its behaviour.
 type AckAgent struct {
 	BaseAgent
-	DisableAcks         bool
+	DisableAcks 		map[PNSpace]bool
+	TotalDataAcked 	    map[PNSpace]uint64
 	DisablePathResponse bool
 }
 
 func (a *AckAgent) Run(conn *Connection) {
 	a.Init("AckAgent", conn.SourceCID)
+	a.DisableAcks = make(map[PNSpace]bool)
+	a.TotalDataAcked = make(map[PNSpace]uint64)
 
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)
@@ -42,8 +45,9 @@ func (a *AckAgent) Run(conn *Connection) {
 						}
 					}
 
-					if !a.DisableAcks && p.ShouldBeAcknowledged()  {
+					if !a.DisableAcks[p.PNSpace()] && p.ShouldBeAcknowledged()  {
 						conn.FrameQueue.Submit(QueuedFrame{conn.GetAckFrame(p.PNSpace()), p.EncryptionLevel()})
+						a.TotalDataAcked[p.PNSpace()] += uint64(len(p.Encode(p.EncodePayload())))
 					}
 				}
 			case <-a.close:

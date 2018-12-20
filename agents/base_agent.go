@@ -106,5 +106,6 @@ func GetDefaultAgents() []Agent {
 		&AckAgent{},
 		&SendingAgent{MTU: 1200},
 		&RecoveryAgent{TimerValue: 500 * time.Millisecond},
+		&RTTAgent{},
 	}
 }

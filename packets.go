@@ -114,6 +114,7 @@ type Framer interface {
 	AddFrame(frame Frame)
 	GetRetransmittableFrames() []Frame
 	Contains(frameType FrameType) bool
+	OnlyContains(frameType FrameType) bool
 	GetFirst(frameType FrameType) Frame
 	GetAll(frameType FrameType) []Frame
 }

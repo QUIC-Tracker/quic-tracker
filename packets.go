@@ -148,6 +148,14 @@ func (p *FramePacket) Contains(frameType FrameType) bool {
 	}
 	return false
 }
+func (p *FramePacket) OnlyContains(frameType FrameType) bool {
+	for _, f := range p.Frames {
+		if f.FrameType() != frameType {
+			return false
+		}
+	}
+	return true
+}
 func (p *FramePacket) GetFirst(frameType FrameType) Frame {
 	for _, f := range p.Frames {
 		if f.FrameType() == frameType {

@@ -41,7 +41,7 @@ func (p abstractPacket) ShortString() string {
 	return fmt.Sprintf("{type=%s, number=%d}", p.header.PacketType().String(), p.header.PacketNumber())
 }
 
-type VersionNegotationPacket struct {
+type VersionNegotiationPacket struct {
 	abstractPacket
 	UnusedField uint8
 	Version        uint32
@@ -53,8 +53,8 @@ type SupportedVersion uint32
 func (v SupportedVersion) String() string {
 	return hex.EncodeToString(Uint32ToBEBytes(uint32(v)))
 }
-func (p *VersionNegotationPacket) ShouldBeAcknowledged() bool { return false }
-func (p *VersionNegotationPacket) EncodePayload() []byte {
+func (p *VersionNegotiationPacket) ShouldBeAcknowledged() bool { return false }
+func (p *VersionNegotiationPacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	buffer.WriteByte(p.UnusedField & 0x80)
 	binary.Write(buffer, binary.BigEndian, p.Version)
@@ -66,13 +66,13 @@ func (p *VersionNegotationPacket) EncodePayload() []byte {
 	}
 	return buffer.Bytes()
 }
-func (p *VersionNegotationPacket) Pointer() unsafe.Pointer {
+func (p *VersionNegotiationPacket) Pointer() unsafe.Pointer {
 	return unsafe.Pointer(p)
 }
-func (p *VersionNegotationPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
-func (p *VersionNegotationPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
-func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket {
-	p := new(VersionNegotationPacket)
+func (p *VersionNegotiationPacket) PNSpace() PNSpace                 { return PNSpaceNoSpace }
+func (p *VersionNegotiationPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
+func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotiationPacket {
+	p := new(VersionNegotiationPacket)
 	b, err := buffer.ReadByte()
 	if err != nil {
 		panic(err)
@@ -98,8 +98,8 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotationPacket 
 	}
 	return p
 }
-func NewVersionNegotationPacket(unusedField uint8, version uint32, versions []SupportedVersion, conn *Connection) *VersionNegotationPacket {
-	p := new(VersionNegotationPacket)
+func NewVersionNegotiationPacket(unusedField uint8, version uint32, versions []SupportedVersion, conn *Connection) *VersionNegotiationPacket {
+	p := new(VersionNegotiationPacket)
 	p.UnusedField = unusedField
 	p.DestinationCID = conn.DestinationCID
 	p.SourceCID = conn.SourceCID
@@ -241,9 +241,9 @@ type RetryPacket struct {
 }
 func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
-	p.header = ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
-	OCIDL, _ := buffer.ReadByte()
-	OCIDL = 0xf & OCIDL
+	h := ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
+	p.header = h
+	OCIDL := h.lowerBits & 0x0f
 	if OCIDL > 0 {
 		OCIDL += 3
 	}

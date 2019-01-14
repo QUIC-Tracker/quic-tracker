@@ -32,7 +32,7 @@ type SocketAgent struct {
 }
 
 func (a *SocketAgent) Run(conn *Connection) {
-	a.Init("SocketAgent", conn.SourceCID)
+	a.Init("SocketAgent", conn.OriginalDestinationCID)
 	a.conn = conn
 	a.SocketStatus = broadcast.NewBroadcaster(10)
 	a.ECNStatus = broadcast.NewBroadcaster(1000)

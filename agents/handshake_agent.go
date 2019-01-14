@@ -1,13 +1,13 @@
 package agents
 
 import (
-	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/dustin/go-broadcast"
-	"fmt"
+	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/dustin/go-broadcast"
 	"strings"
-	"bytes"
 )
 
 type HandshakeStatus struct {
@@ -29,10 +29,11 @@ type HandshakeAgent struct {
 	SocketAgent      *SocketAgent
 	HandshakeStatus  broadcast.Broadcaster //type: HandshakeStatus
 	sendInitial		 chan bool
+	receivedRetry    bool
 }
 
 func (a *HandshakeAgent) Run(conn *Connection) {
-	a.Init("HandshakeAgent", conn.SourceCID)
+	a.Init("HandshakeAgent", conn.OriginalDestinationCID)
 	a.HandshakeStatus = broadcast.NewBroadcaster(10)
 	a.sendInitial = make(chan bool, 1)
 
@@ -62,7 +63,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 			case p := <-incPackets:
 				switch p := p.(type) {
-				case *VersionNegotationPacket:
+				case *VersionNegotiationPacket:
 					err := conn.ProcessVersionNegotation(p)
 					if err != nil {
 						a.HandshakeStatus.Submit(HandshakeStatus{false, p, err})
@@ -70,7 +71,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 				case *RetryPacket:
-					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) {  // TODO: Check the original_connection_id TP too
+					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
+						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						conn.TransitionTo(QuicVersion, QuicALPNToken)
 						conn.Token = p.RetryToken

@@ -77,7 +77,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
-						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{uint8(len(scid)), 1, scid, resetToken}, qt.EncryptionLevelBest})
+						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{ 1, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
 						conn.SendHTTPGETRequest(preferredUrl, 0)
 						expectingResponse = true
 					}

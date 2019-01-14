@@ -31,23 +31,23 @@
 package quictracker
 
 import (
-	"encoding/binary"
-	"github.com/mpiraux/pigotls"
-	_ "github.com/mpiraux/ls-qpack-go"
-	"math"
 	"bytes"
+	"encoding/binary"
 	. "github.com/QUIC-Tracker/quic-tracker/lib"
+	_ "github.com/mpiraux/ls-qpack-go"
+	"github.com/mpiraux/pigotls"
+	"math"
 )
 
-var QuicVersion uint32 = 0xff00000f // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-15"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicVersion uint32 = 0xff000011 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-17"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MaximumVersion         = 0xff000010
-	MinimumVersion         = 0xff00000f
+	MaximumVersion         = 0xff000011
+	MinimumVersion         = 0xff000011
 )
 
 // errors
@@ -69,20 +69,11 @@ func (p PacketNumber) Truncate(largestAcknowledged PacketNumber) TruncatedPN {
 		panic("PNs should be truncated with a lower PN")
 	}
 	length := (int(math.Log2(float64(p - largestAcknowledged + 1))) / 8) + 1  // See: https://tools.ietf.org/html/draft-ietf-quic-transport-13#section-4.8
-	switch length {
-	case 1:
-		mask := uint32(0x7f)
-		return TruncatedPN{uint32(p) & mask, 1}
-	case 2:
-		mask := uint32(0x3fff)
-		return TruncatedPN{(uint32(p) & mask) | 0x8000, 1}
-	case 3, 4:
-		mask := uint32(0x3fffffff)
-		return TruncatedPN{(uint32(p) & mask) | 0xc0000000, 4}
-	default:
+	if length > 4 {
 		println("couldn't truncate", p, "with", largestAcknowledged)
 		panic(length)
 	}
+	return TruncatedPN{uint32(p) & (0xFFFFFFFF >> (8 * (4 - uint(length)))), length}
 }
 
 type TruncatedPN struct {
@@ -90,23 +81,12 @@ type TruncatedPN struct {
 	Length int
 }
 
-func ReadTruncatedPN(buffer *bytes.Reader) TruncatedPN {
-	firstByte, _ := buffer.ReadByte()
-	if firstByte & 0x80 == 0 {
-		return TruncatedPN{uint32(firstByte), 1}
-	} else if firstByte & 0xc0 == 0x80 {
-		twoBytes := make([]byte, 2)
-		buffer.UnreadByte()
-		buffer.Read(twoBytes)
-		return TruncatedPN{uint32(0x3fff & binary.BigEndian.Uint16(twoBytes)), 2}
-	} else if firstByte & 0xc0 == 0xc0 {
-		fourBytes := make([]byte, 4)
-		buffer.UnreadByte()
-		buffer.Read(fourBytes)
-		return TruncatedPN{uint32(0x3fffffff & binary.BigEndian.Uint32(fourBytes)), 4}
-	} else {
-		panic("Could not decode truncated packet number")
-	}
+func ReadTruncatedPN(buffer *bytes.Reader, length int) TruncatedPN {
+	pn := TruncatedPN{Length: length}
+	value := make([]byte, 4, 4)
+	buffer.Read(value[4-length:])
+	pn.Value = binary.BigEndian.Uint32(value)
+	return pn
 }
 
 func (t TruncatedPN) Encode() []byte {
@@ -116,6 +96,8 @@ func (t TruncatedPN) Encode() []byte {
 		buffer.WriteByte(byte(t.Value))
 	case 2:
 		buffer.Write(Uint16ToBEBytes(uint16(t.Value)))
+	case 3:
+		buffer.Write(Uint24ToBEBytes(t.Value))
 	case 4:
 		buffer.Write(Uint32ToBEBytes(t.Value))
 	}
@@ -123,16 +105,11 @@ func (t TruncatedPN) Encode() []byte {
 }
 
 func (t TruncatedPN) Join(p PacketNumber) PacketNumber {
-	var mask uint64
-	switch t.Length {
-	case 1:
-		mask = uint64(0x7f)
-	case 2:
-		mask = uint64(0x3fff)
-	case 4:
-		mask = uint64(0x3fffffff)
-	}
-	return PacketNumber((uint64(p) & ^mask) | (uint64(t.Value) & mask))
+	return PacketNumber(uint64(p & (0xFFFFFFFFFFFFFFFF << uint(t.Length * 8))) | uint64(t.Value))
+}
+
+func (t *TruncatedPN) SetLength(length int) {
+	t.Length = length
 }
 
 type VarInt struct {
@@ -199,6 +176,12 @@ func Uint32ToBEBytes(uint32 uint32) []byte {
 	b := make([]byte, 4, 4)
 	binary.BigEndian.PutUint32(b, uint32)
 	return b
+}
+
+func Uint24ToBEBytes(uint32 uint32) []byte {
+	b := make([]byte, 4, 4)
+	binary.BigEndian.PutUint32(b, uint32)
+	return b[1:]
 }
 
 func Uint16ToBEBytes(uint16 uint16) []byte {

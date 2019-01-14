@@ -44,7 +44,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case *qt.VersionNegotationPacket:
+			case *qt.VersionNegotiationPacket:
 				vnCount++
 				if vnCount > 1 && unusedField != p.UnusedField {
 					trace.ErrorCode = 0

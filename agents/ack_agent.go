@@ -14,7 +14,7 @@ type AckAgent struct {
 }
 
 func (a *AckAgent) Run(conn *Connection) {
-	a.Init("AckAgent", conn.SourceCID)
+	a.Init("AckAgent", conn.OriginalDestinationCID)
 	a.DisableAcks = make(map[PNSpace]bool)
 	a.TotalDataAcked = make(map[PNSpace]uint64)
 

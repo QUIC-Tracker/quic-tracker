@@ -51,7 +51,9 @@ func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 			handshakeAgent.HandshakeStatus.Unregister(handshakeStatus)
 		case <-s.Timeout().C:
 			if !status.Completed {
-				trace.MarkError(H_Timeout, "", nil)
+				if trace.ErrorCode == 0 {
+					trace.MarkError(H_Timeout, "", nil)
+				}
 				connAgents.StopAll()
 			} else {
 				connAgents.CloseConnection(false, 0, "")

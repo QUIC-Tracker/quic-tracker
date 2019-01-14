@@ -23,7 +23,7 @@ type TLSAgent struct {
 }
 
 func (a *TLSAgent) Run(conn *Connection) {
-	a.Init("TLSAgent", conn.SourceCID)
+	a.Init("TLSAgent", conn.OriginalDestinationCID)
 	a.TLSStatus = broadcast.NewBroadcaster(10)
 	a.ResumptionTicket = broadcast.NewBroadcaster(10)
 
@@ -86,11 +86,11 @@ func (a *TLSAgent) Run(conn *Connection) {
 						}
 
 						if conn.CryptoStates[EncryptionLevelHandshake] != nil {
-							if conn.CryptoStates[EncryptionLevelHandshake].PacketRead == nil && len(conn.Tls.HandshakeReadSecret()) > 0 {
+							if conn.CryptoStates[EncryptionLevelHandshake].HeaderRead == nil && len(conn.Tls.HandshakeReadSecret()) > 0 {
 								a.Logger.Printf("Installing handshake read crypto with secret %s\n", hex.EncodeToString(conn.Tls.HandshakeReadSecret()))
 								conn.CryptoStates[EncryptionLevelHandshake].InitRead(conn.Tls, conn.Tls.HandshakeReadSecret())
 							}
-							if conn.CryptoStates[EncryptionLevelHandshake].PacketWrite == nil && len(conn.Tls.HandshakeWriteSecret()) > 0 {
+							if conn.CryptoStates[EncryptionLevelHandshake].HeaderWrite == nil && len(conn.Tls.HandshakeWriteSecret()) > 0 {
 								a.Logger.Printf("Installing handshake write crypto with secret %s\n", hex.EncodeToString(conn.Tls.HandshakeWriteSecret()))
 								conn.CryptoStates[EncryptionLevelHandshake].InitWrite(conn.Tls, conn.Tls.HandshakeWriteSecret())
 							}
@@ -117,7 +117,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 						}
 
 						for _, e := range encryptionLevels {
-							if !encryptionLevelsAvailable[e] && conn.CryptoStates[e.EncryptionLevel] != nil && ((e.Read && conn.CryptoStates[e.EncryptionLevel].PacketRead != nil) || (!e.Read && conn.CryptoStates[e.EncryptionLevel].PacketWrite != nil)) {
+							if !encryptionLevelsAvailable[e] && conn.CryptoStates[e.EncryptionLevel] != nil && ((e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderRead != nil) || (!e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderWrite != nil)) {
 								encryptionLevelsAvailable[e] = true
 								conn.EncryptionLevelsAvailable.Submit(e)
 							}

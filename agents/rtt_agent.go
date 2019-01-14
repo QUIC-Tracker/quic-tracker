@@ -24,7 +24,7 @@ type SentPacket struct {
 }
 
 func (a *RTTAgent) Run(conn *Connection) {
-	a.Init("RTTAgent", conn.SourceCID)
+	a.Init("RTTAgent", conn.OriginalDestinationCID)
 	a.MinRTT = math.MaxUint64
 
 	a.SentPackets = map[PNSpace]map[PacketNumber]SentPacket{
@@ -63,7 +63,7 @@ func (a *RTTAgent) Run(conn *Connection) {
 						ack := f.(*AckFrame)
 
 						if sp, ok := a.SentPackets[p.PNSpace()][ack.LargestAcknowledged]; ok {
-							var ackDelayExponent uint8
+							var ackDelayExponent uint64
 							if conn.TLSTPHandler.ReceivedParameters != nil {
 								ackDelayExponent = conn.TLSTPHandler.ReceivedParameters.AckDelayExponent
 							}

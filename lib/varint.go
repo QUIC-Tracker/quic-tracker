@@ -94,17 +94,21 @@ func ReadVarIntValue(b io.ByteReader) (uint64, error) {
 
 // WriteVarInt writes a number in the QUIC varint format
 func WriteVarInt(b *bytes.Buffer, i uint64) {
+	b.Write(EncodeVarInt(i))
+}
+
+func EncodeVarInt(i uint64) []byte {
 	if i <= maxVarInt1 {
-		b.WriteByte(uint8(i))
+		return []byte{uint8(i)}
 	} else if i <= maxVarInt2 {
-		b.Write([]byte{uint8(i>>8) | 0x40, uint8(i)})
+		return []byte{uint8(i>>8) | 0x40, uint8(i)}
 	} else if i <= maxVarInt4 {
-		b.Write([]byte{uint8(i>>24) | 0x80, uint8(i >> 16), uint8(i >> 8), uint8(i)})
+		return []byte{uint8(i>>24) | 0x80, uint8(i >> 16), uint8(i >> 8), uint8(i)}
 	} else if i <= maxVarInt8 {
-		b.Write([]byte{
+		return []byte{
 			uint8(i>>56) | 0xc0, uint8(i >> 48), uint8(i >> 40), uint8(i >> 32),
 			uint8(i >> 24), uint8(i >> 16), uint8(i >> 8), uint8(i),
-		})
+		}
 	} else {
 		panic(fmt.Sprintf("%#x doesn't fit into 62 bits", i))
 	}

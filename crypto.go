@@ -4,10 +4,10 @@ import (
 	"github.com/mpiraux/pigotls"
 )
 
-var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-10#section-5.2.2
-	0x9c, 0x10, 0x8f, 0x98, 0x52, 0x0a, 0x5c, 0x5c,
-	0x32, 0x96, 0x8e, 0x95, 0x0e, 0x8a, 0x2c, 0x5f,
-	0xe0, 0x6d, 0x6c, 0x38,
+var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-17#section-5.2
+	0xef, 0x4f, 0xb0, 0xab, 0xb4, 0x74, 0x70, 0xc4,
+	0x1b, 0xef, 0xcf, 0x80, 0x31, 0x33, 0x4f, 0xae,
+	0x48, 0x5e, 0x09, 0xa0,
 }
 
 const (
@@ -60,26 +60,26 @@ type DirectionalEncryptionLevel struct {
 }
 
 type CryptoState struct {
-	Read  *pigotls.AEAD
-	Write *pigotls.AEAD
-	PacketRead *pigotls.Cipher
-	PacketWrite *pigotls.Cipher
+	Read        *pigotls.AEAD
+	Write       *pigotls.AEAD
+	HeaderRead  *pigotls.Cipher
+	HeaderWrite *pigotls.Cipher
 }
 
 func (s *CryptoState) InitRead(tls *pigotls.Connection, readSecret []byte) {
 	s.Read = tls.NewAEAD(readSecret, false)
-	s.PacketRead = tls.NewCipher(tls.HkdfExpandLabel(readSecret, "pn", nil, tls.AEADKeySize()))
+	s.HeaderRead = tls.NewCipher(tls.HkdfExpandLabel(readSecret, "hp", nil, tls.AEADKeySize(), pigotls.QuicBaseLabel))
 }
 
 func (s *CryptoState) InitWrite(tls *pigotls.Connection, writeSecret []byte) {
 	s.Write = tls.NewAEAD(writeSecret, true)
-	s.PacketWrite = tls.NewCipher(tls.HkdfExpandLabel(writeSecret, "pn", nil, tls.AEADKeySize()))
+	s.HeaderWrite = tls.NewCipher(tls.HkdfExpandLabel(writeSecret, "hp", nil, tls.AEADKeySize(), pigotls.QuicBaseLabel))
 }
 
 func NewInitialPacketProtection(conn *Connection) *CryptoState {
 	initialSecret := conn.Tls.HkdfExtract(quicVersionSalt, conn.DestinationCID)
-	readSecret := conn.Tls.HkdfExpandLabel(initialSecret, serverInitialLabel, nil, conn.Tls.HashDigestSize())
-	writeSecret := conn.Tls.HkdfExpandLabel(initialSecret, clientInitialLabel, nil, conn.Tls.HashDigestSize())
+	readSecret := conn.Tls.HkdfExpandLabel(initialSecret, serverInitialLabel, nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
+	writeSecret := conn.Tls.HkdfExpandLabel(initialSecret, clientInitialLabel, nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
 	return NewProtectedCryptoState(conn.Tls, readSecret, writeSecret)
 }
 

@@ -34,7 +34,11 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
 	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
 
+	oldState := conn.CryptoStates[qt.EncryptionLevel1RTT]
+
 	conn.CryptoStates[qt.EncryptionLevel1RTT] = qt.NewProtectedCryptoState(conn.Tls, readSecret, writeSecret)
+	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderRead = oldState.HeaderRead
+	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderWrite = oldState.HeaderWrite
 	conn.KeyPhaseIndex++
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)

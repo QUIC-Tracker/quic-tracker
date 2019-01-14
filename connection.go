@@ -274,7 +274,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.EncryptionLevelsAvailable = broadcast.NewBroadcaster(10)
 	c.FrameQueue = broadcast.NewBroadcaster(1000)
 
-	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
+	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 
 	c.TransitionTo(version, ALPN)
 

@@ -26,7 +26,8 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 3
 
-	connAgents := s.CompleteHandshake(conn, trace, H3ES_TLSHandshakeFailed)
+	http := agents.HTTPAgent{QPACKEncoderOpts: ls_qpack_go.LSQPackEncOptIxAggr}
+	connAgents := s.CompleteHandshake(conn, trace, H3ES_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return
 	}
@@ -38,9 +39,6 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 		trace.Results["max_bidi_streams"] = conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams
 		return
 	}
-
-	http := agents.HTTPAgent{QPACKEncoderOpts: ls_qpack_go.LSQPackEncOptIxAggr}
-	connAgents.Add(&http)
 
 	frameReceived := make(chan interface{}, 1000)
 	http.FrameReceived.Register(frameReceived)

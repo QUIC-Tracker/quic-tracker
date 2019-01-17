@@ -29,14 +29,14 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
 	s.timeout = time.NewTimer(10 * time.Second)
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	connAgents := s.CompleteHandshake(conn, trace, NCI_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
-
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
 
 	trace.ErrorCode = NCI_HostDidNotProvideCID
 

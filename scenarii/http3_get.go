@@ -23,7 +23,8 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 3
 
-	connAgents := s.CompleteHandshake(conn, trace, H3G_TLSHandshakeFailed)
+	http := agents.HTTPAgent{}
+	connAgents := s.CompleteHandshake(conn, trace, H3G_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return
 	}
@@ -36,8 +37,6 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 		return
 	}
 
-	http := agents.HTTPAgent{}
-	connAgents.Add(&http)
 	responseReceived := make(chan interface{}, 1000)
 	http.HTTPResponseReceived.Register(responseReceived)
 

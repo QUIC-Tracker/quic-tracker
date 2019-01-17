@@ -37,11 +37,11 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.
 		return
 	}
 
-	conn.SendHTTPGETRequest(preferredUrl, 2)
-	conn.FrameQueue.Submit(qt.QueuedFrame{&qt.StopSendingFrame{2, 0}, qt.EncryptionLevel1RTT})
-
 	incPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incPackets)
+
+	conn.SendHTTPGETRequest(preferredUrl, 2)
+	conn.FrameQueue.Submit(qt.QueuedFrame{&qt.StopSendingFrame{2, 0}, qt.EncryptionLevel1RTT})
 
 	trace.ErrorCode = SSRS_DidNotCloseTheConnection
 	for {

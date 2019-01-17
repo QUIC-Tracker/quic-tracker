@@ -50,7 +50,7 @@ func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	select {
 	case i := <-incPackets:
 		packet := i.(qt.Packet)
-		if vn, ok := packet.(*qt.VersionNegotationPacket); ok {
+		if vn, ok := packet.(*qt.VersionNegotiationPacket); ok {
 			if err := conn.ProcessVersionNegotation(vn); err != nil {
 				trace.MarkError(P_VNDidNotComplete, err.Error(), vn)
 				return

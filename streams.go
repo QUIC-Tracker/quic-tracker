@@ -2,8 +2,15 @@ package quictracker
 
 import (
 	"fmt"
-	"math"
 	"github.com/dustin/go-broadcast"
+	"math"
+)
+
+type StreamsType bool
+
+const (
+	BidiStreams StreamsType = false
+	UniStreams              = true
 )
 
 type Streams map[uint64]*Stream

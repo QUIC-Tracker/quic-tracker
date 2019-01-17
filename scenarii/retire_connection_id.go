@@ -25,14 +25,14 @@ func NewRetireConnectionIDScenario() *RetireConnectionIDScenario {
 func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 
+	incPackets := make(chan interface{}, 1000)
+	conn.IncomingPackets.Register(incPackets)
+
 	connAgents := s.CompleteHandshake(conn, trace, RCI_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
-
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
 
 	trace.ErrorCode = RCI_HostDidNotProvideCID
 

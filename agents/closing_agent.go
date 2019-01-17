@@ -11,7 +11,7 @@ type ClosingAgent struct {
 }
 
 func (a *ClosingAgent) Run (conn *Connection) {
-	a.Init("ClosingAgent", conn.SourceCID)
+	a.Init("ClosingAgent", conn.OriginalDestinationCID)
 
 	outgoingPackets := make(chan interface{}, 1000)
 	conn.OutgoingPackets.Register(outgoingPackets)

@@ -67,10 +67,6 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 			if fp, ok := p.(qt.Framer); ok && fp.Contains(qt.PathChallengeType) {
 				trace.ErrorCode = 0
 			}
-
-			if conn.Streams.Get(0).ReadClosed {
-				conn.CloseConnection(false, 0, "")
-			}
 		case <-s.Timeout().C:
 			return
 		}

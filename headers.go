@@ -3,9 +3,36 @@ package quictracker
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
-	"math/rand"
 )
+
+type PacketType uint8
+
+const (
+	Initial          PacketType = 0x0
+	ZeroRTTProtected PacketType = 0x1
+	Handshake        PacketType = 0x2
+	Retry            PacketType = 0x3
+
+	ShortHeaderPacket PacketType = 0xff  // TODO: Find a way around this
+)
+
+var packetTypeToString = map[PacketType]string{
+	Initial: "Initial",
+	Retry: "Retry",
+	Handshake: "Handshake",
+	ZeroRTTProtected: "0-RTT Protected",
+
+	ShortHeaderPacket: "1-RTT Protected",
+}
+
+var packetTypeToPNSPace = map[PacketType]PNSpace {
+	Initial: PNSpaceInitial,
+	Retry: PNSpaceNoSpace,
+	Handshake: PNSpaceHandshake,
+	ZeroRTTProtected: PNSpaceAppData,
+
+	ShortHeaderPacket: PNSpaceAppData,
+}
 
 type Header interface {
 	PacketType() PacketType
@@ -30,6 +57,7 @@ func ReadHeader(buffer *bytes.Reader, conn *Connection) Header {
 
 type LongHeader struct {
 	packetType     PacketType
+	lowerBits      byte
 	Version        uint32
 	DestinationCID ConnectionID
 	SourceCID      ConnectionID
@@ -41,8 +69,9 @@ type LongHeader struct {
 }
 func (h *LongHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
-	typeByte := uint8(0x80)
-	typeByte |= uint8(h.packetType)
+	typeByte := uint8(0xC0)
+	typeByte |= uint8(h.packetType) << 4
+	typeByte |= uint8(h.truncatedPN.Length) - 1
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.Version)
 	buffer.WriteByte((h.DestinationCID.CIDL() << 4) | h.SourceCID.CIDL())
@@ -73,7 +102,8 @@ func (h *LongHeader) HeaderLength() int {
 func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	h := new(LongHeader)
 	typeByte, _ := buffer.ReadByte()
-	h.packetType = PacketType(typeByte - 0x80)
+	h.lowerBits = typeByte & 0x0F
+	h.packetType = PacketType(typeByte - 0xC0) >> 4
 	binary.Read(buffer, binary.BigEndian, &h.Version)
 	CIDL, _ := buffer.ReadByte()
 	DCIL := 3 + ((CIDL & 0xf0) >> 4)
@@ -89,7 +119,7 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	}
 	if h.packetType != Retry {
 		h.Length, _ = ReadVarInt(buffer)
-		h.truncatedPN = ReadTruncatedPN(buffer)
+		h.truncatedPN = ReadTruncatedPN(buffer, int(typeByte & 0x3) + 1)
 		h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[h.packetType.PNSpace()])
 	}
 	return h
@@ -110,35 +140,6 @@ func NewLongHeader(packetType PacketType, conn *Connection, space PNSpace) *Long
 	return h
 }
 
-type PacketType uint8
-
-const (
-	Initial          PacketType = 0x7f
-	Retry            PacketType = 0x7e
-	Handshake        PacketType = 0x7d
-	ZeroRTTProtected PacketType = 0x7c
-
-	ShortHeaderPacket PacketType = 0  // TODO: Find a way around this
-)
-
-var packetTypeToString = map[PacketType]string{
-	Initial: "Initial",
-	Retry: "Retry",
-	Handshake: "Handshake",
-	ZeroRTTProtected: "0-RTT Protected",
-
-	ShortHeaderPacket: "1-RTT Protected",
-}
-
-var packetTypeToPNSPace = map[PacketType]PNSpace {
-	Initial: PNSpaceInitial,
-	Retry: PNSpaceNoSpace,
-	Handshake: PNSpaceHandshake,
-	ZeroRTTProtected: PNSpaceAppData,
-
-	ShortHeaderPacket: PNSpaceAppData,
-}
-
 func (t PacketType) String() string {
 	return packetTypeToString[t]
 }
@@ -156,11 +157,11 @@ type ShortHeader struct {
 func (h *ShortHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
 	var typeByte uint8
+	typeByte |= 0x40
 	if h.KeyPhase == KeyPhaseOne {
-		typeByte |= 0x40
+		typeByte |= 0x04
 	}
-	typeByte |= 0x30
-	typeByte |= uint8(rand.Int()) & 0x7
+	typeByte |= uint8(h.truncatedPN.Length) - 1
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
 	buffer.Write(h.truncatedPN.Encode())
@@ -176,15 +177,11 @@ func (h *ShortHeader) HeaderLength() int                     { return 1 + len(h.
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()
-	h.KeyPhase = (typeByte & 0x40) == 0x40
-
-	if typeByte & 0x38 != 0x30 {
-		fmt.Printf("SH fixed bits not respected: expected %b, got %b\n", 0x30, typeByte & 0x38)
-	}
+	h.KeyPhase = (typeByte & 0x04) == 0x04
 
 	h.DestinationCID = make([]byte, len(conn.SourceCID))
 	buffer.Read(h.DestinationCID)
-	h.truncatedPN = ReadTruncatedPN(buffer)
+	h.truncatedPN = ReadTruncatedPN(buffer, int(typeByte&0x3) + 1)
 	h.packetNumber = h.truncatedPN.Join(conn.LargestPNsReceived[PNSpaceAppData])
 	return h
 }

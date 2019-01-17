@@ -117,7 +117,7 @@ func GitCommit() string {
 	cmdName := "git"
 	cmdArgs := []string{"rev-parse", "--verify", "HEAD"}
 	if cmdOut, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
-		panic(err)
+		return ""
 	}
 	return strings.TrimSpace(string(cmdOut))
 }

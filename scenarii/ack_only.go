@@ -39,6 +39,9 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
+			if p.PNSpace() != qt.PNSpaceNoSpace {
+				conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], p.Header().PacketNumber())
+			}
 			if p.ShouldBeAcknowledged() {
 				ackFrame := conn.GetAckFrame(p.PNSpace())
 				if ackFrame == nil {

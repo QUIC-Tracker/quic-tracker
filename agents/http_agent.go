@@ -56,7 +56,7 @@ const (
 )
 
 func (a *HTTPAgent) Run(conn *Connection) {
-	a.Init("HTTPAgent", conn.SourceCID)
+	a.Init("HTTPAgent", conn.OriginalDestinationCID)
 	a.conn = conn
 	a.QPACK = QPACKAgent{EncoderStreamID: 6, DecoderStreamID: 10}
 	a.QPACK.Run(conn)

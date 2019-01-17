@@ -39,7 +39,7 @@ const (
 )
 
 func (a *QPACKAgent) Run(conn *Connection) {
-	a.Init("QPACKAgent", conn.SourceCID)
+	a.Init("QPACKAgent", conn.OriginalDestinationCID)
 	a.DecodedHeaders = broadcast.NewBroadcaster(1000)
 	a.EncodedHeaders = broadcast.NewBroadcaster(1000)
 	a.DecodeHeaders = make(chan EncodedHeaders, 1000)

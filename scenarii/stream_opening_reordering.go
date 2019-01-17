@@ -28,9 +28,6 @@ func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Tra
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
-
 	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
 	pp1 := qt.NewProtectedPacket(conn)

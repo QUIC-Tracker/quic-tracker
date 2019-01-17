@@ -15,7 +15,7 @@ type RecoveryAgent struct {
 }
 
 func (a *RecoveryAgent) Run(conn *Connection) {
-	a.Init("RecoveryAgent", conn.SourceCID)
+	a.Init("RecoveryAgent", conn.OriginalDestinationCID)
 	a.conn = conn
 
 	a.retransmissionBuffer = map[PNSpace]map[PacketNumber]RetransmittableFrames{
@@ -76,7 +76,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 				case *RetryPacket:
 					a.Logger.Println("Received a Retry packet, emptying Initial retransmit buffer")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
-				case *VersionNegotationPacket:
+				case *VersionNegotiationPacket:
 					a.Logger.Println("Received a VN packet, emptying Initial retransmit buffer")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 				}

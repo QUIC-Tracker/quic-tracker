@@ -1,9 +1,9 @@
 package agents
 
 import (
+	"bytes"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"unsafe"
-	"bytes"
 )
 
 // The ParsingAgent is responsible for decrypting and parsing the payloads received in UDP datagrams. It also decrypts
@@ -16,7 +16,7 @@ type ParsingAgent struct {
 
 func (a *ParsingAgent) Run(conn *Connection) {
 	a.conn = conn
-	a.Init("ParsingAgent", conn.SourceCID)
+	a.Init("ParsingAgent", conn.OriginalDestinationCID)
 
 	incomingPayloads := make(chan interface{})
 	a.conn.IncomingPayloads.Register(incomingPayloads)
@@ -34,7 +34,6 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					ciphertext := udpPayload[off:]
 					header := ReadHeader(bytes.NewReader(ciphertext), a.conn)
 					cryptoState := a.conn.CryptoStates[header.EncryptionLevel()]
-					var pnLength int
 
 					if lh, ok := header.(*LongHeader); ok && lh.Version == 0x00000000 {
 						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
@@ -47,13 +46,23 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 					switch header.PacketType() {
 					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN
-						if cryptoState != nil && cryptoState.PacketRead != nil && cryptoState.Read != nil {
+						if cryptoState != nil && cryptoState.HeaderRead != nil && cryptoState.Read != nil {
 							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(ciphertext))
 
+							firstByteMask := byte(0x1F)
+							if ciphertext[0] & 0x80 == 0x80 {
+								firstByteMask = 0x0F
+							}
+
 							sample, pnOffset := GetPacketSample(header, ciphertext)
-							pn := cryptoState.PacketRead.Encrypt(sample, ciphertext[pnOffset:pnOffset+4])
-							pnLength = ReadTruncatedPN(bytes.NewReader(pn)).Length
-							copy(ciphertext[pnOffset:pnOffset+4], pn[:pnLength])
+							mask := cryptoState.HeaderRead.Encrypt(sample, make([]byte, 5, 5))
+							ciphertext[0] ^= mask[0] & firstByteMask
+
+							pnLength := int(ciphertext[0] & 0x3) + 1
+
+							for i := 0; i < pnLength; i++ {
+								ciphertext[pnOffset+i] ^= mask[1+i]
+							}
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
 							a.Logger.Printf("Packet number of %s packet of length %d bytes could not be decrypted, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
@@ -70,7 +79,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					switch header.PacketType() {
 					case Handshake, Initial:
 						lHeader := header.(*LongHeader)
-						pLen := int(lHeader.Length.Value) - pnLength
+						pLen := int(lHeader.Length.Value) - header.TruncatedPN().Length
 
 						if hLen+pLen > len(ciphertext) {
 							a.Logger.Printf("Payload length %d is past the %d received bytes, has PN decryption failed ? Aborting", hLen+pLen, len(ciphertext))

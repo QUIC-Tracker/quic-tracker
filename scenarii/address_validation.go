@@ -26,7 +26,9 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	defer connAgents.StopAll()
 
 	ackAgent := connAgents.Get("AckAgent").(*agents.AckAgent)
-	ackAgent.DisableAcks = true
+	ackAgent.DisableAcks[qt.PNSpaceInitial] = true
+	ackAgent.DisableAcks[qt.PNSpaceHandshake] = true
+	ackAgent.DisableAcks[qt.PNSpaceAppData] = true
 	socketAgent := connAgents.Get("SocketAgent").(*agents.SocketAgent)
 	tlsAgent := connAgents.Get("TLSAgent").(*agents.TLSAgent)
 	tlsAgent.DisableFrameSending = true
@@ -106,7 +108,9 @@ forLoop:
 				}
 			}
 			addressValidated = true
-			ackAgent.DisableAcks = false
+			ackAgent.DisableAcks[qt.PNSpaceInitial] = false
+			ackAgent.DisableAcks[qt.PNSpaceHandshake] = false
+			ackAgent.DisableAcks[qt.PNSpaceAppData] = false
 			tlsAgent.DisableFrameSending = false
 			trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
 		case <-s.Timeout().C:
@@ -116,4 +120,7 @@ forLoop:
 
 	trace.Results["datagrams_received"] = socketAgent.DatagramsReceived
 	trace.Results["total_data_received"] = socketAgent.TotalDataReceived
+	if trace.ErrorCode == AV_SentMoreThan3TimesAmount {
+		trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
+	}
 }

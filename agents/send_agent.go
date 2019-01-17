@@ -16,7 +16,7 @@ type SendingAgent struct {
 }
 
 func (a *SendingAgent) Run(conn *Connection) {
-	a.Init("SendingAgent", conn.SourceCID)
+	a.Init("SendingAgent", conn.OriginalDestinationCID)
 
 	frameQueue := make(chan interface{}, 1000)
 	conn.FrameQueue.Register(frameQueue)

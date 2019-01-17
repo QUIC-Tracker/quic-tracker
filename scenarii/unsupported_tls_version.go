@@ -39,7 +39,7 @@ forLoop:
 		select {
 		case i := <-incPackets:
 			switch p := i.(type) {
-			case *qt.VersionNegotationPacket:
+			case *qt.VersionNegotiationPacket:
 				if err := conn.ProcessVersionNegotation(p); err != nil {
 					trace.MarkError(UTS_VNDidNotComplete, err.Error(), p)
 					return

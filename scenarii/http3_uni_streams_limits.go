@@ -24,7 +24,8 @@ func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 1
 
-	connAgents := s.CompleteHandshake(conn, trace, H3USFC_TLSHandshakeFailed)
+	http := agents.HTTPAgent{}
+	connAgents := s.CompleteHandshake(conn, trace, H3USFC_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return
 	}
@@ -37,8 +38,6 @@ func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace
 		return
 	}
 
-	http := agents.HTTPAgent{}
-	connAgents.Add(&http)
 	responseReceived := make(chan interface{}, 1000)
 	http.HTTPResponseReceived.Register(responseReceived)
 

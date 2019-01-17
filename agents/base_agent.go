@@ -35,9 +35,9 @@ type BaseAgent struct {
 func (a *BaseAgent) Name() string { return a.name }
 
 // All agents that embed this structure must call Init() as soon as their Run() method is called
-func (a *BaseAgent) Init(name string, SCID ConnectionID) {
+func (a *BaseAgent) Init(name string, ODCID ConnectionID) {
 	a.name = name
-	a.Logger = log.New(os.Stdout, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(SCID), a.Name()), log.Lshortfile)
+	a.Logger = log.New(os.Stderr, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(ODCID), a.Name()), log.Lshortfile)
 	a.Logger.Println("Agent started")
 	a.close = make(chan bool)
 	a.closed = make(chan bool)
@@ -106,5 +106,6 @@ func GetDefaultAgents() []Agent {
 		&AckAgent{},
 		&SendingAgent{MTU: 1200},
 		&RecoveryAgent{TimerValue: 500 * time.Millisecond},
+		&RTTAgent{},
 	}
 }

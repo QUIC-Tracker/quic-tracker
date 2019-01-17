@@ -9,7 +9,7 @@ type BufferAgent struct {
 }
 
 func (a *BufferAgent) Run(conn *Connection) {
-	a.Init("BufferAgent", conn.SourceCID)
+	a.Init("BufferAgent", conn.OriginalDestinationCID)
 
 	uPChan := make(chan interface{}, 1000)
 	conn.UnprocessedPayloads.Register(uPChan)

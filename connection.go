@@ -2,17 +2,17 @@ package quictracker
 
 import (
 	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
+	"github.com/dustin/go-broadcast"
+	"github.com/mpiraux/pigotls"
+	"log"
 	"net"
 	"os"
-	"fmt"
-	"errors"
 	"sort"
-	"github.com/mpiraux/pigotls"
 	"unsafe"
-	"log"
-	"encoding/hex"
-	"github.com/dustin/go-broadcast"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 type Connection struct {
@@ -66,10 +66,10 @@ func (c *Connection) nextPacketNumber(space PNSpace) PacketNumber {  // TODO: Th
 	return pn
 }
 func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
-	cryptoState := c.CryptoStates[level]
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
 		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
+		cryptoState := c.CryptoStates[level]
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
@@ -80,9 +80,17 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 		protectedPayload := cryptoState.Write.Encrypt(payload, uint64(packet.Header().PacketNumber()), header)
 		packetBytes := append(header, protectedPayload...)
 
+		firstByteMask := byte(0x1F)
+		if packet.Header().PacketType() != ShortHeaderPacket {
+			firstByteMask = 0x0F
+		}
 		sample, pnOffset := GetPacketSample(packet.Header(), packetBytes)
+		mask := cryptoState.HeaderWrite.Encrypt(sample, make([]byte, 5, 5))
+		packetBytes[0] ^= mask[0] & firstByteMask
 
-		copy(packetBytes[pnOffset:pnOffset+4], cryptoState.PacketWrite.Encrypt(sample, packetBytes[pnOffset:pnOffset+4])[:packet.Header().TruncatedPN().Length])
+		for i := 0; i < packet.Header().TruncatedPN().Length; i++ {
+			packetBytes[pnOffset+i] ^= mask[1+i]
+		}
 
 		c.UdpConnection.Write(packetBytes)
 
@@ -133,7 +141,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	return initialPacket
 }
-func (c *Connection) ProcessVersionNegotation(vn *VersionNegotationPacket) error {
+func (c *Connection) ProcessVersionNegotation(vn *VersionNegotiationPacket) error {
 	var version uint32
 	for _, v := range vn.SupportedVersions {
 		if v >= MinimumVersion && v <= MaximumVersion {
@@ -266,7 +274,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.EncryptionLevelsAvailable = broadcast.NewBroadcaster(10)
 	c.FrameQueue = broadcast.NewBroadcaster(1000)
 
-	c.Logger = log.New(os.Stdout, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.SourceCID)), log.Lshortfile)
+	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 
 	c.TransitionTo(version, ALPN)
 

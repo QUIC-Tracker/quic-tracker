@@ -17,7 +17,7 @@ type AddressValidationScenario struct {
 }
 
 func NewAddressValidationScenario() *AddressValidationScenario {
-	return &AddressValidationScenario{AbstractScenario{"address_validation", 2, false, nil}}
+	return &AddressValidationScenario{AbstractScenario{"address_validation", 3, false, nil}}
 }
 func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
@@ -49,10 +49,8 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	var arrivals []uint64
 	var start time.Time
 	var initialLength int
-	var addressValidated bool
-	ackTimer := time.NewTimer(3 * time.Second)
 
-	trace.ErrorCode = AV_TLSHandshakeFailed
+	trace.ErrorCode = 0
 
 forLoop:
 	for {
@@ -80,11 +78,8 @@ forLoop:
 				}
 			}
 
-			if !addressValidated && float32(socketAgent.TotalDataReceived) / float32(initialLength) > 3.5 {
+			if float32(socketAgent.TotalDataReceived) / float32(initialLength) > 3.5 {
 				trace.MarkError(AV_SentMoreThan3TimesAmount, "", i.(qt.Packet))
-				ackTimer.Stop()
-			} else if !addressValidated {
-				ackTimer.Reset(3 * time.Second)
 			}
 		case i := <-outgoingPackets:
 			p := i.(qt.Packet)
@@ -100,27 +95,12 @@ forLoop:
 				defer connAgents.CloseConnection(false, 0, "")
 				trace.ErrorCode = 0
 			}
-		case <-ackTimer.C:
-			for pns, enc := range map[qt.PNSpace]qt.EncryptionLevel{qt.PNSpaceInitial: qt.EncryptionLevelInitial, qt.PNSpaceHandshake: qt.EncryptionLevelHandshake, qt.PNSpaceAppData: qt.EncryptionLevel1RTT} {
-				f := conn.GetAckFrame(pns)
-				if f != nil {
-					conn.FrameQueue.Submit(qt.QueuedFrame{f, enc})
-				}
-			}
-			addressValidated = true
-			ackAgent.DisableAcks[qt.PNSpaceInitial] = false
-			ackAgent.DisableAcks[qt.PNSpaceHandshake] = false
-			ackAgent.DisableAcks[qt.PNSpaceAppData] = false
-			tlsAgent.DisableFrameSending = false
-			trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
 		case <-s.Timeout().C:
 			break forLoop
 		}
 	}
 
+	trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
 	trace.Results["datagrams_received"] = socketAgent.DatagramsReceived
 	trace.Results["total_data_received"] = socketAgent.TotalDataReceived
-	if trace.ErrorCode == AV_SentMoreThan3TimesAmount {
-		trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)
-	}
 }

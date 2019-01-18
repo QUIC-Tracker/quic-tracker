@@ -179,7 +179,7 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 			receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
 		case MaxAckDelay:
 			receivedParameters.MaxAckDelay, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
-			receivedParameters.ToJSON["max_ack_delay"] = p.Value
+			receivedParameters.ToJSON["max_ack_delay"] = receivedParameters.MaxAckDelay
 		case DisableMigration:
 			receivedParameters.DisableMigration = true
 			receivedParameters.ToJSON["disable_migration"] = true

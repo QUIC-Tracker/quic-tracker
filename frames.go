@@ -48,13 +48,13 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 		return Frame(NewMaxDataFrame(buffer)), nil
 	case frameType == MaxStreamDataType:
 		return Frame(NewMaxStreamDataFrame(buffer)), nil
-	case frameType == MaxStreamsType:
+	case frameType&0xFE == MaxStreamsType:
 		return Frame(NewMaxStreamIdFrame(buffer)), nil
 	case frameType == DataBlockedType:
 		return Frame(NewBlockedFrame(buffer)), nil
 	case frameType == StreamDataBlockedType:
 		return Frame(NewStreamBlockedFrame(buffer)), nil
-	case frameType == StreamsBlockedType:
+	case frameType&0xFE == StreamsBlockedType:
 		return Frame(NewStreamIdNeededFrame(buffer)), nil
 	case frameType == NewConnectionIdType:
 		return Frame(NewNewConnectionIdFrame(buffer)), nil

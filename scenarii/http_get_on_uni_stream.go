@@ -60,7 +60,7 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 							return
 						}
 					case *qt.ConnectionCloseFrame:
-						if trace.ErrorCode == GS2_DidNotCloseTheConnection && f.ErrorCode == qt.ERR_STREAM_ID_ERROR || f.ErrorCode == qt.ERR_PROTOCOL_VIOLATION {
+						if trace.ErrorCode == GS2_DidNotCloseTheConnection && f.ErrorCode == qt.ERR_STREAM_LIMIT_ERROR || f.ErrorCode == qt.ERR_PROTOCOL_VIOLATION {
 							trace.ErrorCode = GS2_TooLowStreamIdUniToSendRequest
 						}
 						return

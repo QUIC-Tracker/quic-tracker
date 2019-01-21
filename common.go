@@ -55,8 +55,9 @@ const (
 // errors
 
 const (
-	ERR_STREAM_ID_ERROR = 0x4
-	ERR_PROTOCOL_VIOLATION = 0xA
+	ERR_STREAM_LIMIT_ERROR = 0x04
+	ERR_STREAM_STATE_ERROR = 0x05
+	ERR_PROTOCOL_VIOLATION = 0x0a
 )
 
 type PacketNumber uint64

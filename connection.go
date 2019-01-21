@@ -216,7 +216,7 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 	}
 }
 func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
-	c.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, c.Streams.Get(streamID), []byte(fmt.Sprintf("GET %s\r\n", path)), true), EncryptionLevelBest})
+	c.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, c.Streams.Get(streamID), []byte(fmt.Sprintf("GET %s\r\n", path)), true), EncryptionLevelBestAppData})
 }
 func (c *Connection) Close() {
 	c.Tls.Close()

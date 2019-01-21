@@ -23,7 +23,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 	newEncryptionLevelAvailable := make(chan interface{}, 10)
 	conn.EncryptionLevelsAvailable.Register(newEncryptionLevelAvailable)
 
-	encryptionLevels := []EncryptionLevel{EncryptionLevelInitial, EncryptionLevel0RTT, EncryptionLevelHandshake, EncryptionLevel1RTT, EncryptionLevelBest}
+	encryptionLevels := []EncryptionLevel{EncryptionLevelInitial, EncryptionLevel0RTT, EncryptionLevelHandshake, EncryptionLevel1RTT, EncryptionLevelBest, EncryptionLevelBestAppData}
 	encryptionLevelsAvailable := map[DirectionalEncryptionLevel]bool {
 		{EncryptionLevelNone, false}: true,
 		{EncryptionLevelInitial, false}: true,
@@ -64,7 +64,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 	}
 
 	fillAndSendPacket := func(packet Framer, level EncryptionLevel) {
-		if len(frameBuffer[level]) > 0 {
+		if len(frameBuffer[level]) > 0 && encryptionLevelsAvailable[DirectionalEncryptionLevel{level, false}] {
 			a.Logger.Printf("Timer for encryption level %s fired, scheduling the sending of %d bytes in %d frames\n", level.String(), frameBufferLength[level], len(frameBuffer[level]))
 
 			fillWithLevel(packet, level)
@@ -83,8 +83,8 @@ func (a *SendingAgent) Run(conn *Connection) {
 				if frameBufferLength[qf.EncryptionLevel]+qf.FrameLength() > a.MTU {
 					a.Logger.Printf("Scheduling the sending of %d bytes in %d frames in the buffer\n", frameBufferLength[qf.EncryptionLevel], len(frameBuffer[qf.EncryptionLevel]))
 
-					if qf.EncryptionLevel == EncryptionLevelBest {
-						qf.EncryptionLevel = chooseBestEncryptionLevel(encryptionLevelsAvailable)
+					if qf.EncryptionLevel == EncryptionLevelBest || qf.EncryptionLevel == EncryptionLevelBestAppData {
+						qf.EncryptionLevel = chooseBestEncryptionLevel(encryptionLevelsAvailable, qf.EncryptionLevel == EncryptionLevelBestAppData)
 						a.Logger.Printf("Chose %s as best encryption level\n", qf.EncryptionLevel.String())
 					}
 
@@ -117,7 +117,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 				} else {
 					frameBuffer[qf.EncryptionLevel] = append(frameBuffer[qf.EncryptionLevel], qf.Frame)
 					frameBufferLength[qf.EncryptionLevel] += qf.FrameLength()
-					if encryptionLevelsAvailable[DirectionalEncryptionLevel{qf.EncryptionLevel, false}] || qf.EncryptionLevel == EncryptionLevelBest {
+					if encryptionLevelsAvailable[DirectionalEncryptionLevel{qf.EncryptionLevel, false}] || qf.EncryptionLevel == EncryptionLevelBest || qf.EncryptionLevel == EncryptionLevelBestAppData {
 						timers[qf.EncryptionLevel].Reset(5 * time.Millisecond)
 					}
 				}
@@ -130,7 +130,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 			case <-timers[EncryptionLevel1RTT].C:
 				fillAndSendPacket(NewProtectedPacket(conn), EncryptionLevel1RTT)
 			case <-timers[EncryptionLevelBest].C:
-				eL := chooseBestEncryptionLevel(encryptionLevelsAvailable)
+				eL := chooseBestEncryptionLevel(encryptionLevelsAvailable, false)
 				a.Logger.Printf("Timer for encryption level %s fired, chose %s as new encryption level\n", EncryptionLevelBest.String(), eL.String())
 
 				for _, f := range frameBuffer[EncryptionLevelBest] {
@@ -139,6 +139,18 @@ func (a *SendingAgent) Run(conn *Connection) {
 				}
 				frameBuffer[EncryptionLevelBest] = nil
 				frameBufferLength[EncryptionLevelBest] = 0
+
+				timers[eL].Reset(0)
+			case <-timers[EncryptionLevelBestAppData].C:
+				eL := chooseBestEncryptionLevel(encryptionLevelsAvailable, true)
+				a.Logger.Printf("Timer for encryption level %s fired, chose %s as new encryption level\n", EncryptionLevelBestAppData.String(), eL.String())
+
+				for _, f := range frameBuffer[EncryptionLevelBestAppData] {
+					frameBuffer[eL] = append(frameBuffer[eL], f)
+					frameBufferLength[eL] += f.FrameLength()
+				}
+				frameBuffer[EncryptionLevelBestAppData] = nil
+				frameBufferLength[EncryptionLevelBestAppData] = 0
 
 				timers[eL].Reset(0)
 			case i := <- newEncryptionLevelAvailable:
@@ -166,14 +178,22 @@ func (a *SendingAgent) Run(conn *Connection) {
 }
 
 var elOrder = []DirectionalEncryptionLevel {{EncryptionLevel1RTT, false}, {EncryptionLevel0RTT, false}, {EncryptionLevelHandshake, false}, {EncryptionLevelInitial, false}}
+var elAppDataOrder = []DirectionalEncryptionLevel {{EncryptionLevel1RTT, false}, {EncryptionLevel0RTT, false}}
 
-func chooseBestEncryptionLevel(elAvailable map[DirectionalEncryptionLevel]bool) EncryptionLevel {
-	for _, dEL := range elOrder {
+func chooseBestEncryptionLevel(elAvailable map[DirectionalEncryptionLevel]bool, restrictAppData bool) EncryptionLevel {
+	order := elOrder
+	if restrictAppData {
+		order = elAppDataOrder
+	}
+	for _, dEL := range order {
 		if elAvailable[dEL] {
 			return dEL.EncryptionLevel
 		}
 	}
-	return elOrder[len(elOrder) - 1].EncryptionLevel
+	if restrictAppData {
+		return EncryptionLevel1RTT
+	}
+	return order[len(order) - 1].EncryptionLevel
 }
 
 func mergeAckFrames(frames []*AckFrame) *AckFrame {

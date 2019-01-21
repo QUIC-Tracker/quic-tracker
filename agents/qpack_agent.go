@@ -65,7 +65,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 				}
 				a.DecodedHeaders.Submit(DecodedHeaders{dhb.StreamID, headers})
 				if len(dhb.DecoderStream()) > 0 {
-					conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.DecoderStreamID, conn.Streams.Get(a.DecoderStreamID), dhb.DecoderStream(), false), EncryptionLevelBest})
+					conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.DecoderStreamID, conn.Streams.Get(a.DecoderStreamID), dhb.DecoderStream(), false), EncryptionLevelBestAppData})
 				}
 				a.Logger.Printf("Submitted %d decoded headers on stream %d\n", len(headers), dhb.StreamID)
 			}
@@ -142,7 +142,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 				a.EncodedHeaders.Submit(EncodedHeaders{e.StreamID, payload})
 				a.Logger.Printf("Encoded %d headers in %d bytes, with %d additional bytes on the encoder stream\n", len(e.Headers), len(payload), len(encStream))
 				if len(encStream) > 0 {
-					conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.EncoderStreamID, conn.Streams.Get(a.EncoderStreamID), encStream, false), EncryptionLevelBest})
+					conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.EncoderStreamID, conn.Streams.Get(a.EncoderStreamID), encStream, false), EncryptionLevelBestAppData})
 					a.Logger.Printf("Enqueued %d bytes on the encoder stream\n", len(encStream))
 				}
 			case d := <-a.DecodeHeaders:
@@ -157,8 +157,8 @@ func (a *QPACKAgent) Run(conn *Connection) {
 		}
 	}()
 
-	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.EncoderStreamID, conn.Streams.Get(a.EncoderStreamID), []byte{'H'}, false), EncryptionLevelBest})
-	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.DecoderStreamID, conn.Streams.Get(a.DecoderStreamID), []byte{'h'}, false), EncryptionLevelBest})
+	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.EncoderStreamID, conn.Streams.Get(a.EncoderStreamID), []byte{'H'}, false), EncryptionLevelBestAppData})
+	conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.DecoderStreamID, conn.Streams.Get(a.DecoderStreamID), []byte{'h'}, false), EncryptionLevelBestAppData})
 }
 func (a *QPACKAgent) InitEncoder(headerTableSize uint, dynamicTablesize uint, maxRiskedStreams uint, opts uint32) {
 	a.encoder.Init(headerTableSize, dynamicTablesize, maxRiskedStreams, opts)

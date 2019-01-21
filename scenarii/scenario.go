@@ -50,7 +50,7 @@ func (s *AbstractScenario) Timeout() *time.Timer {
 // Useful helper for scenarii that requires the handshake to complete before executing their test and don't want to
 // discern the cause of its failure.
 func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trace, handshakeErrorCode uint8, additionalAgents ...agents.Agent) *agents.ConnectionAgents {
-	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
+	connAgents := agents.AttachAgentsToConnection(conn, append(agents.GetDefaultAgents(), additionalAgents...)...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 

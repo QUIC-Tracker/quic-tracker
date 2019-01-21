@@ -23,7 +23,8 @@ const (
 	EncryptionLevel0RTT
 	EncryptionLevelHandshake
 	EncryptionLevel1RTT
-	EncryptionLevelBest  // A special flag to indicate that the best encryption level available should be used
+	EncryptionLevelBest         // A special flag to indicate that the best encryption level available should be used
+	EncryptionLevelBestAppData  // A special flag to indicate that the best app data encryption level available should be used
 )
 
 func (eL EncryptionLevel) String() string {
@@ -37,6 +38,7 @@ var encryptionLevelToString = map[EncryptionLevel]string {
 	EncryptionLevel0RTT: "0RTT",
 	EncryptionLevel1RTT: "1RTT",
 	EncryptionLevelBest: "Best",
+	EncryptionLevelBestAppData: "BestAppData",
 }
 
 var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{

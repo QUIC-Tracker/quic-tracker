@@ -22,7 +22,7 @@ type VersionNegotiationScenario struct {
 }
 
 func NewVersionNegotiationScenario() *VersionNegotiationScenario {
-	return &VersionNegotiationScenario{AbstractScenario{"version_negotiation", 2, false, nil}}
+	return &VersionNegotiationScenario{AbstractScenario{name: "version_negotiation", version: 2}}
 }
 func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

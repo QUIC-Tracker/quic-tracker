@@ -20,7 +20,7 @@ type FlowControlScenario struct {
 }
 
 func NewFlowControlScenario() *FlowControlScenario {
-	return &FlowControlScenario{AbstractScenario{"flow_control", 2, false, nil}}
+	return &FlowControlScenario{AbstractScenario{name: "flow_control", version: 2}}
 }
 func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

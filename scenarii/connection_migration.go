@@ -18,7 +18,7 @@ type ConnectionMigrationScenario struct {
 }
 
 func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
-	return &ConnectionMigrationScenario{AbstractScenario{"connection_migration", 1, false, nil}}
+	return &ConnectionMigrationScenario{AbstractScenario{name: "connection_migration", version: 1}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

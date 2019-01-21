@@ -20,7 +20,7 @@ type UnsupportedTLSVersionScenario struct {
 }
 
 func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
-	return &UnsupportedTLSVersionScenario{AbstractScenario{"unsupported_tls_version", 1, false, nil}}
+	return &UnsupportedTLSVersionScenario{AbstractScenario{name: "unsupported_tls_version", version: 1}}
 }
 func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

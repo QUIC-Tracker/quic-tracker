@@ -19,7 +19,7 @@ type HandshakeScenario struct {
 }
 
 func NewHandshakeScenario() *HandshakeScenario {
-	return &HandshakeScenario{AbstractScenario{"handshake", 2, false, nil}}
+	return &HandshakeScenario{AbstractScenario{name: "handshake", version: 2}}
 }
 func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

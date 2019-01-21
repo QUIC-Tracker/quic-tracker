@@ -19,7 +19,7 @@ type TransportParameterScenario struct {
 }
 
 func NewTransportParameterScenario() *TransportParameterScenario {
-	return &TransportParameterScenario{AbstractScenario{"transport_parameters", 3, false, nil}}
+	return &TransportParameterScenario{AbstractScenario{name: "transport_parameters", version: 3}}
 }
 func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

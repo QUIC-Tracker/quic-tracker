@@ -19,7 +19,7 @@ type ZeroRTTScenario struct {
 }
 
 func NewZeroRTTScenario() *ZeroRTTScenario {
-	return &ZeroRTTScenario{AbstractScenario{"zero_rtt", 1, false, nil}}
+	return &ZeroRTTScenario{AbstractScenario{name: "zero_rtt", version: 1}}
 }
 func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
@@ -58,7 +58,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	rh, sh, token := conn.ReceivedPacketHandler, conn.SentPacketHandler, conn.Token
 
 	var err error
-	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6)
+	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6, false)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	conn.Token = token

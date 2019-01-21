@@ -17,7 +17,7 @@ type StreamOpeningReorderingScenario struct {
 }
 
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
-	return &StreamOpeningReorderingScenario{AbstractScenario{"stream_opening_reordering", 2, false, nil}}
+	return &StreamOpeningReorderingScenario{AbstractScenario{name: "stream_opening_reordering", version: 2}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

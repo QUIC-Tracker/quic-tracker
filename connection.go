@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strings"
 	"unsafe"
 )
 
@@ -46,6 +47,7 @@ type Connection struct {
 	SourceCID              ConnectionID
 	DestinationCID         ConnectionID
 	Version                uint32
+	ALPN                   string
 
 	Token            []byte
 	ResumptionTicket []byte
@@ -153,7 +155,8 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotiationPacket) erro
 		c.Logger.Printf("Versions received: %v\n", vn.SupportedVersions)
 		return errors.New("no appropriate version found")
 	}
-	QuicVersion, QuicALPNToken = version, fmt.Sprintf("hq-%02d", version & 0xff)
+	QuicVersion = version
+	QuicALPNToken = fmt.Sprintf("%s-%02d", strings.Split(c.ALPN, "-")[0], version & 0xff)
 	c.TransitionTo(QuicVersion, QuicALPNToken)
 	return nil
 }
@@ -193,7 +196,8 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	}
 	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
 	c.Version = version
-	c.Tls = pigotls.NewConnection(c.ServerName, ALPN, c.ResumptionTicket)
+	c.ALPN = ALPN
+	c.Tls = pigotls.NewConnection(c.ServerName, c.ALPN, c.ResumptionTicket)
 	c.PacketNumber = make(map[PNSpace]PacketNumber)
 	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
@@ -229,7 +233,7 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	}
 	return udpConn, nil
 }
-func NewDefaultConnection(address string, serverName string, resumptionTicket []byte, useIPv6 bool) (*Connection, error) {
+func NewDefaultConnection(address string, serverName string, resumptionTicket []byte, useIPv6 bool, negotiateHTTP3 bool) (*Connection, error) {
 	scid := make([]byte, 8, 8)
 	dcid := make([]byte, 8, 8)
 	rand.Read(scid)
@@ -251,7 +255,13 @@ func NewDefaultConnection(address string, serverName string, resumptionTicket []
 		return nil, err
 	}
 
-	c := NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionTicket)
+	var c *Connection
+	if negotiateHTTP3 {
+		c = NewConnection(serverName, QuicVersion, QuicH3ALPNToken, scid, dcid, udpConn, resumptionTicket)
+	} else {
+		c = NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionTicket)
+	}
+
 	c.UseIPv6 = useIPv6
 	c.Host = udpAddr
 	return c, nil

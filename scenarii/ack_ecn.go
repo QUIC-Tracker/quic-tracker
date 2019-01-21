@@ -1,9 +1,9 @@
 package scenarii
 
 import (
-	"time"
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
+	"time"
 )
 
 const (
@@ -19,7 +19,7 @@ type AckECNScenario struct {
 }
 
 func NewAckECNScenario() *AckECNScenario {
-	return &AckECNScenario{AbstractScenario{"ack_ecn", 1, false, nil}}
+	return &AckECNScenario{AbstractScenario{name: "ack_ecn", version: 1}}
 }
 func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

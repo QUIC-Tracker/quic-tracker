@@ -3,8 +3,8 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"time"
 	"fmt"
+	"time"
 )
 
 const (
@@ -25,7 +25,7 @@ type SimpleGetAndWaitScenario struct {
 }
 
 func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
-	return &SimpleGetAndWaitScenario{AbstractScenario{"http_get_and_wait", 1, false, nil}}
+	return &SimpleGetAndWaitScenario{AbstractScenario{name: "http_get_and_wait", version: 1}}
 }
 
 func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {

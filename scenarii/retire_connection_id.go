@@ -20,7 +20,7 @@ type RetireConnectionIDScenario struct {
 }
 
 func NewRetireConnectionIDScenario() *RetireConnectionIDScenario {
-	return &RetireConnectionIDScenario{AbstractScenario{"retire_connection_id", 1, false, nil}}
+	return &RetireConnectionIDScenario{AbstractScenario{name: "retire_connection_id", version: 1}}
 }
 func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

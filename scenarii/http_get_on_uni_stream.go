@@ -20,7 +20,7 @@ type GetOnStream2Scenario struct {
 }
 
 func NewGetOnStream2Scenario() *GetOnStream2Scenario {
-	return &GetOnStream2Scenario{AbstractScenario{"http_get_on_uni_stream", 1, false, nil}}
+	return &GetOnStream2Scenario{AbstractScenario{name: "http_get_on_uni_stream", version: 1}}
 }
 
 func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {

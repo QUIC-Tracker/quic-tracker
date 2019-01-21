@@ -23,7 +23,7 @@ type NewConnectionIDScenario struct {
 }
 
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
-	return &NewConnectionIDScenario{AbstractScenario{"new_connection_id", 1, false, nil}}
+	return &NewConnectionIDScenario{AbstractScenario{name: "new_connection_id", version: 1}}
 }
 func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete

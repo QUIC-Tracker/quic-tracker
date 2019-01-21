@@ -32,7 +32,7 @@ func main() {
 
 	trace := qt.NewTrace(scenario.Name(), scenario.Version(), *host)
 
-	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6()) // Raw IPv6 are not handled correctly
+	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6(), scenario.HTTP3()) // Raw IPv6 are not handled correctly
 
 	if err == nil {
 		pcap, err := qt.StartPcapCapture(conn, *netInterface)

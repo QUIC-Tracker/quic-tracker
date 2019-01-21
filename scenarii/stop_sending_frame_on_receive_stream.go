@@ -20,7 +20,7 @@ type StopSendingOnReceiveStreamScenario struct {
 }
 
 func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario {
-	return &StopSendingOnReceiveStreamScenario{AbstractScenario{"stop_sending_frame_on_receive_stream", 1, false, nil}}
+	return &StopSendingOnReceiveStreamScenario{AbstractScenario{name: "stop_sending_frame_on_receive_stream", version: 1}}
 }
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {

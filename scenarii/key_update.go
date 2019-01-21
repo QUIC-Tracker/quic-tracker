@@ -16,7 +16,7 @@ type KeyUpdateScenario struct {
 }
 
 func NewKeyUpdateScenario() *KeyUpdateScenario {
-	return &KeyUpdateScenario{AbstractScenario{"key_update", 1, false, nil}}
+	return &KeyUpdateScenario{AbstractScenario{name: "key_update", version: 1}}
 }
 func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

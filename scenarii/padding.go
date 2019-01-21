@@ -17,7 +17,7 @@ type PaddingScenario struct {
 }
 
 func NewPaddingScenario() *PaddingScenario {
-	return &PaddingScenario{AbstractScenario{"padding", 1, false, nil}}
+	return &PaddingScenario{AbstractScenario{name: "padding", version: 1}}
 }
 func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

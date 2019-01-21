@@ -17,11 +17,12 @@ type HTTP3GETScenario struct {
 }
 
 func NewHTTP3GETScenario() *HTTP3GETScenario {
-	return &HTTP3GETScenario{AbstractScenario{"http3_get", 1, false, nil}}
+	return &HTTP3GETScenario{AbstractScenario{name: "http3_get", version: 1, http3: true}}
 }
 func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 3
+	conn.TransitionTo(qt.QuicVersion, qt.QuicH3ALPNToken)
 
 	http := agents.HTTPAgent{}
 	connAgents := s.CompleteHandshake(conn, trace, H3G_TLSHandshakeFailed, &http)

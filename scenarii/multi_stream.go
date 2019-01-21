@@ -19,7 +19,7 @@ type MultiStreamScenario struct {
 }
 
 func NewMultiStreamScenario() *MultiStreamScenario {
-	return &MultiStreamScenario{AbstractScenario{"multi_stream", 1, false, nil}}
+	return &MultiStreamScenario{AbstractScenario{name: "multi_stream", version: 1}}
 }
 func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

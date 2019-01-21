@@ -16,7 +16,7 @@ type AckOnlyScenario struct {
 }
 
 func NewAckOnlyScenario() *AckOnlyScenario {
-	return &AckOnlyScenario{AbstractScenario{"ack_only", 1, false, nil}}
+	return &AckOnlyScenario{AbstractScenario{name: "ack_only", version: 1}}
 }
 func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

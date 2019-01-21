@@ -18,7 +18,7 @@ type HTTP3UniStreamsLimitsScenario struct {
 }
 
 func NewHTTP3UniStreamsLimitsScenario() *HTTP3UniStreamsLimitsScenario {
-	return &HTTP3UniStreamsLimitsScenario{AbstractScenario{"http3_uni_streams_limits", 1, false, nil}}
+	return &HTTP3UniStreamsLimitsScenario{AbstractScenario{name: "http3_uni_streams_limits", version: 1, http3: true}}
 }
 func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

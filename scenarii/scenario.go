@@ -22,6 +22,7 @@ type Scenario interface {
 	Name() string
 	Version() int
 	IPv6() bool
+	HTTP3() bool
 	Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool)
 	Timeout() *time.Timer
 }
@@ -31,6 +32,7 @@ type AbstractScenario struct {
 	name    string
 	version int
 	ipv6    bool
+	http3   bool
 	timeout *time.Timer
 }
 
@@ -42,6 +44,9 @@ func (s *AbstractScenario) Version() int {
 }
 func (s *AbstractScenario) IPv6() bool {
 	return s.ipv6
+}
+func (s *AbstractScenario) HTTP3() bool {
+	return s.http3
 }
 func (s *AbstractScenario) Timeout() *time.Timer {
 	return s.timeout

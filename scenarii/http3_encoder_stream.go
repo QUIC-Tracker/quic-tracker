@@ -20,7 +20,7 @@ type HTTP3EncoderStreamScenario struct {
 }
 
 func NewHTTP3EncoderStreamScenario() *HTTP3EncoderStreamScenario {
-	return &HTTP3EncoderStreamScenario{AbstractScenario{"http3_encoder_stream", 1, false, nil}}
+	return &HTTP3EncoderStreamScenario{AbstractScenario{name: "http3_encoder_stream", version: 1, http3: true}}
 }
 func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

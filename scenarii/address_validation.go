@@ -17,7 +17,7 @@ type AddressValidationScenario struct {
 }
 
 func NewAddressValidationScenario() *AddressValidationScenario {
-	return &AddressValidationScenario{AbstractScenario{"address_validation", 3, false, nil}}
+	return &AddressValidationScenario{AbstractScenario{name: "address_validation", version: 3}}
 }
 func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)

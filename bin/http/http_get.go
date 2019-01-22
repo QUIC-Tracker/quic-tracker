@@ -27,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	t := time.NewTimer(time.Duration(*timeout) * time.Second)
-	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6)
+	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, false)
 	if err != nil {
 		panic(err)
 	}

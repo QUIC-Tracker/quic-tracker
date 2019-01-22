@@ -28,6 +28,7 @@ type HandshakeAgent struct {
 	TLSAgent         *TLSAgent
 	SocketAgent      *SocketAgent
 	HandshakeStatus  broadcast.Broadcaster //type: HandshakeStatus
+	IgnoreRetry 	 bool
 	sendInitial		 chan bool
 	receivedRetry    bool
 }
@@ -71,7 +72,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 				case *RetryPacket:
-					if bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
+					if !a.IgnoreRetry && bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						conn.TransitionTo(QuicVersion, QuicALPNToken)

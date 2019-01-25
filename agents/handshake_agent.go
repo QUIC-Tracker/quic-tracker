@@ -75,7 +75,9 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					if !a.IgnoreRetry && bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
+						tlsTP := conn.TLSTPHandler
 						conn.TransitionTo(QuicVersion, QuicALPNToken)
+						conn.TLSTPHandler = tlsTP
 						conn.Token = p.RetryToken
 						a.TLSAgent.Stop()
 						a.TLSAgent.Join()

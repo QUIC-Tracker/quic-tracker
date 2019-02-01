@@ -63,9 +63,21 @@ func (a *SendingAgent) Run(conn *Connection) {
 		frameBufferLength[level] = 0
 	}
 
-	fillAndSendPacket := func(packet Framer, level EncryptionLevel) {
+	fillAndSendPacket := func(level EncryptionLevel) {
 		if len(frameBuffer[level]) > 0 && encryptionLevelsAvailable[DirectionalEncryptionLevel{level, false}] {
 			a.Logger.Printf("Timer for encryption level %s fired, scheduling the sending of %d bytes in %d frames\n", level.String(), frameBufferLength[level], len(frameBuffer[level]))
+
+			var packet Framer
+			switch level {
+			case EncryptionLevelInitial:
+				packet = NewInitialPacket(conn)
+			case EncryptionLevel0RTT:
+				packet = NewZeroRTTProtectedPacket(conn)
+			case EncryptionLevelHandshake:
+				packet = NewHandshakePacket(conn)
+			case EncryptionLevel1RTT:
+				packet = NewProtectedPacket(conn)
+			}
 
 			fillWithLevel(packet, level)
 			conn.SendPacket(packet, level)
@@ -122,13 +134,13 @@ func (a *SendingAgent) Run(conn *Connection) {
 					}
 				}
 			case <-timers[EncryptionLevelInitial].C:
-				fillAndSendPacket(NewInitialPacket(conn), EncryptionLevelInitial)
+				fillAndSendPacket(EncryptionLevelInitial)
 			case <-timers[EncryptionLevel0RTT].C:
-				fillAndSendPacket(NewZeroRTTProtectedPacket(conn), EncryptionLevel0RTT)
+				fillAndSendPacket(EncryptionLevel0RTT)
 			case <-timers[EncryptionLevelHandshake].C:
-				fillAndSendPacket(NewHandshakePacket(conn), EncryptionLevelHandshake)
+				fillAndSendPacket(EncryptionLevelHandshake)
 			case <-timers[EncryptionLevel1RTT].C:
-				fillAndSendPacket(NewProtectedPacket(conn), EncryptionLevel1RTT)
+				fillAndSendPacket(EncryptionLevel1RTT)
 			case <-timers[EncryptionLevelBest].C:
 				eL := chooseBestEncryptionLevel(encryptionLevelsAvailable, false)
 				a.Logger.Printf("Timer for encryption level %s fired, chose %s as new encryption level\n", EncryptionLevelBest.String(), eL.String())

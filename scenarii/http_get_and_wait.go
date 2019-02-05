@@ -44,8 +44,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, pre
 	}
 
 	errors := make(map[uint8]string)
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)
 

@@ -29,8 +29,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	conn.Version = ForceVersionNegotiation
 	trace.ErrorCode = VN_Timeout

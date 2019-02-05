@@ -59,8 +59,7 @@ func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trac
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 
-	handshakeStatus := make(chan interface{}, 10)
-	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeStatus := handshakeAgent.HandshakeStatus.RegisterNewChan(10)
 	handshakeAgent.InitiateHandshake()
 
 	select {

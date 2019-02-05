@@ -32,8 +32,7 @@ func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)
 

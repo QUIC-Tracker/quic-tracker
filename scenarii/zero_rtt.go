@@ -29,11 +29,9 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 		return
 	}
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	resumptionTicket := make(chan interface{}, 10)
-	connAgents.Get("TLSAgent").(*agents.TLSAgent).ResumptionTicket.Register(resumptionTicket)
+	resumptionTicket := connAgents.Get("TLSAgent").(*agents.TLSAgent).ResumptionTicket.RegisterNewChan(10)
 
 	ticket := conn.Tls.ResumptionTicket()
 
@@ -75,14 +73,9 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	defer connAgents.CloseConnection(false, 0, "")
 	defer trace.Complete(conn)
 
-	incPackets = make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets = conn.IncomingPackets.RegisterNewChan(1000)
+	encryptionLevelsAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
 
-	encryptionLevelsAvailable := make(chan interface{}, 10)
-	conn.EncryptionLevelsAvailable.Register(encryptionLevelsAvailable)
-
-	handshakeStatus := make(chan interface{}, 10)
-	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
 	handshakeAgent.InitiateHandshake()
 
 	if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {

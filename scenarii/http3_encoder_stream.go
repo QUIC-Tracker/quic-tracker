@@ -40,11 +40,8 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 		return
 	}
 
-	frameReceived := make(chan interface{}, 1000)
-	http.FrameReceived.Register(frameReceived)
-
-	responseReceived := make(chan interface{}, 1000)
-	http.HTTPResponseReceived.Register(responseReceived)
+	frameReceived := http.FrameReceived.RegisterNewChan(1000)
+	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
 
 forLoop:
 	for {

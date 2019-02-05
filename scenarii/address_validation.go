@@ -36,14 +36,10 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: tlsAgent, SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	handshakeAgent.IgnoreRetry = true
 	connAgents.Add(handshakeAgent)
-	handshakeStatus := make(chan interface{}, 10)
-	handshakeAgent.HandshakeStatus.Register(handshakeStatus)
+	handshakeStatus := handshakeAgent.HandshakeStatus.RegisterNewChan(10)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
-
-	outgoingPackets := make(chan interface{}, 1000)
-	conn.OutgoingPackets.Register(outgoingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
+	outgoingPackets := conn.OutgoingPackets.RegisterNewChan(1000)
 
 	handshakeAgent.InitiateHandshake()
 

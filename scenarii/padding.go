@@ -42,8 +42,7 @@ func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 		conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)
 	}
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	sendEmptyInitialPacket()
 

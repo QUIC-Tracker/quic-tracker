@@ -28,8 +28,7 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	defer connAgents.StopAll()
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	sendUnsupportedInitial(conn)
 

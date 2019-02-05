@@ -50,8 +50,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevelHandshake, false})  // TODO: Find a way around this
 	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevel1RTT, false})
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)
 	trace.ErrorCode = CM_HostDidNotMigrate // Assume it until proven wrong

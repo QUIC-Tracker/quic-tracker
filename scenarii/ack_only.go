@@ -28,8 +28,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	connAgents.Get("AckAgent").Stop()
 	connAgents.Get("AckAgent").Join()
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	conn.SendHTTPGETRequest(preferredUrl, 0)
 

@@ -27,8 +27,7 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	// TODO: Move this to crypto.go
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)

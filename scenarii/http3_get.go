@@ -38,8 +38,7 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 		return
 	}
 
-	responseReceived := make(chan interface{}, 1000)
-	http.HTTPResponseReceived.Register(responseReceived)
+	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
 
 	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
 

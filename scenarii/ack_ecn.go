@@ -30,12 +30,11 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl 
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	socketAgent := connAgents.Get("SocketAgent").(*agents.SocketAgent)
-	ecnStatus := make(chan interface{}, 1000)
-	socketAgent.ECNStatus.Register(ecnStatus)
+	ecnStatus := socketAgent.ECNStatus.RegisterNewChan(1000)
+
 
 	err := socketAgent.ConfigureECN()
 	if err != nil {

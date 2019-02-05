@@ -34,8 +34,7 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	trace.Results["received_transport_parameters"] = conn.TLSTPHandler.ReceivedParameters.ToJSON
 	if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams == 0 {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/compat"
-	"github.com/dustin/go-broadcast"
 	"syscall"
 	"unsafe"
 )
@@ -27,15 +26,15 @@ type SocketAgent struct {
 	ecn               bool
 	TotalDataReceived int
 	DatagramsReceived int
-	SocketStatus      broadcast.Broadcaster //type: err
-	ECNStatus         broadcast.Broadcaster //type: ECNStatus
+	SocketStatus      Broadcaster //type: err
+	ECNStatus         Broadcaster //type: ECNStatus
 }
 
 func (a *SocketAgent) Run(conn *Connection) {
 	a.Init("SocketAgent", conn.OriginalDestinationCID)
 	a.conn = conn
-	a.SocketStatus = broadcast.NewBroadcaster(10)
-	a.ECNStatus = broadcast.NewBroadcaster(1000)
+	a.SocketStatus = NewBroadcaster(10)
+	a.ECNStatus = NewBroadcaster(1000)
 	recChan := make(chan []byte)
 
 	go func() {

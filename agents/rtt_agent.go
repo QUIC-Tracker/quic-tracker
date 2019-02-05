@@ -35,11 +35,8 @@ func (a *RTTAgent) Run(conn *Connection) {
 
 	a.LargestSentPackets = make(map[PNSpace]PacketNumber)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
-
-	outgoingPackets := make(chan interface{}, 1000)
-	conn.OutgoingPackets.Register(outgoingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
+	outgoingPackets := conn.OutgoingPackets.RegisterNewChan(1000)
 
 	go func() { // TODO: Support ACK_ECN
 		defer a.Logger.Println("Agent terminated")

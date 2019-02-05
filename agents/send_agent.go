@@ -18,10 +18,8 @@ type SendingAgent struct {
 func (a *SendingAgent) Run(conn *Connection) {
 	a.Init("SendingAgent", conn.OriginalDestinationCID)
 
-	frameQueue := make(chan interface{}, 1000)
-	conn.FrameQueue.Register(frameQueue)
-	newEncryptionLevelAvailable := make(chan interface{}, 10)
-	conn.EncryptionLevelsAvailable.Register(newEncryptionLevelAvailable)
+	frameQueue := conn.FrameQueue.RegisterNewChan(1000)
+	newEncryptionLevelAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
 
 	encryptionLevels := []EncryptionLevel{EncryptionLevelInitial, EncryptionLevel0RTT, EncryptionLevelHandshake, EncryptionLevel1RTT, EncryptionLevelBest, EncryptionLevelBestAppData}
 	encryptionLevelsAvailable := map[DirectionalEncryptionLevel]bool {

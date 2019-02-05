@@ -25,14 +25,9 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 	}
 	retransmissionTicker := time.NewTicker(100 * time.Millisecond)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
-
-	outgoingPackets := make(chan interface{}, 1000)
-	conn.OutgoingPackets.Register(outgoingPackets)
-
-	eLAvailable := make(chan interface{}, 1000)
-	conn.EncryptionLevelsAvailable.Register(eLAvailable)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
+	outgoingPackets := conn.OutgoingPackets.RegisterNewChan(1000)
+	eLAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")

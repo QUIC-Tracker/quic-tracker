@@ -2,7 +2,6 @@ package agents
 
 import (
 	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/dustin/go-broadcast"
 	"github.com/mpiraux/ls-qpack-go"
 	"math"
 )
@@ -27,9 +26,9 @@ type QPACKAgent struct {
 	EncoderStreamID uint64
 	DecoderStreamID uint64
 	DecodeHeaders   chan EncodedHeaders
-	DecodedHeaders  broadcast.Broadcaster //type: DecodedHeaders
+	DecodedHeaders  Broadcaster //type: DecodedHeaders
 	EncodeHeaders   chan DecodedHeaders
-	EncodedHeaders  broadcast.Broadcaster //type: EncodedHeaders
+	EncodedHeaders  Broadcaster //type: EncodedHeaders
 	encoder         *ls_qpack_go.QPackEncoder
 	decoder         *ls_qpack_go.QPackDecoder
 }
@@ -40,13 +39,12 @@ const (
 
 func (a *QPACKAgent) Run(conn *Connection) {
 	a.Init("QPACKAgent", conn.OriginalDestinationCID)
-	a.DecodedHeaders = broadcast.NewBroadcaster(1000)
-	a.EncodedHeaders = broadcast.NewBroadcaster(1000)
+	a.DecodedHeaders = NewBroadcaster(1000)
+	a.EncodedHeaders = NewBroadcaster(1000)
 	a.DecodeHeaders = make(chan EncodedHeaders, 1000)
 	a.EncodeHeaders = make(chan DecodedHeaders, 1000)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	a.encoder = ls_qpack_go.NewQPackEncoder(false)
 	a.decoder = ls_qpack_go.NewQPackDecoder(1024, 100)

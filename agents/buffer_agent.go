@@ -11,10 +11,8 @@ type BufferAgent struct {
 func (a *BufferAgent) Run(conn *Connection) {
 	a.Init("BufferAgent", conn.OriginalDestinationCID)
 
-	uPChan := make(chan interface{}, 1000)
-	conn.UnprocessedPayloads.Register(uPChan)
-	eLChan := make(chan interface{}, 1000)
-	conn.EncryptionLevelsAvailable.Register(eLChan)
+	uPChan := conn.UnprocessedPayloads.RegisterNewChan(1000)
+	eLChan := conn.EncryptionLevelsAvailable.RegisterNewChan(1000)
 
 	unprocessedPayloads := make(map[EncryptionLevel][][]byte)
 	encryptionLevelsAvailable := make(map[EncryptionLevel]bool)

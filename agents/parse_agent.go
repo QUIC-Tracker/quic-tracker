@@ -18,8 +18,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 	a.conn = conn
 	a.Init("ParsingAgent", conn.OriginalDestinationCID)
 
-	incomingPayloads := make(chan interface{})
-	a.conn.IncomingPayloads.Register(incomingPayloads)
+	incomingPayloads := a.conn.IncomingPayloads.RegisterNewChan(1000)
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")

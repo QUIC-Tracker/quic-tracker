@@ -18,8 +18,7 @@ func (a *AckAgent) Run(conn *Connection) {
 	a.DisableAcks = make(map[PNSpace]bool)
 	a.TotalDataAcked = make(map[PNSpace]uint64)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")

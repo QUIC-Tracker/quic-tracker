@@ -2,12 +2,11 @@ package agents
 
 import (
 	"bytes"
+	"errors"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/http3"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dustin/go-broadcast"
 	"math"
-	"errors"
 )
 
 type HTTPResponse struct {
@@ -41,8 +40,8 @@ type HTTPAgent struct {
 	conn                 *Connection
 	QPACK                QPACKAgent
 	QPACKEncoderOpts     uint32
-	HTTPResponseReceived broadcast.Broadcaster //type: HTTPResponse
-	FrameReceived        broadcast.Broadcaster //type: HTTPFrameReceived
+	HTTPResponseReceived Broadcaster //type: HTTPResponse
+	FrameReceived        Broadcaster //type: HTTPFrameReceived
 	streamData           chan streamData
 	streamDataBuffer     map[uint64]*bytes.Buffer
 	responseBuffer       map[uint64]*HTTPResponse
@@ -61,19 +60,14 @@ func (a *HTTPAgent) Run(conn *Connection) {
 	a.QPACK = QPACKAgent{EncoderStreamID: 6, DecoderStreamID: 10}
 	a.QPACK.Run(conn)
 
-	a.HTTPResponseReceived = broadcast.NewBroadcaster(1000)
-	a.FrameReceived = broadcast.NewBroadcaster(1000)
+	a.HTTPResponseReceived = NewBroadcaster(1000)
+	a.FrameReceived = NewBroadcaster(1000)
 
-	frameReceived := make(chan interface{}, 1000)
-	a.FrameReceived.Register(frameReceived)
+	frameReceived := a.FrameReceived.RegisterNewChan(1000)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
-
-	encodedHeaders := make(chan interface{}, 1000)
-	a.QPACK.EncodedHeaders.Register(encodedHeaders)
-	decodedHeaders := make(chan interface{}, 1000)
-	a.QPACK.DecodedHeaders.Register(decodedHeaders)
+	encodedHeaders := a.QPACK.EncodedHeaders.RegisterNewChan(1000)
+	decodedHeaders := a.QPACK.DecodedHeaders.RegisterNewChan(1000)
 
 	a.controlStreamID = uint64(2)
 	a.peerControlStreamID = HTTPNoStream
@@ -229,8 +223,7 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 
 	streamID := a.nextRequestStream
 	stream := a.conn.Streams.Get(streamID)
-	streamChan := make(chan interface{}, 1000)
-	stream.ReadChan.Register(streamChan)
+	streamChan := stream.ReadChan.RegisterNewChan(1000)
 	a.streamDataBuffer[streamID] = new(bytes.Buffer)
 	response := &HTTPResponse{StreamID: streamID}
 	a.responseBuffer[streamID] = response
@@ -254,6 +247,7 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 			}
 
 		}
+		stream.ReadChan.Unregister(streamChan)
 	}()
 
 	a.QPACK.EncodeHeaders <- DecodedHeaders{streamID, hdrs}

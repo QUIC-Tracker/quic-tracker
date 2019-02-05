@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker/lib"
-	"github.com/dustin/go-broadcast"
 	"github.com/mpiraux/pigotls"
 	"log"
 	"net"
@@ -36,12 +35,12 @@ type Connection struct {
 	CryptoStreams       CryptoStreams  // TODO: It should be a parent class without closing states
 	Streams             Streams
 
-	IncomingPackets           broadcast.Broadcaster //type: Packet
-	OutgoingPackets           broadcast.Broadcaster //type: Packet
-	IncomingPayloads          broadcast.Broadcaster //type: []byte
-	UnprocessedPayloads       broadcast.Broadcaster //type: UnprocessedPayload
-	EncryptionLevelsAvailable broadcast.Broadcaster //type: DirectionalEncryptionLevel
-	FrameQueue                broadcast.Broadcaster //type: QueuedFrame
+	IncomingPackets           Broadcaster //type: Packet
+	OutgoingPackets           Broadcaster //type: Packet
+	IncomingPayloads          Broadcaster //type: []byte
+	UnprocessedPayloads       Broadcaster //type: UnprocessedPayload
+	EncryptionLevelsAvailable Broadcaster //type: DirectionalEncryptionLevel
+	FrameQueue                Broadcaster //type: QueuedFrame
 
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
@@ -277,12 +276,12 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 
 	c.ResumptionTicket = resumptionTicket
 
-	c.IncomingPackets = broadcast.NewBroadcaster(1000)
-	c.OutgoingPackets = broadcast.NewBroadcaster(1000)
-	c.IncomingPayloads = broadcast.NewBroadcaster(1000)
-	c.UnprocessedPayloads = broadcast.NewBroadcaster(1000)
-	c.EncryptionLevelsAvailable = broadcast.NewBroadcaster(10)
-	c.FrameQueue = broadcast.NewBroadcaster(1000)
+	c.IncomingPackets = NewBroadcaster(1000)
+	c.OutgoingPackets = NewBroadcaster(1000)
+	c.IncomingPayloads = NewBroadcaster(1000)
+	c.UnprocessedPayloads = NewBroadcaster(1000)
+	c.EncryptionLevelsAvailable = NewBroadcaster(10)
+	c.FrameQueue = NewBroadcaster(1000)
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 

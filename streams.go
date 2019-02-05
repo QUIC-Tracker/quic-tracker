@@ -2,7 +2,6 @@ package quictracker
 
 import (
 	"fmt"
-	"github.com/dustin/go-broadcast"
 	"math"
 )
 
@@ -48,7 +47,7 @@ type Stream struct {
 	ReadData  []byte
 	WriteData []byte
 
-	ReadChan broadcast.Broadcaster
+	ReadChan Broadcaster
 	MaxReadReceived uint64
 	gaps *byteIntervalList
 
@@ -63,7 +62,7 @@ type Stream struct {
 
 func NewStream() *Stream {
 	s := new(Stream)
-	s.ReadChan = broadcast.NewBroadcaster(1024)
+	s.ReadChan = NewBroadcaster(1024)
 	s.readFeedback = make(chan interface{}, 1)
 	s.ReadChan.Register(s.readFeedback)
 	s.gaps = NewbyteIntervalList().Init()

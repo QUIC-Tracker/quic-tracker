@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/dustin/go-broadcast"
 	"strings"
 )
 
@@ -27,7 +26,7 @@ type HandshakeAgent struct {
 	BaseAgent
 	TLSAgent         *TLSAgent
 	SocketAgent      *SocketAgent
-	HandshakeStatus  broadcast.Broadcaster //type: HandshakeStatus
+	HandshakeStatus  Broadcaster //type: HandshakeStatus
 	IgnoreRetry 	 bool
 	sendInitial		 chan bool
 	receivedRetry    bool
@@ -35,17 +34,14 @@ type HandshakeAgent struct {
 
 func (a *HandshakeAgent) Run(conn *Connection) {
 	a.Init("HandshakeAgent", conn.OriginalDestinationCID)
-	a.HandshakeStatus = broadcast.NewBroadcaster(10)
+	a.HandshakeStatus = NewBroadcaster(10)
 	a.sendInitial = make(chan bool, 1)
 
-	incPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incPackets)
+	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	outPackets := make(chan interface{}, 1000)
-	conn.OutgoingPackets.Register(outPackets)
+	outPackets := conn.OutgoingPackets.RegisterNewChan(1000)
 
-	tlsStatus := make(chan interface{}, 10)
-	a.TLSAgent.TLSStatus.Register(tlsStatus)
+	tlsStatus := a.TLSAgent.TLSStatus.RegisterNewChan(10)
 
 	socketStatus := make(chan interface{}, 10)
 	a.SocketAgent.SocketStatus.Register(socketStatus)
@@ -132,8 +128,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 		}
 	}()
 
-	status := make(chan interface{}, 1)
-	a.HandshakeStatus.Register(status)
+	status := a.HandshakeStatus.RegisterNewChan(1)
 
 	go func() {
 		for {

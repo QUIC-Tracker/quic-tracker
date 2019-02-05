@@ -1,9 +1,8 @@
 package agents
 
 import (
-	. "github.com/QUIC-Tracker/quic-tracker"
 	"encoding/hex"
-	"github.com/dustin/go-broadcast"
+	. "github.com/QUIC-Tracker/quic-tracker"
 )
 
 type TLSStatus struct {
@@ -17,21 +16,20 @@ type TLSStatus struct {
 // DisableFrameSending. The TLSAgent will broadcast when new encryption or decryption levels are available.
 type TLSAgent struct {
 	BaseAgent
-	TLSStatus  broadcast.Broadcaster //type: TLSStatus
-	ResumptionTicket broadcast.Broadcaster //type: []byte
+	TLSStatus  Broadcaster //type: TLSStatus
+	ResumptionTicket Broadcaster //type: []byte
 	DisableFrameSending bool
 }
 
 func (a *TLSAgent) Run(conn *Connection) {
 	a.Init("TLSAgent", conn.OriginalDestinationCID)
-	a.TLSStatus = broadcast.NewBroadcaster(10)
-	a.ResumptionTicket = broadcast.NewBroadcaster(10)
+	a.TLSStatus = NewBroadcaster(10)
+	a.ResumptionTicket = NewBroadcaster(10)
 
 	encryptionLevels := []DirectionalEncryptionLevel{{EncryptionLevelHandshake, false}, {EncryptionLevelHandshake, true}, {EncryptionLevel1RTT, false}, {EncryptionLevel1RTT, true}}
 	encryptionLevelsAvailable := make(map[DirectionalEncryptionLevel]bool)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	cryptoChans := map[PNSpace]chan interface{}{
 		PNSpaceInitial:   make(chan interface{}, 1000),

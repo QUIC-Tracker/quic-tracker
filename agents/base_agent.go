@@ -80,6 +80,13 @@ func (c *ConnectionAgents) Get(name string) Agent {
 	return c.agents[name]
 }
 
+func (c *ConnectionAgents) Stop(names... string) {
+	for _, n := range names {
+		c.Get(n).Stop()
+		c.Get(n).Join()
+	}
+}
+
 func (c *ConnectionAgents) StopAll() {
 	for _, a := range c.agents {
 		a.Stop()

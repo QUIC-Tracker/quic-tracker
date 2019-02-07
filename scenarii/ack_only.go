@@ -25,8 +25,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
-	connAgents.Get("AckAgent").Stop()
-	connAgents.Get("AckAgent").Join()
+	connAgents.Stop("AckAgent")
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 

@@ -30,10 +30,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	<-time.NewTimer(3 * time.Second).C // Wait some time before migrating
 
-	connAgents.Get("SocketAgent").Stop()
-	connAgents.Get("SendingAgent").Stop()
-	connAgents.Get("SocketAgent").Join()
-	connAgents.Get("SendingAgent").Join()
+	connAgents.Stop("SocketAgent", "SendingAgent")
 
 	newUdpConn, err := qt.EstablishUDPConnection(conn.Host)
 	if err != nil {

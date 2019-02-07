@@ -66,8 +66,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 	}
 
 	connAgents = agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
-	connAgents.Get("RecoveryAgent").Stop()
-	connAgents.Get("RecoveryAgent").Join()
+	connAgents.Stop("RecoveryAgent")
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
 	defer connAgents.CloseConnection(false, 0, "")

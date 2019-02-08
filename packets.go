@@ -186,7 +186,7 @@ func (p *FramePacket) ShouldBeAcknowledged() bool {
 func (p *FramePacket) EncodePayload() []byte {
 	buffer := new(bytes.Buffer)
 	for _, frame := range p.Frames {
-		frame.writeTo(buffer)
+		frame.WriteTo(buffer)
 	}
 	return buffer.Bytes()
 }

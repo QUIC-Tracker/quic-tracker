@@ -42,6 +42,8 @@ type Connection struct {
 	EncryptionLevelsAvailable Broadcaster //type: DirectionalEncryptionLevel
 	FrameQueue                Broadcaster //type: QueuedFrame
 
+	PreparePacket 			  Broadcaster //type: EncryptionLevel
+
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
 	DestinationCID         ConnectionID
@@ -282,6 +284,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.UnprocessedPayloads = NewBroadcaster(1000)
 	c.EncryptionLevelsAvailable = NewBroadcaster(10)
 	c.FrameQueue = NewBroadcaster(1000)
+	c.PreparePacket = NewBroadcaster(1000)
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 

@@ -58,6 +58,7 @@ func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trac
 	connAgents := agents.AttachAgentsToConnection(conn, append(agents.GetDefaultAgents(), additionalAgents...)...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
+	connAgents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = connAgents.GetFrameProducingAgents()
 
 	handshakeStatus := handshakeAgent.HandshakeStatus.RegisterNewChan(10)
 	handshakeAgent.InitiateHandshake()

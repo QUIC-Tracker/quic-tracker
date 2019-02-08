@@ -37,6 +37,7 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	handshakeAgent.IgnoreRetry = true
 	connAgents.Add(handshakeAgent)
 	handshakeStatus := handshakeAgent.HandshakeStatus.RegisterNewChan(10)
+	connAgents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = connAgents.GetFrameProducingAgents()
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 	outgoingPackets := conn.OutgoingPackets.RegisterNewChan(1000)

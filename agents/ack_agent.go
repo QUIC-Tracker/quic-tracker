@@ -7,14 +7,15 @@ import (
 // The AckAgent is in charge of queuing ACK frames in response to receiving packets that need to be acknowledged as well
 // as answering to PATH_CHALLENGE frames. Both can be disabled independently for a finer control on its behaviour.
 type AckAgent struct {
-	BaseAgent
-	DisableAcks 		map[PNSpace]bool
-	TotalDataAcked 	    map[PNSpace]uint64
+	FrameProducingAgent
+	DisableAcks         map[PNSpace]bool
+	TotalDataAcked      map[PNSpace]uint64
 	DisablePathResponse bool
 }
 
 func (a *AckAgent) Run(conn *Connection) {
-	a.Init("AckAgent", conn.OriginalDestinationCID)
+	a.BaseAgent.Init("AckAgent", conn.OriginalDestinationCID)
+	a.FrameProducingAgent.InitFPA(conn)
 	a.DisableAcks = make(map[PNSpace]bool)
 	a.TotalDataAcked = make(map[PNSpace]uint64)
 
@@ -32,7 +33,7 @@ func (a *AckAgent) Run(conn *Connection) {
 					for _, number := range conn.AckQueue[p.PNSpace()] {
 						if number == pn {
 							a.Logger.Printf("Received duplicate packet number %d in PN space %s\n", pn, p.PNSpace().String())
-							// TODO: This should be flagged somewhere
+							// TODO: This should be flagged somewhere, and placed in a more general ErrorAgent
 						}
 					}
 
@@ -44,10 +45,20 @@ func (a *AckAgent) Run(conn *Connection) {
 						}
 					}
 
-					if !a.DisableAcks[p.PNSpace()] && p.ShouldBeAcknowledged()  {
-						conn.FrameQueue.Submit(QueuedFrame{conn.GetAckFrame(p.PNSpace()), p.EncryptionLevel()})
-						a.TotalDataAcked[p.PNSpace()] += uint64(len(p.Encode(p.EncodePayload())))
+					if !a.DisableAcks[p.PNSpace()] && p.ShouldBeAcknowledged() {
+						a.conn.PreparePacket.Submit(p.EncryptionLevel())
+						a.TotalDataAcked[p.PNSpace()] += uint64(len(p.Encode(p.EncodePayload()))) // TODO: See following todo
 					}
+				}
+			case args := <-a.requestFrame: // TODO: Keep track of the ACKs and their packet to shorten the ack blocks once received by the peer
+				f := conn.GetAckFrame(EncryptionLevelToPNSpace[args.level])
+				if f != nil && args.availableSpace >= int(f.FrameLength()) {
+					a.frames <- []Frame{f}
+				} else if f != nil {
+					a.conn.PreparePacket.Submit(args.level)
+					a.frames <- nil
+				} else {
+					a.frames <- nil
 				}
 			case <-a.close:
 				return

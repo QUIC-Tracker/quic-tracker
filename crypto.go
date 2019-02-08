@@ -41,6 +41,16 @@ var encryptionLevelToString = map[EncryptionLevel]string {
 	EncryptionLevelBestAppData: "BestAppData",
 }
 
+var EncryptionLevelToPNSpace = map[EncryptionLevel]PNSpace {
+	EncryptionLevelNone: PNSpaceNoSpace,
+	EncryptionLevelInitial: PNSpaceInitial,
+	EncryptionLevelHandshake: PNSpaceHandshake,
+	EncryptionLevel0RTT: PNSpaceAppData,
+	EncryptionLevel1RTT: PNSpaceAppData,
+	EncryptionLevelBest: PNSpaceNoSpace,
+	EncryptionLevelBestAppData: PNSpaceAppData,
+}
+
 var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{
 	Initial: EncryptionLevelInitial,
 	Retry: EncryptionLevelNone,

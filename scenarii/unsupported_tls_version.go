@@ -26,6 +26,7 @@ func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace
 	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
+	connAgents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = connAgents.GetFrameProducingAgents()
 	defer connAgents.StopAll()
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)

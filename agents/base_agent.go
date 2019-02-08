@@ -8,11 +8,11 @@
 package agents
 
 import (
+	"encoding/hex"
+	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"log"
 	"os"
-	"fmt"
-	"encoding/hex"
 	"time"
 )
 
@@ -22,6 +22,12 @@ type Agent interface {
 	Run(conn *Connection)
 	Stop()
 	Join()
+}
+
+type RequestFrameArgs struct {
+	availableSpace int
+	level  EncryptionLevel
+	number PacketNumber
 }
 
 // All agents should embed this structure
@@ -34,7 +40,7 @@ type BaseAgent struct {
 
 func (a *BaseAgent) Name() string { return a.name }
 
-// All agents that embed this structure must call Init() as soon as their Run() method is called
+// All agents that embed this structure must call InitFPA() as soon as their Run() method is called
 func (a *BaseAgent) Init(name string, ODCID ConnectionID) {
 	a.name = name
 	a.Logger = log.New(os.Stderr, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(ODCID), a.Name()), log.Lshortfile)
@@ -54,6 +60,37 @@ func (a *BaseAgent) Stop() {
 func (a *BaseAgent) Join() {
 	<-a.closed
 }
+
+type FrameProducer interface {
+	RequestFrames(availableSpace int, level EncryptionLevel, number PacketNumber) ([]Frame, bool)
+}
+
+type FrameProducingAgent struct {
+	BaseAgent
+	conn         *Connection
+	requestFrame chan RequestFrameArgs
+	frames       chan []Frame
+}
+
+func (a *FrameProducingAgent) InitFPA(conn *Connection) {
+	a.conn = conn
+	a.requestFrame = make(chan RequestFrameArgs)
+	a.frames = make(chan []Frame)
+}
+
+func (a *FrameProducingAgent) RequestFrames(availableSpace int, level EncryptionLevel, number PacketNumber) ([]Frame, bool) {
+	select {
+	case a.requestFrame <- RequestFrameArgs{availableSpace, level, number}:
+		select {
+		case f := <-a.frames:
+			return f, true
+		}
+	case <-a.close:
+		return nil, false
+	}
+}
+
+func (a *FrameProducingAgent) Run(conn *Connection) {}
 
 // Represents a set of agents that are attached to a particular connection
 type ConnectionAgents struct {
@@ -78,6 +115,16 @@ func (c *ConnectionAgents) Add(agent Agent) {
 
 func (c *ConnectionAgents) Get(name string) Agent {
 	return c.agents[name]
+}
+
+func (c *ConnectionAgents) GetFrameProducingAgents() []FrameProducer {
+	var agents []FrameProducer
+	for _, a := range c.agents {
+		if fpa, ok := a.(FrameProducer); ok {
+			agents = append(agents, fpa)
+		}
+	}
+	return agents
 }
 
 func (c *ConnectionAgents) Stop(names... string) {
@@ -114,5 +161,6 @@ func GetDefaultAgents() []Agent {
 		&SendingAgent{MTU: 1200},
 		&RecoveryAgent{TimerValue: 500 * time.Millisecond},
 		&RTTAgent{},
+		&FrameQueueAgent{},
 	}
 }

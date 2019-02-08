@@ -11,7 +11,7 @@ import (
 
 type Frame interface {
 	FrameType() FrameType
-	writeTo(buffer *bytes.Buffer)
+	WriteTo(buffer *bytes.Buffer)
 	shouldBeRetransmitted() bool
 	FrameLength() uint16
 }
@@ -102,7 +102,7 @@ const (
 type PaddingFrame byte
 
 func (frame PaddingFrame) FrameType() FrameType { return PaddingFrameType }
-func (frame PaddingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame PaddingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
 func (frame PaddingFrame) shouldBeRetransmitted() bool { return false }
@@ -115,7 +115,7 @@ func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 type PingFrame byte
 
 func (frame PingFrame) FrameType() FrameType { return PingType }
-func (frame PingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame PingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
 func (frame PingFrame) shouldBeRetransmitted() bool { return false }
@@ -139,7 +139,7 @@ type AckBlock struct {
 
 func (frame AckFrame) FrameType() FrameType        { return AckType }
 func (frame AckFrame) shouldBeRetransmitted() bool { return false }
-func (frame AckFrame) writeTo(buffer *bytes.Buffer) {
+func (frame AckFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
 	WriteVarInt(buffer, frame.AckDelay)
@@ -214,8 +214,8 @@ type AckECNFrame struct {
 }
 
 func (frame AckECNFrame) FrameType() FrameType { return AckECNType }
-func (frame AckECNFrame) writeTo(buffer *bytes.Buffer) {
-	frame.AckFrame.writeTo(buffer)
+func (frame AckECNFrame) WriteTo(buffer *bytes.Buffer) {
+	frame.AckFrame.WriteTo(buffer)
 	WriteVarInt(buffer, frame.ECT0Count)
 	WriteVarInt(buffer, frame.ECT1Count)
 	WriteVarInt(buffer, frame.ECTCECount)
@@ -238,7 +238,7 @@ type ResetStream struct {
 }
 
 func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
-func (frame ResetStream) writeTo(buffer *bytes.Buffer) {
+func (frame ResetStream) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	binary.Write(buffer, binary.BigEndian, frame.ApplicationErrorCode)
@@ -261,7 +261,7 @@ type StopSendingFrame struct {
 }
 
 func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
-func (frame StopSendingFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StopSendingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	binary.Write(buffer, binary.BigEndian, frame.ApplicationErrorCode)
@@ -283,7 +283,7 @@ type CryptoFrame struct {
 }
 
 func (frame CryptoFrame) FrameType() FrameType { return CryptoType }
-func (frame CryptoFrame) writeTo(buffer *bytes.Buffer) {
+func (frame CryptoFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.Offset)
 	WriteVarInt(buffer, frame.Length)
@@ -313,7 +313,7 @@ type NewTokenFrame struct {
 }
 
 func (frame NewTokenFrame) FrameType() FrameType { return NewTokenType }
-func (frame NewTokenFrame) writeTo(buffer *bytes.Buffer) {
+func (frame NewTokenFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(len(frame.Token)))
 	buffer.Write(frame.Token)
@@ -341,7 +341,7 @@ type StreamFrame struct {
 }
 
 func (frame StreamFrame) FrameType() FrameType { return StreamType }
-func (frame StreamFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamFrame) WriteTo(buffer *bytes.Buffer) {
 	typeByte := uint64(frame.FrameType())
 	if frame.FinBit {
 		typeByte |= 0x01
@@ -416,7 +416,7 @@ type MaxDataFrame struct {
 }
 
 func (frame MaxDataFrame) FrameType() FrameType { return MaxDataType }
-func (frame MaxDataFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxDataFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.MaximumData)
 }
@@ -435,7 +435,7 @@ type MaxStreamDataFrame struct {
 }
 
 func (frame MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
-func (frame MaxStreamDataFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxStreamDataFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.MaximumStreamData)
@@ -462,7 +462,7 @@ func (frame MaxStreamsFrame) FrameType() FrameType {
 		return MaxStreamsType + 1
 	}
 }
-func (frame MaxStreamsFrame) writeTo(buffer *bytes.Buffer) {
+func (frame MaxStreamsFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.MaximumStreams)
 }
@@ -482,7 +482,7 @@ type DataBlockedFrame struct {
 }
 
 func (frame DataBlockedFrame) FrameType() FrameType { return DataBlockedType }
-func (frame DataBlockedFrame) writeTo(buffer *bytes.Buffer) {
+func (frame DataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.DataLimit)
 }
@@ -501,7 +501,7 @@ type StreamDataBlockedFrame struct {
 }
 
 func (frame StreamDataBlockedFrame) FrameType() FrameType { return StreamDataBlockedType }
-func (frame StreamDataBlockedFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamDataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.StreamDataLimit)
@@ -528,7 +528,7 @@ func (frame StreamsBlockedFrame) FrameType() FrameType {
 		return StreamsBlockedType + 1
 	}
 }
-func (frame StreamsBlockedFrame) writeTo(buffer *bytes.Buffer) {
+func (frame StreamsBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamLimit)
 }
@@ -551,7 +551,7 @@ type NewConnectionIdFrame struct {
 }
 
 func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
-func (frame NewConnectionIdFrame) writeTo(buffer *bytes.Buffer) {
+func (frame NewConnectionIdFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.Sequence)
 	buffer.WriteByte(frame.Length)
@@ -576,7 +576,7 @@ type RetireConnectionId struct {
 }
 
 func (frame RetireConnectionId) FrameType() FrameType { return RetireConnectionIdType }
-func (frame RetireConnectionId) writeTo(buffer *bytes.Buffer) {
+func (frame RetireConnectionId) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.SequenceNumber)
 }
@@ -594,7 +594,7 @@ type PathChallenge struct {
 }
 
 func (frame PathChallenge) FrameType() FrameType { return PathChallengeType }
-func (frame PathChallenge) writeTo(buffer *bytes.Buffer) {
+func (frame PathChallenge) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	buffer.Write(frame.Data[:])
 }
@@ -612,7 +612,7 @@ type PathResponse struct {
 }
 
 func (frame PathResponse) FrameType() FrameType { return PathResponseType }
-func (frame PathResponse) writeTo(buffer *bytes.Buffer) {
+func (frame PathResponse) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	buffer.Write(frame.Data[:])
 }
@@ -638,7 +638,7 @@ type ConnectionCloseFrame struct {
 }
 
 func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
-func (frame ConnectionCloseFrame) writeTo(buffer *bytes.Buffer) {
+func (frame ConnectionCloseFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	binary.Write(buffer, binary.BigEndian, frame.ErrorCode)
 	WriteVarInt(buffer, frame.ErrorFrameType)
@@ -671,7 +671,7 @@ type ApplicationCloseFrame struct {
 }
 
 func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
-func (frame ApplicationCloseFrame) writeTo(buffer *bytes.Buffer) {
+func (frame ApplicationCloseFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	binary.Write(buffer, binary.BigEndian, frame.errorCode)
 	WriteVarInt(buffer, frame.reasonPhraseLength)

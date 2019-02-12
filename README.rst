@@ -20,7 +20,7 @@ openssl headers installed before starting.
 
 ::
 
-    go get github.com/QUIC-Tracker/quic-tracker  # This will fail because of the missing dependencies that should be build using the 4 lines below
+    go get -u github.com/QUIC-Tracker/quic-tracker  # This will fail because of the missing dependencies that should be build using the 4 lines below
     cd $GOPATH/src/github.com/mpiraux/pigotls
     make
     cd $GOPATH/src/github.com/mpiraux/ls-qpack-go

@@ -152,6 +152,7 @@ func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint16, rea
 
 // Returns the agents needed for a basic QUIC connection to operate
 func GetDefaultAgents() []Agent {
+	fc := &FlowControlAgent{}
 	return []Agent{
 		&SocketAgent{},
 		&ParsingAgent{},
@@ -162,5 +163,7 @@ func GetDefaultAgents() []Agent {
 		&RecoveryAgent{TimerValue: 500 * time.Millisecond},
 		&RTTAgent{},
 		&FrameQueueAgent{},
+		fc,
+		&StreamAgent{FlowControlAgent: fc},
 	}
 }

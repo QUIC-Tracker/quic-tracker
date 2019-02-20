@@ -396,18 +396,15 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 
 	return frame
 }
-func NewStreamFrame(streamId uint64, stream *Stream, data []byte, finBit bool) *StreamFrame {
+func NewStreamFrame(streamId, offset uint64, data []byte, finBit bool) *StreamFrame {
 	frame := new(StreamFrame)
 	frame.StreamId = streamId
 	frame.FinBit = finBit
 	frame.LenBit = true
-	frame.Offset = stream.WriteOffset
+	frame.Offset = offset
 	frame.OffBit = frame.Offset > 0
 	frame.Length = uint64(len(data))
 	frame.StreamData = data
-	stream.WriteOffset += uint64(frame.Length)
-	stream.WriteData = append(stream.WriteData, data...)
-	stream.WriteClosed = frame.FinBit
 	return frame
 }
 
@@ -486,7 +483,7 @@ func (frame DataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.DataLimit)
 }
-func (frame DataBlockedFrame) shouldBeRetransmitted() bool { return true }
+func (frame DataBlockedFrame) shouldBeRetransmitted() bool { return false }
 func (frame DataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.DataLimit)) }
 func NewBlockedFrame(buffer *bytes.Reader) *DataBlockedFrame {
 	frame := new(DataBlockedFrame)
@@ -506,7 +503,7 @@ func (frame StreamDataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.StreamDataLimit)
 }
-func (frame StreamDataBlockedFrame) shouldBeRetransmitted() bool { return true }
+func (frame StreamDataBlockedFrame) shouldBeRetransmitted() bool { return false }
 func (frame StreamDataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.StreamDataLimit)) }
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamDataBlockedFrame {
 	frame := new(StreamDataBlockedFrame)
@@ -532,7 +529,7 @@ func (frame StreamsBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamLimit)
 }
-func (frame StreamsBlockedFrame) shouldBeRetransmitted() bool { return true }
+func (frame StreamsBlockedFrame) shouldBeRetransmitted() bool { return false }
 func (frame StreamsBlockedFrame) IsUni() bool                 { return frame.StreamsType == UniStreams }
 func (frame StreamsBlockedFrame) IsBidi() bool                { return frame.StreamsType == BidiStreams }
 func (frame StreamsBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamLimit)) }

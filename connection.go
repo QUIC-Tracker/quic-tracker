@@ -41,8 +41,10 @@ type Connection struct {
 	UnprocessedPayloads       Broadcaster //type: UnprocessedPayload
 	EncryptionLevelsAvailable Broadcaster //type: DirectionalEncryptionLevel
 	FrameQueue                Broadcaster //type: QueuedFrame
+	TransportParameters       Broadcaster //type: QuicTransportParameters
 
 	PreparePacket 			  Broadcaster //type: EncryptionLevel
+	StreamInput               Broadcaster //type: StreamInput
 
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
@@ -211,7 +213,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
 	c.CryptoStreams = make(map[PNSpace]*Stream)
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
-	c.Streams = make(map[uint64]*Stream)
+	c.Streams = Streams{make(map[uint64]*Stream), &c.StreamInput}
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
 	if quicLayer {
@@ -220,8 +222,8 @@ func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhras
 		c.FrameQueue.Submit(QueuedFrame{&ApplicationCloseFrame{errCode, uint64(len(reasonPhrase)), reasonPhrase}, EncryptionLevelBest})
 	}
 }
-func (c *Connection) SendHTTPGETRequest(path string, streamID uint64) {
-	c.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, c.Streams.Get(streamID), []byte(fmt.Sprintf("GET %s\r\n", path)), true), EncryptionLevelBestAppData})
+func (c *Connection) SendHTTP09GETRequest(path string, streamID uint64) {
+	c.Streams.Send(streamID, []byte(fmt.Sprintf("GET %s\r\n", path)), true)
 }
 func (c *Connection) Close() {
 	c.Tls.Close()
@@ -284,7 +286,9 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.UnprocessedPayloads = NewBroadcaster(1000)
 	c.EncryptionLevelsAvailable = NewBroadcaster(10)
 	c.FrameQueue = NewBroadcaster(1000)
+	c.TransportParameters = NewBroadcaster(10)
 	c.PreparePacket = NewBroadcaster(1000)
+	c.StreamInput = NewBroadcaster(1000)
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 

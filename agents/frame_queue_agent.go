@@ -122,7 +122,6 @@ func (a *FrameQueueAgent) Run(conn *Connection) {
 				a.Logger.Printf("Received a 0x%02x frame for encryption level %s\n", qf.FrameType(), qf.EncryptionLevel)
 				conn.PreparePacket.Submit(qf.EncryptionLevel)
 			case args := <-a.requestFrame:
-				a.Logger.Printf("Request frame {len=%d, enc=%s, pn=%d}\n", args.availableSpace, args.level.String(), args.number)
 				var frames []Frame
 				buffer := frameBuffer[args.level]
 				var i interface{}

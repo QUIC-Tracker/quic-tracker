@@ -36,14 +36,14 @@ func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	for i := uint64(0); i < conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
-		conn.SendHTTPGETRequest(preferredUrl, uint64(i*4))
+		conn.SendHTTP09GETRequest(preferredUrl, uint64(i*4))
 	}
 
 forLoop:
 	for {
 		select {
 		case <-incPackets:
-			for _, stream := range conn.Streams {
+			for _, stream := range conn.Streams.GetAll() {
 				if !stream.ReadClosed {
 					allClosed = false
 					break
@@ -60,7 +60,7 @@ forLoop:
 	}
 
 	allClosed = true
-	for streamId, stream := range conn.Streams {
+	for streamId, stream := range conn.Streams.GetAll() {
 		if streamId != 0 && !stream.ReadClosed {
 			allClosed = false
 			break
@@ -69,7 +69,7 @@ forLoop:
 
 	if !allClosed {
 		trace.ErrorCode = MS_NotAllStreamsWereClosed
-		for streamId, stream := range conn.Streams {
+		for streamId, stream := range conn.Streams.GetAll() {
 			trace.Results[fmt.Sprintf("stream_%d_rec_offset", streamId)] = stream.ReadOffset
 			trace.Results[fmt.Sprintf("stream_%d_snd_offset", streamId)] = stream.WriteOffset
 			trace.Results[fmt.Sprintf("stream_%d_snd_closed", streamId)] = stream.WriteClosed

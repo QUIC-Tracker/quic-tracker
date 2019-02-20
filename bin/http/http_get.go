@@ -77,7 +77,7 @@ func main() {
 	}
 
 	defer conn.CloseConnection(false, 0, "")
-	conn.FrameQueue.Submit(m.QueuedFrame{m.NewStreamFrame(4, conn.Streams.Get(4), []byte(fmt.Sprintf("GET %s\r\n", *url)), true), m.EncryptionLevel1RTT})
+	conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
 
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)
@@ -85,8 +85,8 @@ func main() {
 	for {
 		select {
 		case <-incomingPackets:
-			if conn.Streams.Get(4).ReadClosed {
-				spew.Dump(conn.Streams.Get(4).ReadData)
+			if conn.Streams.Get(0).ReadClosed {
+				spew.Dump(conn.Streams.Get(0).ReadData)
 				break
 			}
 		case <-t.C:

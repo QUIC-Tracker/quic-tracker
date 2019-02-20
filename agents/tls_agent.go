@@ -111,6 +111,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 							if err != nil {
 								a.Logger.Printf("Failed to decode extension data: %s\n", err.Error())
 							}
+							conn.TransportParameters.Submit(*conn.TLSTPHandler.ReceivedParameters)
 							a.TLSStatus.Submit(TLSStatus{true, packet, err})
 						}
 

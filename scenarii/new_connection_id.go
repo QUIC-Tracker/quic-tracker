@@ -77,7 +77,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
 						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{ 1, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
-						conn.SendHTTPGETRequest(preferredUrl, 0)
+						conn.SendHTTP09GETRequest(preferredUrl, 0)
 						expectingResponse = true
 					}
 				}

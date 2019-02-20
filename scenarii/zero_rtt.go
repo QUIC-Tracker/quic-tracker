@@ -84,7 +84,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 
 	// TODO: Handle stateless connection
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)  // TODO: Verify that this get sent in a 0-RTT packet
+	conn.SendHTTP09GETRequest(preferredUrl, 0) // TODO: Verify that this get sent in a 0-RTT packet
 
 	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	for {
@@ -95,7 +95,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 					if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {
 						return
 					}
-					conn.SendHTTPGETRequest(preferredUrl, 0)
+					conn.SendHTTP09GETRequest(preferredUrl, 0)
 				}
 				if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0

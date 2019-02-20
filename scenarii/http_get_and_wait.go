@@ -46,7 +46,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, pre
 	errors := make(map[uint8]string)
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredUrl, 0)
 
 	var connectionCloseReceived bool
 

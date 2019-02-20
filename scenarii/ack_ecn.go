@@ -42,7 +42,7 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl 
 		return
 	}
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredUrl, 0)
 
 	trace.ErrorCode = AE_NonECN
 	for {

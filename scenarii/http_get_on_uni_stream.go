@@ -41,7 +41,7 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 		trace.ErrorCode = GS2_DidNotCloseTheConnection
 	}
 
-	conn.SendHTTPGETRequest(preferredUrl, 2)
+	conn.SendHTTP09GETRequest(preferredUrl, 2)
 
 	for {
 		select {

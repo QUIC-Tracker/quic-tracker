@@ -51,7 +51,12 @@ func (a *AckAgent) Run(conn *Connection) {
 					}
 				}
 			case args := <-a.requestFrame: // TODO: Keep track of the ACKs and their packet to shorten the ack blocks once received by the peer
-				f := conn.GetAckFrame(EncryptionLevelToPNSpace[args.level])
+				pnSpace := EncryptionLevelToPNSpace[args.level]
+				if a.DisableAcks[pnSpace] || args.level == EncryptionLevelBest || args.level == EncryptionLevelBestAppData {
+					a.frames <- nil
+					break
+				}
+				f := conn.GetAckFrame(pnSpace)
 				if f != nil && args.availableSpace >= int(f.FrameLength()) {
 					a.frames <- []Frame{f}
 				} else if f != nil {

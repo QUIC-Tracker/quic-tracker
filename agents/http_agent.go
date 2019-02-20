@@ -73,7 +73,7 @@ func (a *HTTPAgent) Run(conn *Connection) {
 	a.peerControlStreamID = HTTPNoStream
 	peerControlStream := make(chan interface{}, 1000)
 	peerControlStreamBuffer := new(bytes.Buffer)
-	a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(a.controlStreamID, conn.Streams.Get(a.controlStreamID), []byte{'C'}, false), EncryptionLevelBestAppData})
+	a.conn.Streams.Send(a.controlStreamID, []byte{'C'}, false)
 	a.sendFrameOnStream(http3.NewSETTINGS(nil), a.controlStreamID, false)
 
 	a.streamData = make(chan streamData)
@@ -182,7 +182,7 @@ func (a *HTTPAgent) Run(conn *Connection) {
 func (a *HTTPAgent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64, fin bool) {
 	buf := new(bytes.Buffer)
 	frame.WriteTo(buf)
-	a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamID, a.conn.Streams.Get(streamID), buf.Bytes(), fin), EncryptionLevelBestAppData})
+	a.conn.Streams.Send(streamID, buf.Bytes(), fin)
 }
 func (a *HTTPAgent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 	var l VarInt

@@ -38,7 +38,7 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderWrite = oldState.HeaderWrite
 	conn.KeyPhaseIndex++
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredUrl, 0)
 
 	<-s.Timeout().C
 

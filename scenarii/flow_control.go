@@ -2,6 +2,7 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
 
 	"time"
 )
@@ -30,11 +31,12 @@ func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	if connAgents == nil {
 		return
 	}
+	connAgents.Get("FlowControlAgent").(*agents.FlowControlAgent).DontSlideCreditWindow = true
 	defer connAgents.CloseConnection(false, 0, "")
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredUrl, 0)
 
 	var shouldResume bool
 

@@ -194,6 +194,7 @@ func Uint16ToBEBytes(uint16 uint16) []byte {
 }
 
 func Max(a, b int) int { if a < b { return b }; return a}
+func Min(a, b int) int { if a > b { return b }; return a}
 
 type PacketNumberQueue []PacketNumber
 func (a PacketNumberQueue) Less(i, j int) bool { return a[i] > a[j] }

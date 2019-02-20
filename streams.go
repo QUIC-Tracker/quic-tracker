@@ -12,22 +12,82 @@ const (
 	UniStreams              = true
 )
 
-type Streams map[uint64]*Stream
-
-func (s Streams) Get(streamId uint64) *Stream {  // TODO: This should enforce limits regarding stream ids
-	if s[streamId] == nil {
-		s[streamId] = NewStream()
+func (s StreamsType) String() string {
+	if s == BidiStreams {
+		return "bidirectional streams"
 	}
-	return s[streamId]
+	return "unidirectional streams"
 }
+
+func IsBidi(streamId uint64) bool   { return streamId&2 == 0 }
+func IsUni(streamId uint64) bool    { return streamId&2 == 1 }
+func IsClient(streamId uint64) bool { return streamId&1 == 0 }
+func IsServer(streamId uint64) bool { return streamId&1 == 1 }
+
+func IsBidiClient(streamId uint64) bool { return IsBidi(streamId) && IsClient(streamId) }
+func IsBidiServer(streamId uint64) bool { return IsBidi(streamId) && IsServer(streamId) }
+func IsUniClient(streamId uint64) bool  { return IsUni(streamId) && IsClient(streamId) }
+func IsUniServer(streamId uint64) bool  { return IsUni(streamId) && IsServer(streamId) }
+
+func GetMaxBidiClient(limit uint64) uint64 { return 0 + limit*4 }
+func GetMaxBidiServer(limit uint64) uint64 { return 1 + limit*4 }
+func GetMaxUniClient(limit uint64) uint64  { return 2 + limit*4 }
+func GetMaxUniServer(limit uint64) uint64  { return 3 + limit*4 }
+
+type StreamInput struct {
+	StreamId     uint64
+	Data         []byte
+	Close        bool
+	Reset        bool
+	StopSending  bool
+	AppErrorCode uint16
+}
+
+type Streams struct {
+	streams map[uint64]*Stream
+	input *Broadcaster
+}
+
+func (s Streams) Get(streamId uint64) *Stream {
+	if s.streams[streamId] == nil {
+		s.streams[streamId] = NewStream()
+	}
+	return s.streams[streamId]
+}
+
+func (s Streams) GetAll() map[uint64]*Stream {
+	return s.streams
+}
+
+func (s Streams) Has(streamId uint64) (*Stream, bool) {
+	a, b := s.streams[streamId]
+	return a, b
+}
+
 func (s Streams) NumberOfServerStreamsOpen() int {
 	count := 0
-	for streamID, _ := range s {
-		if streamID % 2 == 1 {
+	for streamID, _ := range s.streams {
+		if streamID%2 == 1 {
 			count++
 		}
 	}
 	return count
+}
+
+func (s Streams) Close(streamId uint64) {
+	s.input.Submit(StreamInput{StreamId: streamId, Data: nil, Close: true})
+}
+
+func (s Streams) Reset(streamId uint64, appErrorCode uint16) {
+	s.input.Submit(StreamInput{StreamId: streamId, AppErrorCode: appErrorCode, Reset: true})
+}
+
+func (s Streams) StopSending(streamId uint64, appErrorCode uint16) {
+	s.input.Submit(StreamInput{StreamId: streamId, AppErrorCode: appErrorCode, StopSending: true})
+}
+
+func (s Streams) Send(streamId uint64, data []byte, close bool) {
+	s.input.Submit(StreamInput{StreamId: streamId, Data: data, Close: close})
 }
 
 type CryptoStreams map[PNSpace]*Stream
@@ -44,17 +104,21 @@ type Stream struct {
 	ReadOffset  uint64
 	WriteOffset uint64
 
+	ReadLimit        uint64
+	ReadBufferOffset uint64
+	WriteLimit       uint64
+	WriteReserved    uint64
+
 	ReadData  []byte
 	WriteData []byte
 
-	ReadChan Broadcaster
-	MaxReadReceived uint64
-	gaps *byteIntervalList
+	ReadChan        Broadcaster
+	maxReadReceived uint64
+	gaps            *byteIntervalList
 
-	ReadClosed bool
-	ReadCloseOffset uint64
-
-	WriteClosed bool
+	ReadClosed       bool
+	ReadCloseOffset  uint64
+	WriteClosed      bool
 	WriteCloseOffset uint64
 
 	readFeedback chan interface{}
@@ -68,33 +132,35 @@ func NewStream() *Stream {
 	s.gaps = NewbyteIntervalList().Init()
 	s.ReadCloseOffset = math.MaxUint64
 	s.WriteCloseOffset = math.MaxUint64
+	s.ReadLimit = math.MaxUint64
+	s.WriteLimit = math.MaxUint64
 	return s
 }
 
-func (s *Stream) addToRead(f *StreamFrame) {  // TODO: Flag implementations that retransmit different data for a given offset
+func (s *Stream) addToRead(f *StreamFrame) { // TODO: Flag implementations that retransmit different data for a given offset
 	if f.Offset > s.ReadCloseOffset {
 		// TODO: report this: write past fin bit
 	}
 	if f.FinBit {
-		if s.ReadCloseOffset != math.MaxUint64 && s.ReadCloseOffset != f.Offset + f.Length {
+		if s.ReadCloseOffset != math.MaxUint64 && s.ReadCloseOffset != f.Offset+f.Length {
 			// TODO: report this: new fin bit offset
 		} else {
 			s.ReadCloseOffset = f.Offset + f.Length
 		}
 	}
 
-	if f.Offset == s.ReadOffset && f.Offset == s.MaxReadReceived {
+	if f.Offset == s.ReadOffset && f.Offset == s.maxReadReceived {
 		s.ReadOffset += f.Length
-		s.MaxReadReceived = s.ReadOffset
+		s.maxReadReceived = s.ReadOffset
 		s.ReadData = append(s.ReadData, f.StreamData...)
 		s.ReadChan.Submit(f.StreamData)
-		<-s.readFeedback  // Makes sure it propagates before returning
-	} else if f.Offset + f.Length > s.MaxReadReceived {
-		if s.MaxReadReceived < f.Offset {
-			s.gaps.Add(byteInterval{s.MaxReadReceived, f.Offset})
+		<-s.readFeedback // Makes sure it propagates before returning
+	} else if f.Offset+f.Length > s.maxReadReceived {
+		if s.maxReadReceived < f.Offset {
+			s.gaps.Add(byteInterval{s.maxReadReceived, f.Offset})
 		}
-		s.MaxReadReceived = f.Offset + f.Length
-		newSlice := make([]byte, int(f.Offset) + len(f.StreamData), int(f.Offset) + len(f.StreamData))
+		s.maxReadReceived = f.Offset + f.Length
+		newSlice := make([]byte, int(f.Offset)+len(f.StreamData), int(f.Offset)+len(f.StreamData))
 		copy(newSlice, s.ReadData)
 		copy(newSlice[f.Offset:int(f.Offset)+len(f.StreamData)], f.StreamData)
 		s.ReadData = newSlice
@@ -110,7 +176,7 @@ func (s *Stream) addToRead(f *StreamFrame) {  // TODO: Flag implementations that
 
 		if s.ReadOffset < firstGap {
 			s.ReadChan.Submit(s.ReadData[s.ReadOffset:firstGap])
-			<-s.readFeedback  // Makes sure it propagates before returning
+			<-s.readFeedback // Makes sure it propagates before returning
 			s.ReadOffset = firstGap
 		}
 	}
@@ -396,20 +462,20 @@ type byteInterval struct {
 	end   uint64
 }
 
-func (b byteInterval) In(offset uint64) bool { return b.start <= offset && offset <= b.end }
+func (b byteInterval) In(offset uint64) bool        { return b.start <= offset && offset <= b.end }
 func (b byteInterval) IsBefore(o byteInterval) bool { return b.end <= o.start }
 func (b byteInterval) Overlap(o byteInterval) bool {
-	return 	(o.start <= b.end && o.end >= b.end) ||
-			(b.start <= o.end && b.end >= o.end) ||
-			(b.start <= o.start && b.end >= o.end) ||
-			(o.start <= b.start && o.end >= b.end)
+	return (o.start <= b.end && o.end >= b.end) ||
+		(b.start <= o.end && b.end >= o.end) ||
+		(b.start <= o.start && b.end >= o.end) ||
+		(o.start <= b.start && o.end >= b.end)
 }
 func (b byteInterval) Merge(o byteInterval) byteInterval {
 	return byteInterval{min(b.start, o.start), max(b.end, o.end)}
 }
 func (b byteInterval) Exclude(o byteInterval) []byteInterval {
 	if o.start > b.start && o.end < b.end {
-		return []byteInterval{{b.start, o.start - 1},{o.end + 1, b.end}}
+		return []byteInterval{{b.start, o.start - 1}, {o.end + 1, b.end}}
 	} else if o.start <= b.start && o.end < b.end {
 		return []byteInterval{{o.end, b.end}}
 	} else if o.end > b.end {

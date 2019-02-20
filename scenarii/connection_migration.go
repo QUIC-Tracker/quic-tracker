@@ -49,7 +49,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTPGETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredUrl, 0)
 	trace.ErrorCode = CM_HostDidNotMigrate // Assume it until proven wrong
 
 	for {

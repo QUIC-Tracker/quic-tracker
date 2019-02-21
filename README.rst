@@ -7,7 +7,7 @@ A test suite for QUIC
 
 
 The test suite comprises a minimal Go implementation of QUIC which is
-currently draft-16 and TLS-1.3 compatible, as well as several
+currently draft-17/18 and TLS-1.3 compatible, as well as several
 test scenarii built upon this implementation. The test suite outputs its
 result as JSON files, which contains the result, the decrypted packets
 exchanged, as well as a pcap file and exporter secrets.
@@ -26,7 +26,7 @@ openssl headers installed before starting.
     cd $GOPATH/src/github.com/mpiraux/ls-qpack-go
     make
 
-The test suite is run by the scripts in ``bin/test_suite/``. For help
+The test suite is run using the scripts in ``bin/test_suite/``. For help
 about their usage see:
 
 ::

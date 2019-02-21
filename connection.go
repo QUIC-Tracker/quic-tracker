@@ -46,6 +46,8 @@ type Connection struct {
 	PreparePacket 			  Broadcaster //type: EncryptionLevel
 	StreamInput               Broadcaster //type: StreamInput
 
+	ConnectionClosed 		  chan bool
+
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
 	DestinationCID         ConnectionID
@@ -287,6 +289,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.EncryptionLevelsAvailable = NewBroadcaster(10)
 	c.FrameQueue = NewBroadcaster(1000)
 	c.TransportParameters = NewBroadcaster(10)
+	c.ConnectionClosed = make(chan bool, 1)
 	c.PreparePacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
 

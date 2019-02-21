@@ -20,13 +20,13 @@ func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{name: "stream_opening_reordering", version: 2}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := s.CompleteHandshake(conn, trace, SOR_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
+
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
@@ -41,7 +41,19 @@ func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Tra
 	conn.SendPacket(pp2, qt.EncryptionLevel1RTT)
 	conn.SendPacket(pp1, qt.EncryptionLevel1RTT)
 
-	<-s.Timeout().C
+forLoop:
+	for {
+		select {
+		case <-incomingPackets:
+			if conn.Streams.Get(0).ReadClosed {
+				s.Finished()
+			}
+		case <-conn.ConnectionClosed:
+			break forLoop
+		case <-s.Timeout():
+			break forLoop
+		}
+	}
 
 	if !conn.Streams.Get(0).ReadClosed {
 		trace.ErrorCode = SOR_HostDidNotRespond

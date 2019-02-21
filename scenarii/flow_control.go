@@ -3,8 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
-
-	"time"
 )
 
 const (
@@ -24,7 +22,6 @@ func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{name: "flow_control", version: 2}}
 }
 func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxStreamDataBidiLocal = 80
 
 	connAgents := s.CompleteHandshake(conn, trace, FC_TLSHandshakeFailed)
@@ -51,6 +48,7 @@ forLoop:
 
 			if conn.Streams.Get(0).ReadClosed {
 				conn.IncomingPackets.Unregister(incPackets)
+				s.Finished()
 				break
 			}
 
@@ -62,8 +60,10 @@ forLoop:
 				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
 				shouldResume = true
 			}
-			case <-s.Timeout().C:
-				break forLoop
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
+			break forLoop
 		}
 	}
 

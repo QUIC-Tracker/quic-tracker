@@ -20,8 +20,6 @@ func NewAddressValidationScenario() *AddressValidationScenario {
 	return &AddressValidationScenario{AbstractScenario{name: "address_validation", version: 3}}
 }
 func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 
@@ -93,7 +91,9 @@ forLoop:
 				defer connAgents.CloseConnection(false, 0, "")
 				trace.ErrorCode = 0
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			break forLoop
 		}
 	}

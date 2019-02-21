@@ -3,7 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/mpiraux/pigotls"
-	"time"
 )
 
 const (
@@ -19,13 +18,13 @@ func NewKeyUpdateScenario() *KeyUpdateScenario {
 	return &KeyUpdateScenario{AbstractScenario{name: "key_update", version: 1}}
 }
 func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := s.CompleteHandshake(conn, trace, KU_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
+
+	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	// TODO: Move this to crypto.go
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
@@ -40,7 +39,19 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 
 	conn.SendHTTP09GETRequest(preferredUrl, 0)
 
-	<-s.Timeout().C
+forLoop:
+	for {
+		select {
+		case <-incomingPackets:
+			if conn.Streams.Get(0).ReadClosed {
+				s.Finished()
+			}
+		case <-conn.ConnectionClosed:
+			break forLoop
+		case <-s.Timeout():
+			break forLoop
+		}
+	}
 
 	if !conn.Streams.Get(0).ReadClosed {
 		trace.ErrorCode = KU_HostDidNotRespond

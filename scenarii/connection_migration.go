@@ -21,7 +21,6 @@ func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{name: "connection_migration", version: 1}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := s.CompleteHandshake(conn, trace, CM_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -43,8 +42,6 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	connAgents.Get("SocketAgent").Run(conn)
 	connAgents.Get("SendingAgent").Run(conn)
-
-	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevelHandshake, false})  // TODO: Find a way around this
 	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevel1RTT, false})
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
@@ -63,7 +60,13 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 			if fp, ok := p.(qt.Framer); ok && fp.Contains(qt.PathChallengeType) {
 				trace.ErrorCode = 0
 			}
-		case <-s.Timeout().C:
+
+			if conn.Streams.Get(0).ReadClosed {
+				s.Finished()
+			}
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

@@ -1,13 +1,12 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bytes"
 	"fmt"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"time"
-	"encoding/hex"
 	"crypto/rand"
+	"encoding/hex"
 )
 
 const (
@@ -23,12 +22,9 @@ type NewConnectionIDScenario struct {
 }
 
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
-	return &NewConnectionIDScenario{AbstractScenario{name: "new_connection_id", version: 1}}
+	return &NewConnectionIDScenario{AbstractScenario{name: "new_connection_id", version: 2}}
 }
 func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	// TODO: Flag NEW_CONNECTION_ID frames sent before TLS Handshake complete
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	connAgents := s.CompleteHandshake(conn, trace, NCI_TLSHandshakeFailed)
@@ -55,8 +51,9 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 			if expectingResponse {
 				if !bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
 					trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
-				} else {
+				} else if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0
+					s.Finished()
 				}
 				break
 			}
@@ -72,7 +69,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 
 					alternativeConnectionIDs = append(alternativeConnectionIDs, hex.EncodeToString(nci.ConnectionId))
 
-					if !expectingResponse { // TODO: Maybe we should provide CIDs in advance, see https://tools.ietf.org/rfcdiff?url2=draft-ietf-quic-transport-15.txt#part-34
+					if !expectingResponse {
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
@@ -82,7 +79,9 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 					}
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

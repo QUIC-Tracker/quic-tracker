@@ -117,6 +117,11 @@ func (c *ConnectionAgents) Get(name string) Agent {
 	return c.agents[name]
 }
 
+func (c *ConnectionAgents) Has(name string) (Agent, bool) {
+	a, b := c.agents[name]
+	return a, b
+}
+
 func (c *ConnectionAgents) GetFrameProducingAgents() []FrameProducer {
 	var agents []FrameProducer
 	for _, a := range c.agents {
@@ -144,8 +149,13 @@ func (c *ConnectionAgents) StopAll() {
 // This function sends an (CONNECTION|APPLICATION)_CLOSE frame and wait for it to be sent out. Then it stops all the
 // agents attached to this connection.
 func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint16, reasonPhrase string) {
-	a := &ClosingAgent{QuicLayer: quicLayer, ErrorCode: errorCode, ReasonPhrase: reasonPhrase}
-	c.Add(a)
+	var a Agent
+	var present bool
+	if a, present = c.Has("ClosingAgent"); !present {
+		a = &ClosingAgent{}
+		c.Add(a)
+	}
+	a.(*ClosingAgent).Close(quicLayer, errorCode, reasonPhrase)
 	a.Join()
 	c.StopAll()
 }
@@ -165,5 +175,6 @@ func GetDefaultAgents() []Agent {
 		&FrameQueueAgent{},
 		fc,
 		&StreamAgent{FlowControlAgent: fc},
+		&ClosingAgent{},
 	}
 }

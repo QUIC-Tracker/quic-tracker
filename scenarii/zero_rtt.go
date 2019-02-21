@@ -22,8 +22,6 @@ func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{name: "zero_rtt", version: 1}}
 }
 func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := s.CompleteHandshake(conn, trace, ZR_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -42,7 +40,11 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 			case i := <-resumptionTicket:
 				ticket = i.([]byte)
 				break getTicket
-			case <-s.Timeout().C:
+			case <-conn.ConnectionClosed:
+				trace.MarkError(ZR_NoResumptionSecret, "", nil)
+				connAgents.CloseConnection(false, 0, "")
+				return
+			case <-s.Timeout():
 				trace.MarkError(ZR_NoResumptionSecret, "", nil)
 				connAgents.CloseConnection(false, 0, "")
 				return
@@ -78,7 +80,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 
 	handshakeAgent.InitiateHandshake()
 
-	if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {
+	if !s.waitFor0RTT(conn, trace, encryptionLevelsAvailable) {
 		return
 	}
 
@@ -92,7 +94,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 			case i := <-incPackets:
 				switch i.(type) {
 				case *qt.RetryPacket:
-					if !s.waitFor0RTT(trace, encryptionLevelsAvailable) {
+					if !s.waitFor0RTT(conn, trace, encryptionLevelsAvailable) {
 						return
 					}
 					conn.SendHTTP09GETRequest(preferredUrl, 0)
@@ -100,13 +102,15 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 				if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0
 				}
-			case <-s.Timeout().C:
+			case <-conn.ConnectionClosed:
+				return
+			case <-s.Timeout():
 				return
 		}
 	}
 }
 
-func (s *ZeroRTTScenario) waitFor0RTT(trace *qt.Trace, encryptionLevelsAvailable chan interface{}) bool {
+func (s *ZeroRTTScenario) waitFor0RTT(conn *qt.Connection, trace *qt.Trace, encryptionLevelsAvailable chan interface{}) bool {
 	for {
 		select {
 		case i := <-encryptionLevelsAvailable:
@@ -114,7 +118,11 @@ func (s *ZeroRTTScenario) waitFor0RTT(trace *qt.Trace, encryptionLevelsAvailable
 			if eL.EncryptionLevel == qt.EncryptionLevel0RTT && !eL.Read {
 				return true
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			trace.ErrorCode = ZR_ZeroRTTFailed
+			trace.Results["error"] = "0-RTT encryption was not available after feeding in the ticket"
+			return false
+		case <-s.Timeout():
 			trace.ErrorCode = ZR_ZeroRTTFailed
 			trace.Results["error"] = "0-RTT encryption was not available after feeding in the ticket"
 			return false

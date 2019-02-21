@@ -3,7 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"time"
 )
 
 const (
@@ -21,7 +20,6 @@ func NewHTTP3UniStreamsLimitsScenario() *HTTP3UniStreamsLimitsScenario {
 	return &HTTP3UniStreamsLimitsScenario{AbstractScenario{name: "http3_uni_streams_limits", version: 1, http3: true}}
 }
 func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 1
 
 	http := agents.HTTPAgent{}
@@ -41,12 +39,14 @@ func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace
 	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
 	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
 
+	trace.ErrorCode = H3USFC_RequestTimeout
 	select {
 	case <-responseReceived:
 		trace.ErrorCode = 0
-		<-s.Timeout().C
-	case <-s.Timeout().C:
-		trace.ErrorCode = H3USFC_RequestTimeout
+		s.Finished()
+		<-s.Timeout()
+	case <-conn.ConnectionClosed:
+	case <-s.Timeout():
 	}
 
 	if conn.Streams.NumberOfServerStreamsOpen() > 1 {

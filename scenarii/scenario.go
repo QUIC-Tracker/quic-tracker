@@ -24,16 +24,19 @@ type Scenario interface {
 	IPv6() bool
 	HTTP3() bool
 	Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool)
-	Timeout() *time.Timer
+	SetTimer(d time.Duration)
+	Timeout() <-chan time.Time
+	Finished()
 }
 
 // Each scenario should embed this structure
 type AbstractScenario struct {
-	name    string
-	version int
-	ipv6    bool
-	http3   bool
-	timeout *time.Timer
+	name     string
+	version  int
+	ipv6     bool
+	http3    bool
+	duration time.Duration
+	timeout  *time.Timer
 }
 
 func (s *AbstractScenario) Name() string {
@@ -48,8 +51,20 @@ func (s *AbstractScenario) IPv6() bool {
 func (s *AbstractScenario) HTTP3() bool {
 	return s.http3
 }
-func (s *AbstractScenario) Timeout() *time.Timer {
-	return s.timeout
+func (s *AbstractScenario) SetTimer(d time.Duration) {
+	s.timeout = time.NewTimer(d)
+	if d == 0 {
+		<-s.timeout.C
+	}
+	s.duration = d
+}
+func (s *AbstractScenario) Timeout() <-chan time.Time {
+	return s.timeout.C
+}
+func (s *AbstractScenario) Finished() {
+	if s.duration == 0 {
+		s.timeout.Reset(0)
+	}
 }
 
 // Useful helper for scenarii that requires the handshake to complete before executing their test and don't want to
@@ -71,7 +86,7 @@ func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trac
 			connAgents.StopAll()
 			return nil
 		}
-	case <-s.Timeout().C:
+	case <-s.Timeout():
 		trace.MarkError(handshakeErrorCode, "handshake timeout", nil)
 		connAgents.StopAll()
 		return nil

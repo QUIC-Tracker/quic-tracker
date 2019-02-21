@@ -1,10 +1,9 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"time"
 	"encoding/hex"
 )
 
@@ -23,8 +22,6 @@ func NewRetireConnectionIDScenario() *RetireConnectionIDScenario {
 	return &RetireConnectionIDScenario{AbstractScenario{name: "retire_connection_id", version: 1}}
 }
 func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	connAgents := s.CompleteHandshake(conn, trace, RCI_TLSHandshakeFailed)
@@ -60,6 +57,7 @@ func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.RetireConnectionId{nci.Sequence}, qt.EncryptionLevel1RTT})
 					} else {
 						trace.ErrorCode = 0
+						s.Finished()
 					}
 				}
 				if !hasRetiredCIDs && pp.Contains(qt.NewConnectionIdType) {
@@ -67,7 +65,9 @@ func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 					trace.ErrorCode = RCI_HostDidNotProvideNewCID
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

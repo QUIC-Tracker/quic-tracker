@@ -1,10 +1,8 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
-
-	"time"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 )
 
 const (
@@ -24,8 +22,6 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 }
 
 func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := s.CompleteHandshake(conn, trace, SSRS_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -59,7 +55,9 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.
 					return
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

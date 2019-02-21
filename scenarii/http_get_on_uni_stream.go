@@ -2,8 +2,6 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
-
-	"time"
 )
 
 const (
@@ -24,7 +22,6 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 }
 
 func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxBidiStreams = 1
 	conn.TLSTPHandler.MaxUniStreams = 1
 
@@ -66,7 +63,9 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 					}
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

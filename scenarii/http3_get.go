@@ -3,7 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"time"
 )
 
 const (
@@ -20,7 +19,6 @@ func NewHTTP3GETScenario() *HTTP3GETScenario {
 	return &HTTP3GETScenario{AbstractScenario{name: "http3_get", version: 1, http3: true}}
 }
 func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 3
 	conn.TransitionTo(qt.QuicVersion, qt.QuicH3ALPNToken)
 
@@ -42,12 +40,15 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 
 	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
 
+	trace.ErrorCode = H3G_RequestTimeout
 	select {
 	case <-responseReceived:
 		trace.ErrorCode = 0
-		<-s.Timeout().C
-	case <-s.Timeout().C:
-		trace.ErrorCode = H3G_RequestTimeout
+		s.Finished()
+		<-s.Timeout()
+	case <-conn.ConnectionClosed:
+		return
+	case <-s.Timeout():
 		return
 	}
 }

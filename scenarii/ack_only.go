@@ -2,8 +2,6 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
-
-	"time"
 )
 
 const (
@@ -19,7 +17,6 @@ func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{name: "ack_only", version: 1}}
 }
 func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := s.CompleteHandshake(conn, trace, AO_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -67,7 +64,9 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 					return
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

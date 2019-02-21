@@ -17,6 +17,7 @@ func main() {
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap.")
+	timeout := flag.Int("timeout", 10, "The amount of time in seconds spent when completing the test. Defaults to 10. When set to 0, the test ends as soon as possible.")
 	flag.Parse()
 
 	if *host == "" || *url == "" || *scenarioName == "" {
@@ -43,6 +44,7 @@ func main() {
 		trace.AttachTo(conn)
 
 		start := time.Now()
+		scenario.SetTimer(time.Duration(*timeout) * time.Second)
 		scenario.Run(conn, trace, *url, *debug)
 		trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 		ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)

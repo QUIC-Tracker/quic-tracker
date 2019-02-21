@@ -1,10 +1,9 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bytes"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"time"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
@@ -23,7 +22,6 @@ func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 	return &UnsupportedTLSVersionScenario{AbstractScenario{name: "unsupported_tls_version", version: 1}}
 }
 func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	connAgents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = connAgents.GetFrameProducingAgents()
@@ -58,18 +56,18 @@ forLoop:
 						}
 						trace.Results["connection_reason_phrase"] = cc.ReasonPhrase
 						connectionClosed = true
+						s.Finished()
 					}
 				}
-			case qt.Packet:
-				trace.MarkError(UTS_ReceivedUnexpectedPacketType, "", p)
 			}
-			case <-s.Timeout().C:
-				break forLoop
+		case <-conn.ConnectionClosed:
+			break forLoop
+		case <-s.Timeout():
+			if !connectionClosed {
+				trace.ErrorCode = UTS_NoConnectionCloseSent
+			}
+			break forLoop
 		}
-	}
-
-	if !connectionClosed {
-		trace.ErrorCode = UTS_NoConnectionCloseSent
 	}
 }
 

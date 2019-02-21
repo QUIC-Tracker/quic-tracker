@@ -4,7 +4,6 @@ import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"fmt"
-	"time"
 )
 
 const (
@@ -29,7 +28,6 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 }
 
 func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxBidiStreams = 0
 	conn.TLSTPHandler.MaxUniStreams = 0
 
@@ -69,10 +67,13 @@ forLoop:
 						}
 					case *qt.ConnectionCloseFrame, *qt.ApplicationCloseFrame:
 						connectionCloseReceived = true
+						s.Finished()
 					}
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			break forLoop
+		case <-s.Timeout():
 			break forLoop
 		}
 	}

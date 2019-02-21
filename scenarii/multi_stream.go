@@ -1,11 +1,9 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
+	qt "github.com/QUIC-Tracker/quic-tracker"
 	_ "github.com/davecgh/go-spew/spew"
-
-	"time"
 )
 
 const (
@@ -22,7 +20,6 @@ func NewMultiStreamScenario() *MultiStreamScenario {
 	return &MultiStreamScenario{AbstractScenario{name: "multi_stream", version: 1}}
 }
 func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxData = 1024 * 1024
 	conn.TLSTPHandler.MaxStreamDataBidiLocal = 1024 * 1024 / 10
 
@@ -51,10 +48,11 @@ forLoop:
 			}
 
 			if allClosed {
-				conn.CloseConnection(false, 0, "")
-				break forLoop
+				s.Finished()
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			break forLoop
+		case <-s.Timeout():
 			break forLoop
 		}
 	}

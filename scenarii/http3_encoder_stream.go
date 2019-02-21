@@ -23,7 +23,6 @@ func NewHTTP3EncoderStreamScenario() *HTTP3EncoderStreamScenario {
 	return &HTTP3EncoderStreamScenario{AbstractScenario{name: "http3_encoder_stream", version: 1, http3: true}}
 }
 func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	conn.TLSTPHandler.MaxUniStreams = 3
 
 	http := agents.HTTPAgent{QPACKEncoderOpts: ls_qpack_go.LSQPackEncOptIxAggr}
@@ -52,7 +51,9 @@ forLoop:
 			case *http3.SETTINGS:
 				break forLoop
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			trace.ErrorCode = H3ES_SETTINGSNotSent
 			return
 		}
@@ -61,12 +62,15 @@ forLoop:
 	<-time.NewTimer(200 * time.Millisecond).C
 	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
 
+	trace.ErrorCode = H3ES_RequestTimeout
 	select {
 	case <-responseReceived:
 		trace.ErrorCode = 0
-		<-s.Timeout().C
-	case <-s.Timeout().C:
-		trace.ErrorCode = H3ES_RequestTimeout
+		s.Finished()
+		<-s.Timeout()
+	case <-conn.ConnectionClosed:
+		return
+	case <-s.Timeout():
 		return
 	}
 }

@@ -4,7 +4,6 @@ import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 
 	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"time"
 )
 
 const (
@@ -22,7 +21,6 @@ func NewHandshakeScenario() *HandshakeScenario {
 	return &HandshakeScenario{AbstractScenario{name: "handshake", version: 2}}
 }
 func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: connAgents.Get("TLSAgent").(*agents.TLSAgent), SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	connAgents.Add(handshakeAgent)
@@ -49,7 +47,9 @@ func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 				trace.Results["negotiated_version"] = conn.Version
 			}
 			handshakeAgent.HandshakeStatus.Unregister(handshakeStatus)
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			if !status.Completed {
 				if trace.ErrorCode == 0 {
 					trace.MarkError(H_Timeout, "", nil)

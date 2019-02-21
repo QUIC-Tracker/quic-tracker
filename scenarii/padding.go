@@ -2,9 +2,8 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
-	"time"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
+	. "github.com/QUIC-Tracker/quic-tracker/lib"
 )
 
 const (
@@ -20,7 +19,6 @@ func NewPaddingScenario() *PaddingScenario {
 	return &PaddingScenario{AbstractScenario{name: "padding", version: 1}}
 }
 func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 
@@ -57,8 +55,11 @@ func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 			sendEmptyInitialPacket()
 		} else {
 			trace.MarkError(P_ReceivedSmth, "", packet)
+			s.Finished()
 		}
-	case <-s.Timeout().C:
+	case <-conn.ConnectionClosed:
+		return
+	case <-s.Timeout():
 		return
 	}
 }

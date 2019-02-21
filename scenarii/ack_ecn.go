@@ -3,7 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"time"
 )
 
 const (
@@ -22,8 +21,6 @@ func NewAckECNScenario() *AckECNScenario {
 	return &AckECNScenario{AbstractScenario{name: "ack_ecn", version: 1}}
 }
 func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
-
 	connAgents := s.CompleteHandshake(conn, trace, AE_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -68,7 +65,9 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl 
 					trace.ErrorCode = 0
 				}
 			}
-		case <-s.Timeout().C:
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
 			return
 		}
 	}

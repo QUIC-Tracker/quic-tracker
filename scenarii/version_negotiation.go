@@ -3,7 +3,6 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 
-	"time"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
 )
 
@@ -25,7 +24,6 @@ func NewVersionNegotiationScenario() *VersionNegotiationScenario {
 	return &VersionNegotiationScenario{AbstractScenario{name: "version_negotiation", version: 2}}
 }
 func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
-	s.timeout = time.NewTimer(10 * time.Second)
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 
@@ -47,22 +45,25 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 				vnCount++
 				if vnCount > 1 && unusedField != p.UnusedField {
 					trace.ErrorCode = 0
-					return
+					s.Finished()
 				} else if vnCount == threshold {
 					trace.ErrorCode = VN_UnusedFieldIsIdentical
-					return
+					s.Finished()
+				} else {
+					unusedField = p.UnusedField
+					trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
+					newInitial := qt.NewInitialPacket(conn)
+					newInitial.Frames = initial.Frames
+					conn.SendPacket(newInitial, qt.EncryptionLevelInitial)
 				}
-				unusedField = p.UnusedField
-				trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
-				newInitial := qt.NewInitialPacket(conn)
-				newInitial.Frames = initial.Frames
-				conn.SendPacket(newInitial, qt.EncryptionLevelInitial)
 			case qt.Packet:
 				trace.MarkError(VN_NotAnsweringToVN, "", p)
 				trace.Results["received_packet_type"] = p.Header().PacketType()
 			}
-			case <-s.Timeout().C:
-				return
+		case <-conn.ConnectionClosed:
+			return
+		case <-s.Timeout():
+			return
 		}
 	}
 }

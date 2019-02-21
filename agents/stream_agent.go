@@ -54,11 +54,14 @@ func (a *StreamAgent) Run(conn *Connection) {
 						f.StreamData = buf[:length-int(f.FrameLength())]
 						f.LenBit = true
 						f.Length = uint64(len(f.StreamData))
-						f.FinBit = stream.WriteCloseOffset == stream.WriteOffset && length == len(buf)+int(f.FrameLength())
 						if len(buf) > length {
 							a.streamBuffers[streamId] = buf[length:]
 						} else {
 							delete(a.streamBuffers, streamId)
+							if a.streamClosing[streamId] {
+								delete(a.streamClosing, streamId)
+								f.FinBit = true
+							}
 						}
 						args.availableSpace -= length
 						frames = append(frames, f)
@@ -122,6 +125,7 @@ func (a *StreamAgent) send(streamId uint64, data []byte, close bool) error {
 		s.WriteCloseOffset = s.WriteOffset
 	}
 	a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
+	a.streamClosing[streamId] = true
 	a.conn.PreparePacket.Submit(EncryptionLevelBestAppData)
 	return nil
 }

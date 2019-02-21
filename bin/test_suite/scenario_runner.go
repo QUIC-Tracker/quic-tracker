@@ -5,6 +5,7 @@ import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	s "github.com/QUIC-Tracker/quic-tracker/scenarii"
 	"flag"
+	"os/exec"
 	"strings"
 	"time"
 	"encoding/json"
@@ -16,6 +17,7 @@ func main() {
 	scenarioName := flag.String("scenario", "", "The particular scenario to run.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
+	nopcap := flag.Bool("nopcap", false, "Disables the pcap capture.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap.")
 	timeout := flag.Int("timeout", 10, "The amount of time in seconds spent when completing the test. Defaults to 10. When set to 0, the test ends as soon as possible.")
 	flag.Parse()
@@ -36,9 +38,12 @@ func main() {
 	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6(), scenario.HTTP3()) // Raw IPv6 are not handled correctly
 
 	if err == nil {
-		pcap, err := qt.StartPcapCapture(conn, *netInterface)
-		if err != nil {
-			trace.Results["pcap_start_error"] = err.Error()
+		var pcap *exec.Cmd
+		if !*nopcap {
+			pcap, err = qt.StartPcapCapture(conn, *netInterface)
+			if err != nil {
+				trace.Results["pcap_start_error"] = err.Error()
+			}
 		}
 
 		trace.AttachTo(conn)
@@ -53,7 +58,9 @@ func main() {
 
 		trace.Complete(conn)
 		conn.Close()
-		err = trace.AddPcap(conn, pcap)
+		if pcap != nil {
+			err = trace.AddPcap(conn, pcap)
+		}
 		if err != nil {
 			trace.Results["pcap_completed_error"] = err.Error()
 		}

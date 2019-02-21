@@ -47,6 +47,7 @@ func (s *HandshakeScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 				trace.Results["negotiated_version"] = conn.Version
 			}
 			handshakeAgent.HandshakeStatus.Unregister(handshakeStatus)
+			s.Finished()
 		case <-conn.ConnectionClosed:
 			return
 		case <-s.Timeout():

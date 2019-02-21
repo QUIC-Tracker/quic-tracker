@@ -103,11 +103,11 @@ func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch
 	currentPacketNumber := ack.LargestAcknowledged
 	buffer := a.retransmissionBuffer[space]
 	delete(buffer, currentPacketNumber)
-	for i := uint64(0); i < ack.AckBlocks[0].Block && i < threshold; i++ {
+	for i := uint64(0); i < ack.AckRanges[0].AckRange && i < threshold; i++ {
 		currentPacketNumber--
 		delete(buffer, currentPacketNumber)
 	}
-	for _, ackBlock := range ack.AckBlocks[1:] {
+	for _, ackBlock := range ack.AckRanges[1:] {
 		for i := uint64(0); i <= ackBlock.Gap && i < threshold; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
 			if f, ok := buffer[currentPacketNumber]; ok {
 				frames = append(frames, f)
@@ -115,7 +115,7 @@ func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch
 			currentPacketNumber--
 			delete(buffer, currentPacketNumber)
 		}
-		for i := uint64(0); i < ackBlock.Block && i < threshold; i++ {
+		for i := uint64(0); i < ackBlock.AckRange && i < threshold; i++ {
 			currentPacketNumber--
 			delete(buffer, currentPacketNumber)
 		}

@@ -40,7 +40,7 @@ type QuicTransportParameters struct {  // A set of QUIC transport parameters val
 	AckDelayExponent        uint64
 	MaxAckDelay				uint64
 	DisableMigration        bool
-	PreferredAddress        string
+	PreferredAddress        []byte
 	AdditionalParameters    TransportParameterList
 	ToJSON                  map[string]interface{}
 }
@@ -184,7 +184,7 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 			receivedParameters.DisableMigration = true
 			receivedParameters.ToJSON["disable_migration"] = true
 		case PreferredAddress:
-			receivedParameters.PreferredAddress = string(p.Value)
+			receivedParameters.PreferredAddress = p.Value
 			receivedParameters.ToJSON["preferredAddress"] = receivedParameters.PreferredAddress
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)

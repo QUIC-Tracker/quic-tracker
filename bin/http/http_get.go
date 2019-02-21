@@ -87,7 +87,7 @@ func main() {
 		case <-incomingPackets:
 			if conn.Streams.Get(0).ReadClosed {
 				spew.Dump(conn.Streams.Get(0).ReadData)
-				break
+				return
 			}
 		case <-t.C:
 			return

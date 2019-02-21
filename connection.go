@@ -170,23 +170,23 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 		return nil
 	}
 	frame := new(AckFrame)
-	frame.AckBlocks = make([]AckBlock, 0, 255)
+	frame.AckRanges = make([]AckRange, 0, 255)
 	frame.LargestAcknowledged = packetNumbers[0]
 
 	previous := frame.LargestAcknowledged
-	ackBlock := AckBlock{}
+	ackBlock := AckRange{}
 	for _, number := range packetNumbers[1:] {
 		if previous - number == 1 {
-			ackBlock.Block++
+			ackBlock.AckRange++
 		} else {
-			frame.AckBlocks = append(frame.AckBlocks, ackBlock)
-			ackBlock = AckBlock{uint64(previous) - uint64(number) - 2, 0}
+			frame.AckRanges = append(frame.AckRanges, ackBlock)
+			ackBlock = AckRange{uint64(previous) - uint64(number) - 2, 0}
 		}
 		previous = number
 	}
-	frame.AckBlocks = append(frame.AckBlocks, ackBlock)
-	if len(frame.AckBlocks) > 0 {
-		frame.AckBlockCount = uint64(len(frame.AckBlocks) - 1)
+	frame.AckRanges = append(frame.AckRanges, ackBlock)
+	if len(frame.AckRanges) > 0 {
+		frame.AckRangeCount = uint64(len(frame.AckRanges) - 1)
 	}
 	return frame
 }

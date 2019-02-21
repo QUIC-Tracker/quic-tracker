@@ -129,12 +129,12 @@ func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 type AckFrame struct {
 	LargestAcknowledged PacketNumber
 	AckDelay            uint64
-	AckBlockCount       uint64
-	AckBlocks           []AckBlock
+	AckRangeCount       uint64
+	AckRanges           []AckRange
 }
-type AckBlock struct {
-	Gap   uint64
-	Block uint64
+type AckRange struct {
+	Gap      uint64
+	AckRange uint64
 }
 
 func (frame AckFrame) FrameType() FrameType        { return AckType }
@@ -143,23 +143,23 @@ func (frame AckFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
 	WriteVarInt(buffer, frame.AckDelay)
-	WriteVarInt(buffer, frame.AckBlockCount)
-	for i, ack := range frame.AckBlocks {
+	WriteVarInt(buffer, frame.AckRangeCount)
+	for i, ack := range frame.AckRanges {
 		if i > 0 {
 			WriteVarInt(buffer, ack.Gap)
 		}
-		WriteVarInt(buffer, ack.Block)
+		WriteVarInt(buffer, ack.AckRange)
 	}
 }
 func (frame AckFrame) FrameLength() uint16 {
 	var length uint16
-	length += 1 + uint16(VarIntLen(uint64(frame.LargestAcknowledged))+VarIntLen(frame.AckDelay)+VarIntLen(frame.AckBlockCount))
+	length += 1 + uint16(VarIntLen(uint64(frame.LargestAcknowledged))+VarIntLen(frame.AckDelay)+VarIntLen(frame.AckRangeCount))
 
-	for i, ack := range frame.AckBlocks {
+	for i, ack := range frame.AckRanges {
 		if i > 0 {
 			length += uint16(VarIntLen(ack.Gap))
 		}
-		length += uint16(VarIntLen(ack.Block))
+		length += uint16(VarIntLen(ack.AckRange))
 	}
 	return length
 }
@@ -168,16 +168,16 @@ func (frame AckFrame) GetAckedPackets() []PacketNumber { // TODO: This is prone 
 
 	currentPacketNumber := frame.LargestAcknowledged
 	packets = append(packets, currentPacketNumber)
-	for i := uint64(0); i < frame.AckBlocks[0].Block; i++ {
+	for i := uint64(0); i < frame.AckRanges[0].AckRange; i++ {
 		currentPacketNumber--
 		packets = append(packets, currentPacketNumber)
 	}
-	for _, ackBlock := range frame.AckBlocks[1:] {
+	for _, ackBlock := range frame.AckRanges[1:] {
 		for i := uint64(0); i <= ackBlock.Gap; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
 			currentPacketNumber--
 			packets = append(packets, currentPacketNumber)
 		}
-		for i := uint64(0); i < ackBlock.Block; i++ {
+		for i := uint64(0); i < ackBlock.AckRange; i++ {
 			currentPacketNumber--
 			packets = append(packets, currentPacketNumber)
 		}
@@ -190,18 +190,18 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 
 	frame.LargestAcknowledged = ReadPacketNumber(buffer)
 	frame.AckDelay, _ = ReadVarIntValue(buffer)
-	frame.AckBlockCount, _ = ReadVarIntValue(buffer)
+	frame.AckRangeCount, _ = ReadVarIntValue(buffer)
 
-	firstBlock := AckBlock{}
-	firstBlock.Block, _ = ReadVarIntValue(buffer)
-	frame.AckBlocks = append(frame.AckBlocks, firstBlock)
+	firstBlock := AckRange{}
+	firstBlock.AckRange, _ = ReadVarIntValue(buffer)
+	frame.AckRanges = append(frame.AckRanges, firstBlock)
 
 	var i uint64
-	for i = 0; i < frame.AckBlockCount; i++ {
-		ack := AckBlock{}
+	for i = 0; i < frame.AckRangeCount; i++ {
+		ack := AckRange{}
 		ack.Gap, _ = ReadVarIntValue(buffer)
-		ack.Block, _ = ReadVarIntValue(buffer)
-		frame.AckBlocks = append(frame.AckBlocks, ack)
+		ack.AckRange, _ = ReadVarIntValue(buffer)
+		frame.AckRanges = append(frame.AckRanges, ack)
 	}
 	return frame
 }
@@ -234,7 +234,7 @@ func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
 type ResetStream struct {
 	StreamId             uint64
 	ApplicationErrorCode uint16
-	FinalOffset          uint64
+	FinalSize            uint64
 }
 
 func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
@@ -242,16 +242,16 @@ func (frame ResetStream) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	binary.Write(buffer, binary.BigEndian, frame.ApplicationErrorCode)
-	WriteVarInt(buffer, frame.FinalOffset)
+	WriteVarInt(buffer, frame.FinalSize)
 }
 func (frame ResetStream) shouldBeRetransmitted() bool { return true }
-func (frame ResetStream) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+2+VarIntLen(frame.FinalOffset)) }
+func (frame ResetStream) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+2+VarIntLen(frame.FinalSize)) }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	buffer.ReadByte() // Discard frame type
 	frame.StreamId, _ = ReadVarIntValue(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.ApplicationErrorCode)
-	frame.FinalOffset, _ = ReadVarIntValue(buffer)
+	frame.FinalSize, _ = ReadVarIntValue(buffer)
 	return frame
 }
 

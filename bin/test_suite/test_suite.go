@@ -1,20 +1,21 @@
 package main
 
 import (
-	"flag"
-	"os"
-	"sort"
-	"github.com/QUIC-Tracker/quic-tracker/scenarii"
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"bufio"
-	"strings"
-	"os/exec"
-	"runtime"
-	"path"
-	"io/ioutil"
-	"fmt"
-	"sync"
 	"encoding/json"
+	"flag"
+	"fmt"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/scenarii"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -123,7 +124,7 @@ func main() {
 				crashTrace := GetCrashTrace(scenario, host) // Prepare one just in case
 				start := time.Now()
 
-				args := []string{"run", scenarioRunnerFilename, "-host", host, "-url", url, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", string(*timeout)}
+				args := []string{"run", scenarioRunnerFilename, "-host", host, "-url", url, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
 				if *debug {
 					args = append(args, "-debug")
 				}

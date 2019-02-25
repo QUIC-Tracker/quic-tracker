@@ -110,9 +110,11 @@ func (a *TLSAgent) Run(conn *Connection) {
 							err = conn.TLSTPHandler.ReceiveExtensionData(conn.Tls.ReceivedQUICTransportParameters())
 							if err != nil {
 								a.Logger.Printf("Failed to decode extension data: %s\n", err.Error())
+								a.TLSStatus.Submit(TLSStatus{true, packet, err})
+							} else {
+								conn.TransportParameters.Submit(*conn.TLSTPHandler.ReceivedParameters)
+								a.TLSStatus.Submit(TLSStatus{true, packet, err})
 							}
-							conn.TransportParameters.Submit(*conn.TLSTPHandler.ReceivedParameters)
-							a.TLSStatus.Submit(TLSStatus{true, packet, err})
 						}
 
 						for _, e := range encryptionLevels {

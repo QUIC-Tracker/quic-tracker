@@ -50,16 +50,16 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 					case *qt.StreamFrame:
 						if f.StreamId == 2 {
 							trace.MarkError(GS2_ReceivedDataOnStream2, "", p)
-							return
+							s.Finished()
 						} else if f.StreamId > 3 {
 							trace.MarkError(GS2_ReceivedDataOnUnauthorizedStream, "", p)
-							return
+							s.Finished()
 						}
 					case *qt.ConnectionCloseFrame:
 						if trace.ErrorCode == GS2_DidNotCloseTheConnection && f.ErrorCode == qt.ERR_STREAM_LIMIT_ERROR || f.ErrorCode == qt.ERR_PROTOCOL_VIOLATION {
 							trace.ErrorCode = GS2_TooLowStreamIdUniToSendRequest
 						}
-						return
+						s.Finished()
 					}
 				}
 			}

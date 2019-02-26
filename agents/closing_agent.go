@@ -47,6 +47,8 @@ func (a *ClosingAgent) Run(conn *Connection) {
 				a.closing = true
 				a.Logger.Printf("Idle timeout of %v reached, closing\n", a.IdleDuration.String())
 				return
+			case <-a.close:
+				return
 			}
 		}
 	}()

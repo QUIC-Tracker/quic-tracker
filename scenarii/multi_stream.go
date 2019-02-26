@@ -19,7 +19,7 @@ type MultiStreamScenario struct {
 func NewMultiStreamScenario() *MultiStreamScenario {
 	return &MultiStreamScenario{AbstractScenario{name: "multi_stream", version: 1}}
 }
-func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxData = 1024 * 1024
 	conn.TLSTPHandler.MaxStreamDataBidiLocal = 1024 * 1024 / 10
 
@@ -33,7 +33,7 @@ func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	for i := uint64(0); i < conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
-		conn.SendHTTP09GETRequest(preferredUrl, uint64(i*4))
+		conn.SendHTTP09GETRequest(preferredPath, uint64(i*4))
 	}
 
 forLoop:

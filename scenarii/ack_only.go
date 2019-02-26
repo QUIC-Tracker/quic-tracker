@@ -16,7 +16,7 @@ type AckOnlyScenario struct {
 func NewAckOnlyScenario() *AckOnlyScenario {
 	return &AckOnlyScenario{AbstractScenario{name: "ack_only", version: 1}}
 }
-func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, AO_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -26,7 +26,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 
 	var ackOnlyPackets []qt.PacketNumber
 

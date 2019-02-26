@@ -23,7 +23,7 @@ type Scenario interface {
 	Version() int
 	IPv6() bool
 	HTTP3() bool
-	Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool)
+	Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool)
 	SetTimer(d time.Duration)
 	Timeout() <-chan time.Time
 	Finished()

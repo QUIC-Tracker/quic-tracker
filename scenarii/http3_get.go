@@ -18,7 +18,7 @@ type HTTP3GETScenario struct {
 func NewHTTP3GETScenario() *HTTP3GETScenario {
 	return &HTTP3GETScenario{AbstractScenario{name: "http3_get", version: 1, http3: true}}
 }
-func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 3
 	conn.TransitionTo(qt.QuicVersion, qt.QuicH3ALPNToken)
 
@@ -38,7 +38,7 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUr
 
 	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
 
-	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
+	http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3G_RequestTimeout
 	select {

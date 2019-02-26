@@ -24,7 +24,7 @@ type NewConnectionIDScenario struct {
 func NewNewConnectionIDScenario() *NewConnectionIDScenario {
 	return &NewConnectionIDScenario{AbstractScenario{name: "new_connection_id", version: 2}}
 }
-func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	connAgents := s.CompleteHandshake(conn, trace, NCI_TLSHandshakeFailed)
@@ -74,7 +74,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
 						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{ 1, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
-						conn.SendHTTP09GETRequest(preferredUrl, 0)
+						conn.SendHTTP09GETRequest(preferredPath, 0)
 						expectingResponse = true
 					}
 				}

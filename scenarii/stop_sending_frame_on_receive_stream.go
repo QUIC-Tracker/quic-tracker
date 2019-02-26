@@ -21,7 +21,7 @@ func NewStopSendingOnReceiveStreamScenario() *StopSendingOnReceiveStreamScenario
 	return &StopSendingOnReceiveStreamScenario{AbstractScenario{name: "stop_sending_frame_on_receive_stream", version: 1}}
 }
 
-func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, SSRS_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -35,7 +35,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredUrl, 2)
+	conn.SendHTTP09GETRequest(preferredPath, 2)
 	conn.FrameQueue.Submit(qt.QueuedFrame{&qt.StopSendingFrame{2, 0}, qt.EncryptionLevel1RTT})
 
 	trace.ErrorCode = SSRS_DidNotCloseTheConnection

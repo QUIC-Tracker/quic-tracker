@@ -21,7 +21,7 @@ type ZeroRTTScenario struct {
 func NewZeroRTTScenario() *ZeroRTTScenario {
 	return &ZeroRTTScenario{AbstractScenario{name: "zero_rtt", version: 1}}
 }
-func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, ZR_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -86,7 +86,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 
 	// TODO: Handle stateless connection
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0) // TODO: Verify that this get sent in a 0-RTT packet
+	conn.SendHTTP09GETRequest(preferredPath, 0) // TODO: Verify that this get sent in a 0-RTT packet
 
 	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	for {
@@ -97,7 +97,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl
 					if !s.waitFor0RTT(conn, trace, encryptionLevelsAvailable) {
 						return
 					}
-					conn.SendHTTP09GETRequest(preferredUrl, 0)
+					conn.SendHTTP09GETRequest(preferredPath, 0)
 				}
 				if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0

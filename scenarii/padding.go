@@ -18,7 +18,7 @@ type PaddingScenario struct {
 func NewPaddingScenario() *PaddingScenario {
 	return &PaddingScenario{AbstractScenario{name: "padding", version: 1}}
 }
-func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 

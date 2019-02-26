@@ -21,7 +21,7 @@ func main() {
 
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
-	url := flag.String("url", "/index.html", "The URL to request")
+	path := flag.String("path", "/index.html", "The path to request")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
 	timeout := flag.Int("timeout", 10, "The number of seconds after which the program will timeout")
 	flag.Parse()
@@ -77,7 +77,7 @@ func main() {
 	}
 
 	defer conn.CloseConnection(false, 0, "")
-	conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *url)), true)
+	conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *path)), true)
 
 	incomingPackets := make(chan interface{}, 1000)
 	conn.IncomingPackets.Register(incomingPackets)

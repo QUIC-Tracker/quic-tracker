@@ -19,7 +19,7 @@ type HTTP3UniStreamsLimitsScenario struct {
 func NewHTTP3UniStreamsLimitsScenario() *HTTP3UniStreamsLimitsScenario {
 	return &HTTP3UniStreamsLimitsScenario{AbstractScenario{name: "http3_uni_streams_limits", version: 1, http3: true}}
 }
-func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 1
 
 	http := agents.HTTPAgent{}
@@ -37,7 +37,7 @@ func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace
 	}
 
 	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
-	http.SendRequest(preferredUrl, "GET", trace.Host, nil)
+	http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3USFC_RequestTimeout
 	select {

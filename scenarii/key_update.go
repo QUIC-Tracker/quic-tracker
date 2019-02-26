@@ -17,7 +17,7 @@ type KeyUpdateScenario struct {
 func NewKeyUpdateScenario() *KeyUpdateScenario {
 	return &KeyUpdateScenario{AbstractScenario{name: "key_update", version: 1}}
 }
-func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, KU_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -37,7 +37,7 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredU
 	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderWrite = oldState.HeaderWrite
 	conn.KeyPhaseIndex++
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 
 forLoop:
 	for {

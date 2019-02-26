@@ -20,7 +20,7 @@ type AckECNScenario struct {
 func NewAckECNScenario() *AckECNScenario {
 	return &AckECNScenario{AbstractScenario{name: "ack_ecn", version: 1}}
 }
-func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, AE_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -39,7 +39,7 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl 
 		return
 	}
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 
 	trace.ErrorCode = AE_NonECN
 	for {

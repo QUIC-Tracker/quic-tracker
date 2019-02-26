@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
+	p "path"
 	"runtime"
 	"sort"
 	"strconv"
@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	hostsFilename := flag.String("hosts", "", "A tab-separated file containing hosts and the URLs used to request data to be sent.")
+	hostsFilename := flag.String("hosts", "", "A tab-separated file containing hosts and the paths used to request data to be sent.")
 	scenarioName := flag.String("scenario", "", "A particular scenario to run. Run all of them if the parameter is missing.")
 	outputFilename := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	logsDirectory := flag.String("logs-directory", "/tmp", "Location of the logs.")
@@ -37,7 +37,7 @@ func main() {
 		println("No caller information")
 		os.Exit(-1)
 	}
-	scenarioRunnerFilename := path.Join(path.Dir(filename), "scenario_runner.go")
+	scenarioRunnerFilename := p.Join(p.Dir(filename), "scenario_runner.go")
 
 	if *hostsFilename == "" {
 		println("The hosts parameter is required")
@@ -90,12 +90,12 @@ func main() {
 		}
 		wg := &sync.WaitGroup{}
 
-		os.MkdirAll(path.Join(*logsDirectory, id), os.ModePerm)
+		os.MkdirAll(p.Join(*logsDirectory, id), os.ModePerm)
 
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "\t")
-			host, url := line[0], line[1]
+			host, path := line[0], line[1]
 
 			<-semaphore
 			wg.Add(1)
@@ -114,7 +114,7 @@ func main() {
 				}
 				outputFile.Close()
 
-				logFile, err := os.Create(path.Join(*logsDirectory, id, host))
+				logFile, err := os.Create(p.Join(*logsDirectory, id, host))
 				if err != nil {
 					println(err.Error())
 					return
@@ -124,7 +124,7 @@ func main() {
 				crashTrace := GetCrashTrace(scenario, host) // Prepare one just in case
 				start := time.Now()
 
-				args := []string{"run", scenarioRunnerFilename, "-host", host, "-url", url, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
+				args := []string{"run", scenarioRunnerFilename, "-host", host, "-path", path, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
 				if *debug {
 					args = append(args, "-debug")
 				}

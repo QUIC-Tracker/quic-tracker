@@ -13,7 +13,7 @@ import (
 
 func main() {
 	host := flag.String("host", "", "The host endpoint to run the test against.")
-	url := flag.String("url", "/index.html", "The URL to request when performing tests that needs data to be sent.")
+	path := flag.String("path", "/index.html", "The path to request when performing tests that needs data to be sent.")
 	scenarioName := flag.String("scenario", "", "The particular scenario to run.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
@@ -22,8 +22,8 @@ func main() {
 	timeout := flag.Int("timeout", 10, "The amount of time in seconds spent when completing the test. Defaults to 10. When set to 0, the test ends as soon as possible.")
 	flag.Parse()
 
-	if *host == "" || *url == "" || *scenarioName == "" {
-		println("Parameters host, url and scenario are required")
+	if *host == "" || *path == "" || *scenarioName == "" {
+		println("Parameters host, path and scenario are required")
 		os.Exit(-1)
 	}
 
@@ -50,7 +50,7 @@ func main() {
 
 		start := time.Now()
 		scenario.SetTimer(time.Duration(*timeout) * time.Second)
-		scenario.Run(conn, trace, *url, *debug)
+		scenario.Run(conn, trace, *path, *debug)
 		trace.Duration = uint64(time.Now().Sub(start).Seconds() * 1000)
 		ip := strings.Replace(conn.ConnectedIp().String(), "[", "", -1)
 		trace.Ip = ip[:strings.LastIndex(ip, ":")]

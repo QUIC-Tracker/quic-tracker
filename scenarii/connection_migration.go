@@ -20,7 +20,7 @@ type ConnectionMigrationScenario struct {
 func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{name: "connection_migration", version: 1}}
 }
-func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, CM_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -46,7 +46,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 	trace.ErrorCode = CM_HostDidNotMigrate // Assume it until proven wrong
 
 	for {

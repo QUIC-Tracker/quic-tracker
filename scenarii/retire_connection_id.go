@@ -21,7 +21,7 @@ type RetireConnectionIDScenario struct {
 func NewRetireConnectionIDScenario() *RetireConnectionIDScenario {
 	return &RetireConnectionIDScenario{AbstractScenario{name: "retire_connection_id", version: 1}}
 }
-func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	connAgents := s.CompleteHandshake(conn, trace, RCI_TLSHandshakeFailed)

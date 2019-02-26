@@ -27,7 +27,7 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 	return &SimpleGetAndWaitScenario{AbstractScenario{name: "http_get_and_wait", version: 1}}
 }
 
-func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxBidiStreams = 0
 	conn.TLSTPHandler.MaxUniStreams = 0
 
@@ -44,7 +44,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, pre
 	errors := make(map[uint8]string)
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 
 	var connectionCloseReceived bool
 

@@ -19,7 +19,7 @@ type AddressValidationScenario struct {
 func NewAddressValidationScenario() *AddressValidationScenario {
 	return &AddressValidationScenario{AbstractScenario{name: "address_validation", version: 3}}
 }
-func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	defer connAgents.StopAll()
 

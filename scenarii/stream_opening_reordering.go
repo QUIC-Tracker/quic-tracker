@@ -19,7 +19,7 @@ type StreamOpeningReorderingScenario struct {
 func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{name: "stream_opening_reordering", version: 2}}
 }
-func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := s.CompleteHandshake(conn, trace, SOR_TLSHandshakeFailed)
 	if connAgents == nil {
 		return
@@ -30,7 +30,7 @@ func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Tra
 
 	<-time.NewTimer(20 * time.Millisecond).C // Simulates the SendingAgent behaviour
 
-	payload := []byte(fmt.Sprintf("GET %s\r\n", preferredUrl))
+	payload := []byte(fmt.Sprintf("GET %s\r\n", preferredPath))
 
 	pp1 := qt.NewProtectedPacket(conn)
 	pp1.Frames = append(pp1.Frames, qt.NewStreamFrame(0, 0, payload, false))

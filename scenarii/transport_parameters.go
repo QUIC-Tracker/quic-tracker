@@ -21,7 +21,7 @@ type TransportParameterScenario struct {
 func NewTransportParameterScenario() *TransportParameterScenario {
 	return &TransportParameterScenario{AbstractScenario{name: "transport_parameters", version: 3}}
 }
-func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	for i := uint16(0xff00); i <= 0xff0f; i++ {
 		p := qt.TransportParameter{ParameterType: qt.TransportParametersType(i)}

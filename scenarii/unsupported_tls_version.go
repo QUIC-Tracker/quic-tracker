@@ -21,7 +21,7 @@ type UnsupportedTLSVersionScenario struct {
 func NewUnsupportedTLSVersionScenario() *UnsupportedTLSVersionScenario {
 	return &UnsupportedTLSVersionScenario{AbstractScenario{name: "unsupported_tls_version", version: 1}}
 }
-func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *UnsupportedTLSVersionScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	connAgents := agents.AttachAgentsToConnection(conn, agents.GetDefaultAgents()...)
 	connAgents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	connAgents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = connAgents.GetFrameProducingAgents()

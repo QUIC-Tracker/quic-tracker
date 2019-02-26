@@ -21,7 +21,7 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 	return &GetOnStream2Scenario{AbstractScenario{name: "http_get_on_uni_stream", version: 1}}
 }
 
-func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxBidiStreams = 1
 	conn.TLSTPHandler.MaxUniStreams = 1
 
@@ -38,7 +38,7 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 		trace.ErrorCode = GS2_DidNotCloseTheConnection
 	}
 
-	conn.SendHTTP09GETRequest(preferredUrl, 2)
+	conn.SendHTTP09GETRequest(preferredPath, 2)
 
 	for {
 		select {

@@ -21,7 +21,7 @@ type FlowControlScenario struct {
 func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{name: "flow_control", version: 2}}
 }
-func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredUrl string, debug bool) {
+func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxStreamDataBidiLocal = 80
 
 	connAgents := s.CompleteHandshake(conn, trace, FC_TLSHandshakeFailed)
@@ -33,7 +33,7 @@ func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredUrl, 0)
+	conn.SendHTTP09GETRequest(preferredPath, 0)
 
 	var shouldResume bool
 

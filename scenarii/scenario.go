@@ -86,6 +86,10 @@ func (s *AbstractScenario) CompleteHandshake(conn *qt.Connection, trace *qt.Trac
 			connAgents.StopAll()
 			return nil
 		}
+	case <-conn.ConnectionClosed:
+		trace.MarkError(handshakeErrorCode, "connection closed", nil)
+		connAgents.StopAll()
+		return nil
 	case <-s.Timeout():
 		trace.MarkError(handshakeErrorCode, "handshake timeout", nil)
 		connAgents.StopAll()

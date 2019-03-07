@@ -88,7 +88,12 @@ forLoop:
 		errors[SGW_DidntReceiveTheRequestedData] = "the response to the request was not complete"
 	}
 
-	if len(errors) > 1 {
+	if len(errors) == 1 {
+		for e, s := range errors {
+			trace.ErrorCode = e
+			trace.Results["error"] = s
+		}
+	} else if len(errors) > 1 {
 		trace.ErrorCode = SGW_MultipleErrors
 		trace.Results["error"] = errors
 	}

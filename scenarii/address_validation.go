@@ -10,6 +10,7 @@ const (
 	AV_TLSHandshakeFailed       = 1
 	AV_SentMoreThan3Datagrams   = 2
 	AV_SentMoreThan3TimesAmount = 3
+	AV_HostTimedOut = 3
 )
 
 type AddressValidationScenario struct {
@@ -45,6 +46,7 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	var arrivals []uint64
 	var start time.Time
 	var initialLength int
+	var recvd bool
 
 	trace.ErrorCode = 0
 
@@ -52,6 +54,7 @@ forLoop:
 	for {
 		select {
 		case i := <-incomingPackets:
+			recvd = true
 			var isRetransmit bool
 			switch p := i.(type) {
 			case *qt.InitialPacket:
@@ -96,6 +99,10 @@ forLoop:
 		case <-s.Timeout():
 			break forLoop
 		}
+	}
+
+	if !recvd {
+		trace.ErrorCode = AV_HostTimedOut
 	}
 
 	trace.Results["amplification_factor"] = float32(socketAgent.TotalDataReceived) / float32(initialLength)

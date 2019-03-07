@@ -125,7 +125,9 @@ func (a *StreamAgent) send(streamId uint64, data []byte, close bool) error {
 		s.WriteCloseOffset = s.WriteOffset
 	}
 	a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
-	a.streamClosing[streamId] = true
+	if close {
+		a.streamClosing[streamId] = true
+	}
 	a.conn.PreparePacket.Submit(EncryptionLevelBestAppData)
 	return nil
 }

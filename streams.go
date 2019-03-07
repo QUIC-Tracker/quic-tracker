@@ -20,7 +20,7 @@ func (s StreamsType) String() string {
 }
 
 func IsBidi(streamId uint64) bool   { return streamId&2 == 0 }
-func IsUni(streamId uint64) bool    { return streamId&2 == 1 }
+func IsUni(streamId uint64) bool    { return streamId&2 == 2 }
 func IsClient(streamId uint64) bool { return streamId&1 == 0 }
 func IsServer(streamId uint64) bool { return streamId&1 == 1 }
 

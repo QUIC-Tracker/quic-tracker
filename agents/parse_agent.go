@@ -64,7 +64,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							}
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
-							a.Logger.Printf("Packet number of %s packet of length %d bytes could not be decrypted, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
+							a.Logger.Printf("Crypto state for %s packet of length %d bytes is not ready, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
 							a.conn.UnprocessedPayloads.Submit(UnprocessedPayload{header.EncryptionLevel(), ciphertext})
 							break packetSelect
 						}

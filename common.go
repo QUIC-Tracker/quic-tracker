@@ -49,7 +49,7 @@ const (
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
 	MaximumVersion         = 0xff000012
-	MinimumVersion         = 0xff000011
+	MinimumVersion         = 0xff000012
 )
 
 // errors

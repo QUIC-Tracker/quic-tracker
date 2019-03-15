@@ -4,7 +4,7 @@ mozquic.ducksong.com:4433	/index.html
 nghttp2.org:4433	/index.html
 quant.eggert.org:4433	/index.html
 kazuhooku.com:4433	/notfound
-msquic.westus.cloudapp.azure.com:4433	/index.html
+quic.westus.cloudapp.azure.com:4433	/index.html
 fb.mvfst.net:4433	/index.html
 pandora.cm.in.tum.de:4433	/index.html
 cloudflare-quic.com:443	/index.html

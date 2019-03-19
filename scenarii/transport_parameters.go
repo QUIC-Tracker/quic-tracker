@@ -34,6 +34,8 @@ func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	if connAgents == nil {
 		return
 	}
+	s.Finished()
+	<-s.timeout.C
 	defer connAgents.CloseConnection(false, 0, "")
 
 	trace.Results["transport_parameters"] = conn.TLSTPHandler.EncryptedExtensionsTransportParameters

@@ -20,7 +20,6 @@ func NewHTTP3GETScenario() *HTTP3GETScenario {
 }
 func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 3
-	conn.TransitionTo(qt.QuicVersion, qt.QuicH3ALPNToken)
 
 	http := agents.HTTPAgent{}
 	connAgents := s.CompleteHandshake(conn, trace, H3G_TLSHandshakeFailed, &http)

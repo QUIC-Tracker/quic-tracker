@@ -16,7 +16,9 @@ type AckAgent struct {
 func (a *AckAgent) Run(conn *Connection) {
 	a.BaseAgent.Init("AckAgent", conn.OriginalDestinationCID)
 	a.FrameProducingAgent.InitFPA(conn)
-	a.DisableAcks = make(map[PNSpace]bool)
+	if a.DisableAcks == nil {
+		a.DisableAcks = make(map[PNSpace]bool)
+	}
 	a.TotalDataAcked = make(map[PNSpace]uint64)
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)

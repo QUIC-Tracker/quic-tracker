@@ -15,7 +15,7 @@ type ClosingAgent struct {
 	IdleTimeout  *time.Timer
 }
 
-func (a *ClosingAgent) Run(conn *Connection) {
+func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and AC
 	a.Init("ClosingAgent", conn.OriginalDestinationCID)
 	a.conn = conn
 	a.IdleDuration = time.Duration(a.conn.TLSTPHandler.IdleTimeout) * time.Second
@@ -27,7 +27,6 @@ func (a *ClosingAgent) Run(conn *Connection) {
 	go func() {
 		defer a.Logger.Println("Agent terminated")
 		defer close(a.closed)
-		defer close(a.conn.ConnectionClosed)
 
 		for {
 			select {
@@ -37,6 +36,7 @@ func (a *ClosingAgent) Run(conn *Connection) {
 				switch p := i.(type) {
 				case Framer:
 					if a.closing && (p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType)) {
+						close(a.conn.ConnectionClosed)
 						return
 					}
 				}
@@ -46,8 +46,12 @@ func (a *ClosingAgent) Run(conn *Connection) {
 			case <-a.IdleTimeout.C:
 				a.closing = true
 				a.Logger.Printf("Idle timeout of %v reached, closing\n", a.IdleDuration.String())
+				close(a.conn.ConnectionClosed)
 				return
-			case <-a.close:
+			case shouldRestart := <-a.close:
+				if !shouldRestart {
+					close(a.conn.ConnectionClosed)
+				}
 				return
 			}
 		}

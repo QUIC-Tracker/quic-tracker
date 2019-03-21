@@ -212,10 +212,10 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 	}
 
 	hdrs := []HTTPHeader{
-		HTTPHeader{":method", method},
-		HTTPHeader{":scheme", "https"},
-		HTTPHeader{":authority", authority},
-		HTTPHeader{":path", path},
+		{":method", method},
+		{":scheme", "https"},
+		{":authority", authority},
+		{":path", path},
 	}
 	for k, v := range headers {
 		hdrs = append(hdrs, HTTPHeader{k, v})

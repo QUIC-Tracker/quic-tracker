@@ -47,6 +47,8 @@ type Connection struct {
 	StreamInput               Broadcaster //type: StreamInput
 
 	ConnectionClosed 		  chan bool
+	ConnectionRestart 	  	  chan bool // Triggered when receiving a Retry or a VN packet
+	ConnectionRestarted 	  chan bool
 
 	OriginalDestinationCID ConnectionID
 	SourceCID              ConnectionID
@@ -290,6 +292,8 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.FrameQueue = NewBroadcaster(1000)
 	c.TransportParameters = NewBroadcaster(10)
 	c.ConnectionClosed = make(chan bool, 1)
+	c.ConnectionRestart = make(chan bool, 1)
+	c.ConnectionRestarted = make(chan bool, 1)
 	c.PreparePacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
 

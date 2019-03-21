@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/davecgh/go-spew/spew"
 	"strings"
 )
 
@@ -38,13 +39,9 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 	a.sendInitial = make(chan bool, 1)
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
-
 	outPackets := conn.OutgoingPackets.RegisterNewChan(1000)
-
 	tlsStatus := a.TLSAgent.TLSStatus.RegisterNewChan(10)
-
-	socketStatus := make(chan interface{}, 10)
-	a.SocketAgent.SocketStatus.Register(socketStatus)
+	socketStatus := a.SocketAgent.SocketStatus.RegisterNewChan(10)
 
 	firstInitialReceived := false
 	tlsCompleted := false
@@ -66,20 +63,17 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						a.HandshakeStatus.Submit(HandshakeStatus{false, p, err})
 						return
 					}
-					conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
+					close(conn.ConnectionRestart)
 				case *RetryPacket:
 					if !a.IgnoreRetry && bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
-						tlsTP := conn.TLSTPHandler
-						conn.TransitionTo(QuicVersion, QuicALPNToken)
+						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
+						spew.Dump(tlsTP)
+						conn.TransitionTo(QuicVersion, alpn)
 						conn.TLSTPHandler = tlsTP
 						conn.Token = p.RetryToken
-						a.TLSAgent.Stop()
-						a.TLSAgent.Join()
-						a.TLSAgent.Run(conn)
-						a.TLSAgent.TLSStatus.Register(tlsStatus)
-						conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
+						close(conn.ConnectionRestart)
 					}
 				case Framer:
 					if p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType) {
@@ -122,6 +116,13 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				if strings.Contains(i.(error).Error(), "connection refused") {
 					a.HandshakeStatus.Submit(HandshakeStatus{false, nil , i.(error)})
 				}
+			case <-conn.ConnectionRestarted:
+				incPackets = conn.IncomingPackets.RegisterNewChan(1000)
+				outPackets = conn.OutgoingPackets.RegisterNewChan(1000)
+				tlsStatus = a.TLSAgent.TLSStatus.RegisterNewChan(10)
+				socketStatus = a.SocketAgent.SocketStatus.RegisterNewChan(10)
+				conn.ConnectionRestarted = make(chan bool, 1)
+				conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
 			case <-a.close:
 				return
 			}

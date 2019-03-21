@@ -21,26 +21,27 @@ type Agent interface {
 	Init(name string, SCID ConnectionID)
 	Run(conn *Connection)
 	Stop()
+	Restart()
 	Join()
 }
 
 type RequestFrameArgs struct {
 	availableSpace int
-	level  EncryptionLevel
-	number PacketNumber
+	level          EncryptionLevel
+	number         PacketNumber
 }
 
 // All agents should embed this structure
 type BaseAgent struct {
 	name   string
 	Logger *log.Logger
-	close  chan bool
+	close  chan bool  // true if should restart, false otherwise
 	closed chan bool
 }
 
 func (a *BaseAgent) Name() string { return a.name }
 
-// All agents that embed this structure must call InitFPA() as soon as their Run() method is called
+// All agents that embed this structure must call Init() as soon as their Run() method is called
 func (a *BaseAgent) Init(name string, ODCID ConnectionID) {
 	a.name = name
 	a.Logger = log.New(os.Stderr, fmt.Sprintf("[%s/%s] ", hex.EncodeToString(ODCID), a.Name()), log.Lshortfile)
@@ -54,6 +55,14 @@ func (a *BaseAgent) Stop() {
 	case <-a.close:
 	default:
 		close(a.close)
+	}
+}
+
+func (a *BaseAgent) Restart() {
+	select {
+	case <-a.close:
+	default:
+		a.close <- true
 	}
 }
 
@@ -105,6 +114,25 @@ func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgen
 		c.Add(a)
 	}
 
+	go func() {
+		for {
+			select {
+			case <-conn.ConnectionRestart:
+				conn.Logger.Printf("Restarting all agents\n")
+				for _, a := range agents {
+					a.Restart()
+					a.Join()
+					a.Run(conn)
+				}
+				conn.ConnectionRestart = make(chan bool, 1)
+				close(conn.ConnectionRestarted)
+				conn.Logger.Printf("Restarting all agents: done\n")
+			case <-conn.ConnectionClosed:
+				return
+			}
+		}
+	}()
+
 	return &c
 }
 
@@ -132,7 +160,7 @@ func (c *ConnectionAgents) GetFrameProducingAgents() []FrameProducer {
 	return agents
 }
 
-func (c *ConnectionAgents) Stop(names... string) {
+func (c *ConnectionAgents) Stop(names ...string) {
 	for _, n := range names {
 		c.Get(n).Stop()
 		c.Get(n).Join()

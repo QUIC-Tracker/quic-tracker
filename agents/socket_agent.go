@@ -45,6 +45,11 @@ func (a *SocketAgent) Run(conn *Connection) {
 
 			if err != nil {
 				a.Logger.Println("Closing UDP socket because of error", err.Error())
+				select {
+				case <-recChan:
+					return
+				default:
+				}
 				close(recChan)
 				a.SocketStatus.Submit(err)
 				break
@@ -65,6 +70,11 @@ func (a *SocketAgent) Run(conn *Connection) {
 			a.Logger.Printf("Received %d bytes from UDP socket\n", i)
 			payload := make([]byte, i)
 			copy(payload, recBuf[:i])
+			select {
+			case <-recChan:
+				return
+			default:
+			}
 			recChan <- payload
 		}
 	}()
@@ -80,9 +90,16 @@ func (a *SocketAgent) Run(conn *Connection) {
 				}
 
 				conn.IncomingPayloads.Submit(p)
-			case <-a.close:
-				conn.UdpConnection.Close()
-				// TODO: Close this agent gracefully
+			case shouldRestart := <-a.close:
+				if !shouldRestart {
+					conn.UdpConnection.Close()
+				}
+				select {
+				case <-recChan:
+					return
+				default:
+				}
+				close(recChan)
 				return
 			}
 		}

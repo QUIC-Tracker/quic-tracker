@@ -24,10 +24,14 @@ func main() {
 	path := flag.String("path", "/index.html", "The path to request")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
 	timeout := flag.Int("timeout", 10, "The number of seconds after which the program will timeout")
+	h3 := flag.Bool("3", false, "Use HTTP/3 instead of HTTP/0.9")
 	flag.Parse()
 
 	t := time.NewTimer(time.Duration(*timeout) * time.Second)
-	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, false)
+	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, *h3)
+	if *h3 {
+		conn.TLSTPHandler.MaxUniStreams = 3
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -77,22 +81,38 @@ func main() {
 	}
 
 	defer conn.CloseConnection(false, 0, "")
-	conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *path)), true)
 
-	incomingPackets := make(chan interface{}, 1000)
-	conn.IncomingPackets.Register(incomingPackets)
+	if !*h3 {
+		conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *path)), true)
 
-	for {
-		select {
-		case <-incomingPackets:
-			if conn.Streams.Get(0).ReadClosed {
-				spew.Dump(conn.Streams.Get(0).ReadData)
+		incomingPackets := make(chan interface{}, 1000)
+		conn.IncomingPackets.Register(incomingPackets)
+
+		for {
+			select {
+			case <-incomingPackets:
+				if conn.Streams.Get(0).ReadClosed {
+					spew.Dump(conn.Streams.Get(0).ReadData)
+					return
+				}
+			case <-t.C:
 				return
 			}
+
+		}
+	} else {
+		http3 := &agents.HTTPAgent{}
+		Agents.Add(http3)
+
+		responseReceived := http3.HTTPResponseReceived.RegisterNewChan(1000)
+
+		http3.SendRequest(*path, "GET", trace.Host, nil)
+
+		select {
+		case r := <-responseReceived:
+			spew.Dump(r)
 		case <-t.C:
 			return
 		}
-
 	}
-
 }

@@ -258,5 +258,5 @@ func peekVarInt(buffer *bytes.Buffer) (VarInt, error) {
 	if buffer.Len() == 0 {
 		return VarInt{}, errors.New("no more byte to read")
 	}
-	return ReadVarInt(bytes.NewReader(buffer.Bytes()[:4]))
+	return ReadVarInt(bytes.NewReader(buffer.Bytes()))
 }

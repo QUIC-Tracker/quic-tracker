@@ -94,12 +94,6 @@ func (a *SocketAgent) Run(conn *Connection) {
 				if !shouldRestart {
 					conn.UdpConnection.Close()
 				}
-				select {
-				case <-recChan:
-					return
-				default:
-				}
-				close(recChan)
 				return
 			}
 		}

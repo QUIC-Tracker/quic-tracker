@@ -124,5 +124,6 @@ func GetAllScenarii() map[string]Scenario {
 		"http3_encoder_stream":      NewHTTP3EncoderStreamScenario(),
 		"http3_uni_streams_limits":  NewHTTP3UniStreamsLimitsScenario(),
 		"http3_reserved_frames":     NewHTTP3ReservedFramesScenario(),
+		"spin_bit":     			 NewSpinBitScenario(),
 	}
 }

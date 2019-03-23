@@ -149,6 +149,7 @@ func (t PacketType) PNSpace() PNSpace {
 }
 
 type ShortHeader struct {
+	SpinBit 	   SpinBit
 	KeyPhase       KeyPhaseBit
 	DestinationCID ConnectionID
 	truncatedPN    TruncatedPN
@@ -158,6 +159,9 @@ func (h *ShortHeader) Encode() []byte {
 	buffer := new(bytes.Buffer)
 	var typeByte uint8
 	typeByte |= 0x40
+	if h.SpinBit == SpinValueOne {
+		typeByte |= 0x20
+	}
 	if h.KeyPhase == KeyPhaseOne {
 		typeByte |= 0x04
 	}
@@ -177,6 +181,7 @@ func (h *ShortHeader) HeaderLength() int                     { return 1 + len(h.
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
 	typeByte, _ := buffer.ReadByte()
+	h.SpinBit = (typeByte & 0x20) == 0x20
 	h.KeyPhase = (typeByte & 0x04) == 0x04
 
 	h.DestinationCID = make([]byte, len(conn.SourceCID))
@@ -187,6 +192,7 @@ func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 }
 func NewShortHeader(conn *Connection) *ShortHeader {
 	h := new(ShortHeader)
+	h.SpinBit = conn.SpinBit
 	h.KeyPhase = conn.KeyPhaseIndex % 2 == 1
 	h.DestinationCID = conn.DestinationCID
 	h.packetNumber = conn.nextPacketNumber(PNSpaceAppData)
@@ -197,3 +203,7 @@ func NewShortHeader(conn *Connection) *ShortHeader {
 type KeyPhaseBit bool
 const KeyPhaseZero KeyPhaseBit = false
 const KeyPhaseOne KeyPhaseBit = true
+
+type SpinBit bool
+const SpinValueZero SpinBit = false
+const SpinValueOne SpinBit = true

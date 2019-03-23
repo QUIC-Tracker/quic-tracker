@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	hostsFilename := flag.String("hosts", "", "A tab-separated file containing hosts and the paths used to request data to be sent.")
+	hostsFilename := flag.String("hosts", "", "A tab-separated file containing hosts, the paths used to request data to be sent and ports for negotiating h3.")
 	scenarioName := flag.String("scenario", "", "A particular scenario to run. Run all of them if the parameter is missing.")
 	outputFilename := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	logsDirectory := flag.String("logs-directory", "/tmp", "Location of the logs.")
@@ -96,6 +96,17 @@ func main() {
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "\t")
 			host, path := line[0], line[1]
+			port, err := strconv.Atoi(line[2])
+			if err != nil {
+				println(err)
+				continue
+			}
+
+			if scenario.HTTP3() {
+				split := strings.Split(host, ":")
+				host, _ = split[0], split[1]
+				host = fmt.Sprintf("%s:%d", host, port)
+			}
 
 			<-semaphore
 			wg.Add(1)

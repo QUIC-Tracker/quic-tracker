@@ -1,17 +1,17 @@
-quic.ogre.com:4433	/index.html
-minq.dev.mozaws.net:4433	/index.html
-mozquic.ducksong.com:4433	/index.html
-nghttp2.org:4433	/index.html
-quant.eggert.org:4433	/index.html
-kazuhooku.com:4433	/notfound
-quic.westus.cloudapp.azure.com:4433	/index.html
-fb.mvfst.net:4433	/index.html
-pandora.cm.in.tum.de:4433	/index.html
-cloudflare-quic.com:443	/index.html
-208.85.208.226:4433	/t1.html
-test.privateoctopus.com:4433	/index.html
-quicker.edm.uhasselt.be:4433	/index.html
-ralith.com:4433	/index.html
-xavamedia.nl:4433	/index.html
-http3-test.litespeedtech.com:4433	/index.html
-quic.tech:4433	/index.html
+quic.ogre.com:4433	/index.html	4433
+minq.dev.mozaws.net:4433	/index.html	4433
+mozquic.ducksong.com:4433	/index.html	4433
+nghttp2.org:4433	/index.html	4433
+quant.eggert.org:4433	/index.html	4433
+kazuhooku.com:4433	/notfound	4433
+quic.westus.cloudapp.azure.com:4433	/index.html	443
+fb.mvfst.net:4433	/index.html	4433
+pandora.cm.in.tum.de:4433	/index.html	4433
+cloudflare-quic.com:443	/index.html	443
+208.85.208.226:4433	/t1.html	4433
+test.privateoctopus.com:4433	/index.html	4433
+quicker.edm.uhasselt.be:4433	/index.html	4433
+ralith.com:4433	/index.html	4433
+xavamedia.nl:4433	/index.html	4433
+http3-test.litespeedtech.com:4433	/index.html	4433
+quic.tech:4433	/index.html	8443

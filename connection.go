@@ -173,10 +173,22 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotiationPacket) erro
 }
 func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack frame based on the packet numbers received
 	sort.Sort(PacketNumberQueue(c.AckQueue[space]))
-	packetNumbers := c.AckQueue[space]
+	packetNumbers := make([]PacketNumber, 0, len(c.AckQueue[space]))
+	if len(c.AckQueue[space]) > 0 {
+		last := c.AckQueue[space][0]
+		packetNumbers = append(packetNumbers, last)
+		for _, i := range c.AckQueue[space] {
+			if i != last {
+				last = i
+				packetNumbers = append(packetNumbers, i)
+			}
+		}
+	}
+
 	if len(packetNumbers) == 0 {
 		return nil
 	}
+
 	frame := new(AckFrame)
 	frame.AckRanges = make([]AckRange, 0, 255)
 	frame.LargestAcknowledged = packetNumbers[0]

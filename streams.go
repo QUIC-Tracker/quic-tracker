@@ -3,6 +3,7 @@ package quictracker
 import (
 	"fmt"
 	"math"
+	"sync"
 )
 
 type StreamsType bool
@@ -45,13 +46,16 @@ type StreamInput struct {
 
 type Streams struct {
 	streams map[uint64]*Stream
-	input *Broadcaster
+	lock    *sync.Mutex
+	input   *Broadcaster
 }
 
 func (s Streams) Get(streamId uint64) *Stream {
+	s.lock.Lock()
 	if s.streams[streamId] == nil {
 		s.streams[streamId] = NewStream()
 	}
+	s.lock.Unlock()
 	return s.streams[streamId]
 }
 

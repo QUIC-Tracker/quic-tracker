@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -220,7 +221,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
 	c.CryptoStreams = make(map[PNSpace]*Stream)
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
-	c.Streams = Streams{make(map[uint64]*Stream), &c.StreamInput}
+	c.Streams = Streams{streams: make(map[uint64]*Stream), lock: &sync.Mutex{}, input: &c.StreamInput}
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
 	if quicLayer {

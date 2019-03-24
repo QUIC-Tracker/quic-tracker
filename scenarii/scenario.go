@@ -126,5 +126,6 @@ func GetAllScenarii() map[string]Scenario {
 		"http3_reserved_frames":     NewHTTP3ReservedFramesScenario(),
 		"spin_bit":     			 NewSpinBitScenario(),
 		"overlapping_stream_frames": NewOverlappingStreamFramesScenario(),
+		"server_flow_control": 		 NewServerFlowControlScenario(),
 	}
 }

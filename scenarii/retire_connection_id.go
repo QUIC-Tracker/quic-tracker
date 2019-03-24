@@ -36,7 +36,7 @@ func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	defer func() { trace.Results["new_connection_ids"] = alternativeConnectionIDs }()
 
 	var hasRetiredCIDs bool
-
+	var highestSeq uint64
 	for {
 		select {
 		case i := <-incPackets:
@@ -55,7 +55,10 @@ func (s *RetireConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 
 					if !hasRetiredCIDs {
 						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.RetireConnectionId{nci.Sequence}, qt.EncryptionLevel1RTT})
-					} else {
+						if highestSeq < nci.Sequence {
+							highestSeq = nci.Sequence
+						}
+					} else if nci.Sequence > highestSeq {
 						trace.ErrorCode = 0
 						s.Finished()
 					}

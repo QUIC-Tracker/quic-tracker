@@ -25,7 +25,7 @@ func NewHTTP3EncoderStreamScenario() *HTTP3EncoderStreamScenario {
 func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 3
 
-	http := agents.HTTPAgent{QPACKEncoderOpts: ls_qpack_go.LSQPackEncOptIxAggr}
+	http := agents.HTTP3Agent{QPACKEncoderOpts: ls_qpack_go.LSQPackEncOptIxAggr}
 	connAgents := s.CompleteHandshake(conn, trace, H3ES_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return
@@ -46,7 +46,7 @@ forLoop:
 	for {
 		select {
 		case i := <-frameReceived:
-			fr := i.(agents.HTTPFrameReceived)
+			fr := i.(agents.HTTP3FrameReceived)
 			switch fr.Frame.(type) {
 			case *http3.SETTINGS:
 				break forLoop

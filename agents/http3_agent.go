@@ -9,10 +9,9 @@ import (
 	"math"
 )
 
-type HTTPResponse struct {
-	StreamID uint64
-	Headers  []HTTPHeader
-	Body     []byte
+type HTTP3Response struct {
+	HTTP09Response
+	headers  []HTTPHeader
 
 	fin              bool
 	headersRemaining int
@@ -20,11 +19,13 @@ type HTTPResponse struct {
 	totalReceived    uint64
 }
 
-func (r HTTPResponse) Complete() bool {
+func (r HTTP3Response) Complete() bool {
 	return r.fin && r.totalReceived > 0 && r.totalProcessed == r.totalReceived && r.headersRemaining == 0
 }
 
-type HTTPFrameReceived struct {
+func (r HTTP3Response) Headers() []HTTPHeader { return r.headers }
+
+type HTTP3FrameReceived struct {
 	StreamID uint64
 	Frame    http3.HTTPFrame
 }
@@ -34,17 +35,18 @@ type streamData struct {
 	data     []byte
 }
 
-// The HTTP Agent is TODO
-type HTTPAgent struct {
+// The HTTP3 Agent is TODO
+type HTTP3Agent struct {
 	BaseAgent
 	conn                 *Connection
+	DisableQPACKStreams	 bool
 	QPACK                QPACKAgent
 	QPACKEncoderOpts     uint32
-	HTTPResponseReceived Broadcaster //type: HTTPResponse
-	FrameReceived        Broadcaster //type: HTTPFrameReceived
+	HTTPResponseReceived Broadcaster //type: HTTP3Response
+	FrameReceived        Broadcaster //type: HTTP3FrameReceived
 	streamData           chan streamData
 	streamDataBuffer     map[uint64]*bytes.Buffer
-	responseBuffer       map[uint64]*HTTPResponse
+	responseBuffer       map[uint64]*HTTP3Response
 	controlStreamID      uint64
 	peerControlStreamID  uint64
 	nextRequestStream    uint64
@@ -54,10 +56,10 @@ const (
 	HTTPNoStream uint64 = math.MaxUint64
 )
 
-func (a *HTTPAgent) Run(conn *Connection) {
-	a.Init("HTTPAgent", conn.OriginalDestinationCID)
+func (a *HTTP3Agent) Run(conn *Connection) {
+	a.Init("HTTP3Agent", conn.OriginalDestinationCID)
 	a.conn = conn
-	a.QPACK = QPACKAgent{EncoderStreamID: 6, DecoderStreamID: 10}
+	a.QPACK = QPACKAgent{EncoderStreamID: 6, DecoderStreamID: 10, DisableStreams: a.DisableQPACKStreams}
 	a.QPACK.Run(conn)
 
 	a.HTTPResponseReceived = NewBroadcaster(1000)
@@ -78,7 +80,7 @@ func (a *HTTPAgent) Run(conn *Connection) {
 
 	a.streamData = make(chan streamData)
 	a.streamDataBuffer = make(map[uint64]*bytes.Buffer)
-	a.responseBuffer = make(map[uint64]*HTTPResponse)
+	a.responseBuffer = make(map[uint64]*HTTP3Response)
 
 	var settingsReceived bool
 	settingsHeaderTableSize := uint64(4096)
@@ -118,12 +120,12 @@ func (a *HTTPAgent) Run(conn *Connection) {
 				streamBuffer.Write(sd.data)
 				a.attemptDecoding(sd.streamID, streamBuffer)
 			case i := <-frameReceived:
-				fr := i.(HTTPFrameReceived)
+				fr := i.(HTTP3FrameReceived)
 				a.Logger.Printf("Received a %s frame on stream %d\n", fr.Frame.Name(), fr.StreamID)
 				switch f := fr.Frame.(type) {
 				case *http3.HEADERS:
 					a.QPACK.DecodeHeaders <- EncodedHeaders{fr.StreamID, f.HeaderBlock}
-					var response *HTTPResponse
+					var response *HTTP3Response
 					var ok bool
 					if response, ok = a.responseBuffer[fr.StreamID]; !ok {
 						a.Logger.Printf("Received encoded headers for stream %d, but no matching response found\n", fr.StreamID)
@@ -132,13 +134,13 @@ func (a *HTTPAgent) Run(conn *Connection) {
 					response.headersRemaining++
 					response.totalProcessed += f.WireLength()
 				case *http3.DATA:
-					var response *HTTPResponse
+					var response *HTTP3Response
 					var ok bool
 					if response, ok = a.responseBuffer[fr.StreamID]; !ok {
 						a.Logger.Printf("%s frame for stream %d does not match any request\n", f.Name(), fr.StreamID)
 						continue
 					}
-					response.Body = append(a.responseBuffer[fr.StreamID].Body, f.Payload...)
+					response.body = append(a.responseBuffer[fr.StreamID].body, f.Payload...)
 					response.totalProcessed += f.WireLength()
 					a.checkResponse(response)
 				case *http3.SETTINGS:
@@ -154,20 +156,24 @@ func (a *HTTPAgent) Run(conn *Connection) {
 							settingsQPACKBlockedStreams = s.Value.Value
 						}
 					}
-					a.QPACK.InitEncoder(uint(settingsHeaderTableSize), uint(settingsHeaderTableSize), uint(settingsQPACKBlockedStreams), a.QPACKEncoderOpts)
+					dynamicTableSize := uint(1024)
+					if a.DisableQPACKStreams {
+						dynamicTableSize = 0
+					}
+					a.QPACK.InitEncoder(uint(settingsHeaderTableSize), dynamicTableSize, uint(settingsQPACKBlockedStreams), a.QPACKEncoderOpts)
 				default:
 					spew.Dump(fr)
 				}
 			case i := <-decodedHeaders:
 				dHdrs := i.(DecodedHeaders)
-				var response *HTTPResponse
+				var response *HTTP3Response
 				var ok bool
 				if response, ok = a.responseBuffer[dHdrs.StreamID]; !ok {
 					a.Logger.Printf("Received decoded headers for stream %d, but no matching response found\n", dHdrs.StreamID)
 					continue
 				}
 				response.headersRemaining--
-				response.Headers = append(a.responseBuffer[dHdrs.StreamID].Headers, dHdrs.Headers...)
+				response.headers = append(a.responseBuffer[dHdrs.StreamID].headers, dHdrs.Headers...)
 				a.checkResponse(response)
 			case i := <-encodedHeaders:
 				eHdrs := i.(EncodedHeaders)
@@ -179,30 +185,30 @@ func (a *HTTPAgent) Run(conn *Connection) {
 		}
 	}()
 }
-func (a *HTTPAgent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64, fin bool) {
+func (a *HTTP3Agent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64, fin bool) {
 	buf := new(bytes.Buffer)
 	frame.WriteTo(buf)
 	a.conn.Streams.Send(streamID, buf.Bytes(), fin)
 }
-func (a *HTTPAgent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
+func (a *HTTP3Agent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 	var l VarInt
 	var err error
 	for l, err = peekVarInt(buffer); err == nil && buffer.Len() >= l.Length+1+int(l.Value); l, err = peekVarInt(buffer) {
 		reader := bytes.NewReader(buffer.Next(l.Length + 1 + int(l.Value)))
 		frame := http3.ReadHTTPFrame(reader)
-		a.FrameReceived.Submit(HTTPFrameReceived{streamID, frame})
+		a.FrameReceived.Submit(HTTP3FrameReceived{streamID, frame})
 	}
 	if err == nil {
 		a.Logger.Printf("Unable to parse %d byte-long frame on stream %d, %d bytes missing\n", l.Value, streamID, int(l.Value)-(buffer.Len()-l.Length-1))
 	}
 }
-func (a *HTTPAgent) checkResponse(response *HTTPResponse) {
+func (a *HTTP3Agent) checkResponse(response *HTTP3Response) {
 	if response.Complete() {
 		a.HTTPResponseReceived.Submit(*response)
 		a.Logger.Printf("A %d-byte long response on stream %d is complete\n", response.totalProcessed, response.StreamID)
 	}
 }
-func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[string]string) {
+func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[string]string) {
 	if headers == nil {
 		headers = make(map[string]string)
 	}
@@ -225,7 +231,7 @@ func (a *HTTPAgent) SendRequest(path, method, authority string, headers map[stri
 	stream := a.conn.Streams.Get(streamID)
 	streamChan := stream.ReadChan.RegisterNewChan(1000)
 	a.streamDataBuffer[streamID] = new(bytes.Buffer)
-	response := &HTTPResponse{StreamID: streamID}
+	response := &HTTP3Response{HTTP09Response: HTTP09Response{streamID: streamID}}
 	a.responseBuffer[streamID] = response
 
 	go func() { // Pipes the data from the response stream to the agent

@@ -25,6 +25,7 @@ type QPACKAgent struct {
 	BaseAgent
 	EncoderStreamID uint64
 	DecoderStreamID uint64
+	DisableStreams  bool
 	DecodeHeaders   chan EncodedHeaders
 	DecodedHeaders  Broadcaster //type: DecodedHeaders
 	EncodeHeaders   chan DecodedHeaders
@@ -46,8 +47,13 @@ func (a *QPACKAgent) Run(conn *Connection) {
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
+	dynamicTableSize := uint(1024)
+	if a.DisableStreams {
+		dynamicTableSize = 0
+	}
+
 	a.encoder = ls_qpack_go.NewQPackEncoder(false)
-	a.decoder = ls_qpack_go.NewQPackDecoder(1024, 100)
+	a.decoder = ls_qpack_go.NewQPackDecoder(dynamicTableSize, 100)
 
 	peerEncoderStreamId := QPACKNoStream
 	peerDecoderStreamId := QPACKNoStream
@@ -155,8 +161,10 @@ func (a *QPACKAgent) Run(conn *Connection) {
 		}
 	}()
 
-	conn.Streams.Send(a.EncoderStreamID, []byte{'H'}, false)
-	conn.Streams.Send(a.DecoderStreamID, []byte{'h'}, false)
+	if a.DisableStreams {
+		conn.Streams.Send(a.EncoderStreamID, []byte{'H'}, false)
+		conn.Streams.Send(a.DecoderStreamID, []byte{'h'}, false)
+	}
 }
 func (a *QPACKAgent) InitEncoder(headerTableSize uint, dynamicTablesize uint, maxRiskedStreams uint, opts uint32) {
 	a.encoder.Init(headerTableSize, dynamicTablesize, maxRiskedStreams, opts)

@@ -101,7 +101,7 @@ func main() {
 
 		}
 	} else {
-		http3 := &agents.HTTPAgent{}
+		http3 := &agents.HTTP3Agent{}
 		Agents.Add(http3)
 
 		responseReceived := http3.HTTPResponseReceived.RegisterNewChan(1000)

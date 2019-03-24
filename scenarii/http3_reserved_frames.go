@@ -23,7 +23,7 @@ func NewHTTP3ReservedFramesScenario() *HTTP3ReservedFramesScenario {
 func (s *HTTP3ReservedFramesScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 3
 
-	http := agents.HTTPAgent{}
+	http := agents.HTTP3Agent{}
 	connAgents := s.CompleteHandshake(conn, trace, H3RF_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return
@@ -45,7 +45,7 @@ func (s *HTTP3ReservedFramesScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 	unknownFrame1.WriteTo(buf)
 	unknownFrame2.WriteTo(buf)
 
-	conn.StreamInput.Submit(qt.StreamInput{StreamId: 0, Data: buf.Bytes()})
+	conn.Streams.Send(0, buf.Bytes(), false)
 
 	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
 

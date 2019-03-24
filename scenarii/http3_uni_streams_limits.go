@@ -22,7 +22,7 @@ func NewHTTP3UniStreamsLimitsScenario() *HTTP3UniStreamsLimitsScenario {
 func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxUniStreams = 1
 
-	http := agents.HTTPAgent{}
+	http := agents.HTTP3Agent{}
 	connAgents := s.CompleteHandshake(conn, trace, H3USFC_TLSHandshakeFailed, &http)
 	if connAgents == nil {
 		return

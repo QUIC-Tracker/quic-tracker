@@ -2,8 +2,6 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
-	"encoding/binary"
-
 	"time"
 )
 
@@ -19,14 +17,12 @@ type TransportParameterScenario struct {
 }
 
 func NewTransportParameterScenario() *TransportParameterScenario {
-	return &TransportParameterScenario{AbstractScenario{name: "transport_parameters", version: 3}}
+	return &TransportParameterScenario{AbstractScenario{name: "transport_parameters", version: 4}}
 }
 func (s *TransportParameterScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	s.timeout = time.NewTimer(10 * time.Second)
 	for i := uint16(0xff00); i <= 0xff0f; i++ {
-		p := qt.TransportParameter{ParameterType: qt.TransportParametersType(i)}
-		p.Value = make([]byte, 2, 2)
-		binary.BigEndian.PutUint16(p.Value, i)
+		p := qt.TransportParameter{qt.TransportParametersType(i), qt.NewVarInt(uint64(i)).Encode()}
 		conn.TLSTPHandler.AdditionalParameters.AddParameter(p)
 	}
 

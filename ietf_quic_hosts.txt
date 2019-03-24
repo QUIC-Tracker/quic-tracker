@@ -3,7 +3,7 @@ minq.dev.mozaws.net:4433	/index.html	4433
 mozquic.ducksong.com:4433	/index.html	4433
 nghttp2.org:4433	/index.html	4433
 quant.eggert.org:4433	/index.html	4433
-kazuhooku.com:4433	/notfound	4433
+kazuhooku.com:4433	/notfound	8433
 quic.westus.cloudapp.azure.com:4433	/index.html	443
 fb.mvfst.net:4433	/index.html	4433
 pandora.cm.in.tum.de:4433	/index.html	4433

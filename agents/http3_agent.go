@@ -205,7 +205,7 @@ func (a *HTTP3Agent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 func (a *HTTP3Agent) checkResponse(response *HTTP3Response) {
 	if response.Complete() {
 		a.HTTPResponseReceived.Submit(*response)
-		a.Logger.Printf("A %d-byte long response on stream %d is complete\n", response.totalProcessed, response.StreamID)
+		a.Logger.Printf("A %d-byte long response on stream %d is complete\n", response.totalProcessed, response.streamID)
 	}
 }
 func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[string]string) {

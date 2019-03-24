@@ -185,7 +185,7 @@ func (s *Stream) addToRead(f *StreamFrame) { // TODO: Flag implementations that 
 		}
 	}
 
-	if s.ReadOffset == s.ReadCloseOffset {
+	if s.ReadOffset == s.ReadCloseOffset && !s.ReadClosed {
 		s.ReadClosed = true
 		s.ReadChan.Close()
 	}

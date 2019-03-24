@@ -161,7 +161,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 		}
 	}()
 
-	if a.DisableStreams {
+	if !a.DisableStreams {
 		conn.Streams.Send(a.EncoderStreamID, []byte{'H'}, false)
 		conn.Streams.Send(a.DecoderStreamID, []byte{'h'}, false)
 	}

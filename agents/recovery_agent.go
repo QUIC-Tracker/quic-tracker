@@ -68,6 +68,9 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 						a.Logger.Printf("Packet %s doesn't contain ACK frames, emptying the corresponding retransmission buffer anyway\n", p.ShortString())
 						a.retransmissionBuffer[p.PNSpace()] = make(map[PacketNumber]RetransmittableFrames)
 					}
+					if p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType) {
+						a.Stop()
+					}
 				case *RetryPacket:
 					a.Logger.Println("Received a Retry packet, emptying Initial retransmit buffer")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)

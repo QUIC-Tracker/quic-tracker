@@ -160,6 +160,9 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 					if a.DisableQPACKStreams {
 						dynamicTableSize = 0
 					}
+					if dynamicTableSize > uint(settingsHeaderTableSize) {
+						dynamicTableSize = uint(settingsHeaderTableSize)
+					}
 					a.QPACK.InitEncoder(uint(settingsHeaderTableSize), dynamicTableSize, uint(settingsQPACKBlockedStreams), a.QPACKEncoderOpts)
 				default:
 					spew.Dump(fr)

@@ -2,6 +2,7 @@ package agents
 
 import (
 	. "github.com/QUIC-Tracker/quic-tracker"
+	"time"
 )
 
 // The AckAgent is in charge of queuing ACK frames in response to receiving packets that need to be acknowledged as well
@@ -21,6 +22,10 @@ func (a *AckAgent) Run(conn *Connection) {
 	}
 	a.TotalDataAcked = make(map[PNSpace]uint64)
 
+	recvdTimestamps := make(map[PNSpace]map[PacketNumber]time.Time)
+	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
+		recvdTimestamps[space] = make(map[PacketNumber]time.Time)
+	}
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	go func() {
@@ -40,6 +45,7 @@ func (a *AckAgent) Run(conn *Connection) {
 					}
 
 					conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], pn)
+					recvdTimestamps[p.PNSpace()][p.Header().PacketNumber()] = p.ReceiveContext().Timestamp
 
 					if framePacket, ok := p.(Framer); ok {
 						if pathChallenge := framePacket.GetFirst(PathChallengeType); !a.DisablePathResponse && pathChallenge != nil {
@@ -59,11 +65,17 @@ func (a *AckAgent) Run(conn *Connection) {
 					break
 				}
 				f := conn.GetAckFrame(pnSpace)
-				if f != nil && args.availableSpace >= int(f.FrameLength()) {
-					a.frames <- []Frame{f}
-				} else if f != nil {
-					a.conn.PreparePacket.Submit(args.level)
-					a.frames <- nil
+				if f != nil {
+					lRTimestamp, ok := recvdTimestamps[pnSpace][f.LargestAcknowledged]
+					if ok {
+						f.AckDelay = uint64((time.Now().Sub(lRTimestamp).Round(time.Microsecond) / time.Microsecond) << conn.TLSTPHandler.AckDelayExponent)
+					}
+					if args.availableSpace >= int(f.FrameLength()) {
+						a.frames <- []Frame{f}
+					} else {
+						a.conn.PreparePacket.Submit(args.level)
+						a.frames <- nil
+					}
 				} else {
 					a.frames <- nil
 				}

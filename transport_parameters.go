@@ -86,7 +86,7 @@ type TLSTransportParameterHandler struct {
 
 func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
 	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters:
-		QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10}}
+		QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10, AckDelayExponent: 3}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter

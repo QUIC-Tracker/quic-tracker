@@ -67,7 +67,7 @@ func (a *RTTAgent) Run(conn *Connection) {
 							if ackDelayExponent == 0 {
 								ackDelayExponent = 3
 							}
-							a.LatestRTT = uint64(time.Now().Sub(sp.sent).Nanoseconds() / int64(time.Microsecond))
+							a.LatestRTT = uint64(p.ReceiveContext().Timestamp.Sub(sp.sent).Nanoseconds() / int64(time.Microsecond))
 							a.UpdateRTT(ack.AckDelay * (2 << (ackDelayExponent - 1)), sp.ackOnly)
 						}
 					}

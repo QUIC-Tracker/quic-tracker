@@ -31,17 +31,16 @@ func (a *ParsingAgent) Run(conn *Connection) {
 				var off int
 				for off < len(udpPayload) {
 					ciphertext := udpPayload[off:]
-					header := ReadHeader(bytes.NewReader(ciphertext), a.conn)
-					cryptoState := a.conn.CryptoStates[header.EncryptionLevel()]
 
-					if lh, ok := header.(*LongHeader); ok && lh.Version == 0x00000000 {
+					if bytes.Equal(ciphertext[1:5], []byte{0, 0, 0, 0}) {
 						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
-
 						a.SaveCleartextPacket(ciphertext, packet.Pointer())
 						a.conn.IncomingPackets.Submit(packet)
-
 						break packetSelect
 					}
+
+					header := ReadHeader(bytes.NewReader(ciphertext), a.conn)
+					cryptoState := a.conn.CryptoStates[header.EncryptionLevel()]
 
 					switch header.PacketType() {
 					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN

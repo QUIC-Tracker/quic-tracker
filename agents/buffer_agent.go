@@ -14,7 +14,7 @@ func (a *BufferAgent) Run(conn *Connection) {
 	uPChan := conn.UnprocessedPayloads.RegisterNewChan(1000)
 	eLChan := conn.EncryptionLevelsAvailable.RegisterNewChan(1000)
 
-	unprocessedPayloads := make(map[EncryptionLevel][][]byte)
+	unprocessedPayloads := make(map[EncryptionLevel][]IncomingPayload)
 	encryptionLevelsAvailable := make(map[EncryptionLevel]bool)
 
 	go func() {
@@ -25,9 +25,9 @@ func (a *BufferAgent) Run(conn *Connection) {
 			case i := <-uPChan:
 				u := i.(UnprocessedPayload)
 				if !encryptionLevelsAvailable[u.EncryptionLevel] {
-					unprocessedPayloads[u.EncryptionLevel] = append(unprocessedPayloads[u.EncryptionLevel], u.Payload)
+					unprocessedPayloads[u.EncryptionLevel] = append(unprocessedPayloads[u.EncryptionLevel], u.IncomingPayload)
 				} else {
-					conn.IncomingPayloads.Submit(u.Payload)
+					conn.IncomingPayloads.Submit(u.IncomingPayload)
 				}
 			case i := <-eLChan:
 				dEL := i.(DirectionalEncryptionLevel)

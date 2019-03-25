@@ -28,10 +28,7 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath
 	defer connAgents.CloseConnection(false, 0, "")
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
-
 	socketAgent := connAgents.Get("SocketAgent").(*agents.SocketAgent)
-	ecnStatus := socketAgent.ECNStatus.RegisterNewChan(1000)
-
 
 	err := socketAgent.ConfigureECN()
 	if err != nil {
@@ -55,10 +52,9 @@ func (s *AckECNScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath
 					}
 				}
 			}
-		case i := <-ecnStatus:
-			switch i.(agents.ECNStatus) {
-			case agents.ECNStatusNonECT:
-			case agents.ECNStatusECT_0, agents.ECNStatusECT_1, agents.ECNStatusCE:
+			switch i.(qt.Packet).ReceiveContext().ECNStatus {
+			case qt.ECNStatusNonECT:
+			case qt.ECNStatusECT_0, qt.ECNStatusECT_1, qt.ECNStatusCE:
 				if trace.ErrorCode == AE_NonECN {
 					trace.ErrorCode = AE_NoACKECNReceived
 				} else if trace.ErrorCode == AE_NonECNButACKECN {

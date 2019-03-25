@@ -27,10 +27,10 @@ func (a *ParsingAgent) Run(conn *Connection) {
 		packetSelect:
 			select {
 			case i := <-incomingPayloads:
-				udpPayload := i.([]byte)
+				ic := i.(IncomingPayload)
 				var off int
-				for off < len(udpPayload) {
-					ciphertext := udpPayload[off:]
+				for off < len(ic.Payload) {
+					ciphertext := ic.Payload[off:]
 
 					if bytes.Equal(ciphertext[1:5], []byte{0, 0, 0, 0}) {
 						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
@@ -64,7 +64,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
 							a.Logger.Printf("Crypto state for %s packet of length %d bytes is not ready, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
-							a.conn.UnprocessedPayloads.Submit(UnprocessedPayload{header.EncryptionLevel(), ciphertext})
+							a.conn.UnprocessedPayloads.Submit(UnprocessedPayload{ic, header.EncryptionLevel()})
 							break packetSelect
 						}
 					}
@@ -105,13 +105,13 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
 							break packetSelect
 						}
-						cleartext = append(append(cleartext, udpPayload[off:off+hLen]...), payload...)
+						cleartext = append(append(cleartext, ic.Payload[off:off+hLen]...), payload...)
 						packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
-						off = len(udpPayload)
+						off = len(ic.Payload)
 					case Retry:
 						cleartext = ciphertext
 						packet = ReadRetryPacket(bytes.NewReader(cleartext), a.conn)
-						off = len(udpPayload)
+						off = len(ic.Payload)
 					default:
 						a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
 						break packetSelect
@@ -126,6 +126,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						}
 					}
 
+					packet.SetContext(ic.ReceiveContext)
 					a.conn.IncomingPackets.Submit(packet)
 					a.SaveCleartextPacket(cleartext, packet.Pointer())
 

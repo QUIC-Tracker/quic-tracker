@@ -37,6 +37,8 @@ import (
 	_ "github.com/mpiraux/ls-qpack-go"
 	"github.com/mpiraux/pigotls"
 	"math"
+	"net"
+	"time"
 )
 
 // TODO: Reconsider the use of global variables
@@ -224,9 +226,29 @@ func max(a, b uint64) uint64 {
 	return b
 }
 
-type UnprocessedPayload struct {
-	EncryptionLevel
+type ECNStatus int
+
+const (
+	ECNStatusNonECT ECNStatus = 0
+	ECNStatusECT_1            = 1
+	ECNStatusECT_0            = 2
+	ECNStatusCE               = 3
+)
+
+type ReceiveContext struct {
+	Timestamp  time.Time
+	RemoteAddr net.Addr
+	ECNStatus
+}
+
+type IncomingPayload struct {
+	ReceiveContext
 	Payload []byte
+}
+
+type UnprocessedPayload struct {
+	IncomingPayload
+	EncryptionLevel
 }
 
 type QueuedFrame struct {

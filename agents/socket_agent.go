@@ -5,16 +5,8 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/compat"
 	"syscall"
+	"time"
 	"unsafe"
-)
-
-type ECNStatus int
-
-const (
-	ECNStatusNonECT ECNStatus = 0
-	ECNStatusECT_1            = 1
-	ECNStatusECT_0            = 2
-	ECNStatusCE               = 3
 )
 
 // The SocketAgent is responsible for receiving the UDP payloads off the socket and putting them in the decryption queue.
@@ -27,21 +19,19 @@ type SocketAgent struct {
 	TotalDataReceived int
 	DatagramsReceived int
 	SocketStatus      Broadcaster //type: err
-	ECNStatus         Broadcaster //type: ECNStatus
 }
 
 func (a *SocketAgent) Run(conn *Connection) {
 	a.Init("SocketAgent", conn.OriginalDestinationCID)
 	a.conn = conn
 	a.SocketStatus = NewBroadcaster(10)
-	a.ECNStatus = NewBroadcaster(1000)
-	recChan := make(chan []byte)
+	recChan := make(chan IncomingPayload)
 
 	go func() {
 		for {
 			recBuf := make([]byte, MaxUDPPayloadSize)
 			oob := make([]byte, 128) // Find a reasonable upper-bound
-			i, oobn, _, _, err := conn.UdpConnection.ReadMsgUDP(recBuf, oob)
+			i, oobn, _, addr, err := conn.UdpConnection.ReadMsgUDP(recBuf, oob)
 
 			if err != nil {
 				a.Logger.Println("Closing UDP socket because of error", err.Error())
@@ -55,6 +45,12 @@ func (a *SocketAgent) Run(conn *Connection) {
 				break
 			}
 
+			sm := IncomingPayload{}
+			sm.Timestamp = time.Now()
+			sm.Payload = make([]byte, i)
+			copy(sm.Payload, recBuf[:i])
+			sm.RemoteAddr = addr
+
 			if a.ecn {
 				ecn, err := findECNValue(oob[:oobn])
 				if err != nil {
@@ -62,20 +58,18 @@ func (a *SocketAgent) Run(conn *Connection) {
 				}
 				ecn = ecn & 0x03
 				a.Logger.Printf("Read ECN value %d\n", ecn)
-				a.ECNStatus.Submit(ECNStatus(ecn))
+				sm.ECNStatus = ECNStatus(ecn)
 			}
 
 			a.TotalDataReceived += i
 			a.DatagramsReceived += 1
 			a.Logger.Printf("Received %d bytes from UDP socket\n", i)
-			payload := make([]byte, i)
-			copy(payload, recBuf[:i])
 			select {
 			case <-recChan:
 				return
 			default:
 			}
-			recChan <- payload
+			recChan <- sm
 		}
 	}()
 

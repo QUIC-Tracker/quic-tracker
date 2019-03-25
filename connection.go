@@ -41,7 +41,7 @@ type Connection struct {
 
 	IncomingPackets           Broadcaster //type: Packet
 	OutgoingPackets           Broadcaster //type: Packet
-	IncomingPayloads          Broadcaster //type: []byte
+	IncomingPayloads          Broadcaster //type: IncomingPayload
 	UnprocessedPayloads       Broadcaster //type: UnprocessedPayload
 	EncryptionLevelsAvailable Broadcaster //type: DirectionalEncryptionLevel
 	FrameQueue                Broadcaster //type: QueuedFrame

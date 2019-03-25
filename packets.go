@@ -3,11 +3,11 @@ package quictracker
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
-	"github.com/davecgh/go-spew/spew"
-	"unsafe"
-	"fmt"
 	"encoding/hex"
+	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"io"
+	"unsafe"
 )
 
 type Packet interface {
@@ -20,13 +20,22 @@ type Packet interface {
 	PNSpace() PNSpace
 	EncryptionLevel() EncryptionLevel
 	ShortString() string
+	ReceiveContext() ReceiveContext
+	SetContext(ctx ReceiveContext)
 }
 
 type abstractPacket struct {
 	header Header
+	receiveContext ReceiveContext
 }
 func (p abstractPacket) Header() Header {
 	return p.header
+}
+func (p abstractPacket) ReceiveContext() ReceiveContext {
+	return p.receiveContext
+}
+func (p *abstractPacket) SetContext(ctx ReceiveContext) {
+	p.receiveContext = ctx
 }
 func (p abstractPacket) EncodeHeader() []byte {
 	return p.header.Encode()
@@ -336,3 +345,4 @@ func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	p.header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)
 	return p
 }
+

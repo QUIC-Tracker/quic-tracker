@@ -32,7 +32,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 				for off < len(ic.Payload) {
 					ciphertext := ic.Payload[off:]
 
-					if bytes.Equal(ciphertext[1:5], []byte{0, 0, 0, 0}) {
+					if ciphertext[0] & 0x80 == 0x80 && bytes.Equal(ciphertext[1:5], []byte{0, 0, 0, 0}) {
 						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
 						a.SaveCleartextPacket(ciphertext, packet.Pointer())
 						a.conn.IncomingPackets.Submit(packet)
@@ -64,6 +64,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
 							a.Logger.Printf("Crypto state for %s packet of length %d bytes is not ready, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
+							ic.Payload = ciphertext
 							a.conn.UnprocessedPayloads.Submit(UnprocessedPayload{ic, header.EncryptionLevel()})
 							break packetSelect
 						}

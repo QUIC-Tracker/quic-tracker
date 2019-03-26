@@ -60,6 +60,7 @@ firstFlight:
 	}
 	<-firstFlightTimer.C
 
+	connAgents.Stop("SocketAgent", "SendingAgent")
 	conn.DestinationCID = ncid
 	conn.SourceCID = scid
 

@@ -68,7 +68,7 @@ func (a *AckAgent) Run(conn *Connection) {
 				if f != nil {
 					lRTimestamp, ok := recvdTimestamps[pnSpace][f.LargestAcknowledged]
 					if ok {
-						f.AckDelay = uint64((time.Now().Sub(lRTimestamp).Round(time.Microsecond) / time.Microsecond) << conn.TLSTPHandler.AckDelayExponent)
+						f.AckDelay = uint64((time.Now().Sub(lRTimestamp).Round(time.Microsecond) / time.Microsecond) >> conn.TLSTPHandler.AckDelayExponent)
 					}
 					if args.availableSpace >= int(f.FrameLength()) {
 						a.frames <- []Frame{f}

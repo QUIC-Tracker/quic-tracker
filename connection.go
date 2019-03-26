@@ -67,6 +67,10 @@ type Connection struct {
 	LargestPNsReceived     map[PNSpace]PacketNumber // Stores the largest PN received
 	LargestPNsAcknowledged map[PNSpace]PacketNumber // Stores the largest PN we have sent that were acknowledged by the peer
 
+	MinRTT             uint64
+	SmoothedRTT        uint64
+	RTTVar             uint64
+
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	Logger               *log.Logger
 }

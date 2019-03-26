@@ -8,6 +8,7 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/davecgh/go-spew/spew"
 	"strings"
+	"time"
 )
 
 type HandshakeStatus struct {
@@ -45,6 +46,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 
 	firstInitialReceived := false
 	tlsCompleted := false
+	pingTimer := time.NewTimer(0)
 	var tlsPacket Packet
 
 	go func() {
@@ -89,6 +91,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				default:
 					a.HandshakeStatus.Submit(HandshakeStatus{false, p.(Packet), errors.New("received incorrect packet type during handshake")})
 				}
+				pingTimer.Reset(time.Duration(conn.SmoothedRTT + conn.RTTVar) * time.Microsecond)
 			case p := <-outPackets:
 				if !tlsCompleted {
 					break
@@ -115,6 +118,11 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 			case i := <-socketStatus:
 				if strings.Contains(i.(error).Error(), "connection refused") {
 					a.HandshakeStatus.Submit(HandshakeStatus{false, nil , i.(error)})
+					return
+				}
+			case <-pingTimer.C:
+				if firstInitialReceived {
+					conn.PreparePacket.Submit(EncryptionLevelBest)
 				}
 			case <-conn.ConnectionRestarted:
 				incPackets = conn.IncomingPackets.RegisterNewChan(1000)

@@ -8,6 +8,7 @@ import (
 
 type RTTAgent struct {
 	BaseAgent
+	conn *Connection
 	MinRTT             uint64
 	LatestRTT          uint64
 	SmoothedRTT        uint64
@@ -25,6 +26,7 @@ type SentPacket struct {
 
 func (a *RTTAgent) Run(conn *Connection) {
 	a.Init("RTTAgent", conn.OriginalDestinationCID)
+	a.conn = conn
 	a.MinRTT = math.MaxUint64
 
 	a.SentPackets = map[PNSpace]map[PacketNumber]SentPacket{
@@ -106,5 +108,10 @@ func (a *RTTAgent) UpdateRTT(ackDelay uint64, ackOnly bool) { // TODO: https://t
 		a.RTTVar = uint64(0.75 * float64(a.RTTVar) + 0.25 * float64(RTTVarSample))
 		a.SmoothedRTT = uint64(0.875 * float64(a.SmoothedRTT) + 0.125 * float64(a.LatestRTT))
 	}
+
+	a.conn.MinRTT = a.MinRTT
+	a.conn.SmoothedRTT = a.SmoothedRTT
+	a.conn.RTTVar = a.RTTVar
+
 	a.Logger.Printf("LatestRTT = %d, MinRTT = %d, SmoothedRTT = %d, RTTVar = %d", a.LatestRTT, a.MinRTT, a.SmoothedRTT, a.RTTVar)
 }

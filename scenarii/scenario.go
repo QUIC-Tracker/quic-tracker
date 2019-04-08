@@ -126,7 +126,6 @@ func GetAllScenarii() map[string]Scenario {
 		"http3_reserved_frames":      NewHTTP3ReservedFramesScenario(),
 		"http3_reserved_streams":     NewHTTP3ReservedStreamsScenario(),
 		"spin_bit":                   NewSpinBitScenario(),
-		"overlapping_stream_frames":  NewOverlappingStreamFramesScenario(),
 		"server_flow_control":        NewServerFlowControlScenario(),
 		"connection_migration_v4_v6": NewConnectionMigrationv4v6Scenario(),
 	}

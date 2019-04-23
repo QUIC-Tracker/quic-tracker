@@ -29,11 +29,11 @@ func main() {
 
 	t := time.NewTimer(time.Duration(*timeout) * time.Second)
 	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, *h3)
-	if *h3 {
-		conn.TLSTPHandler.MaxUniStreams = 3
-	}
 	if err != nil {
 		panic(err)
+	}
+	if *h3 {
+		conn.TLSTPHandler.MaxUniStreams = 3
 	}
 
 	pcap, err := m.StartPcapCapture(conn, *netInterface)

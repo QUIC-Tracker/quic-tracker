@@ -66,27 +66,21 @@ func (list *TransportParameterList) AddParameter(p TransportParameter) {
 }
 
 type ClientHelloTransportParameters struct {
-	InitialVersion    uint32
-	Parameters        TransportParameterList `tls:"head=2"`
+	TransportParameterList `tls:"head=2"`
 }
 
 type EncryptedExtensionsTransportParameters struct {
-	NegotiatedVersion uint32
-	SupportedVersions []SupportedVersion `tls:"head=1"`
-	Parameters        TransportParameterList  `tls:"head=2"`
+	TransportParameterList  `tls:"head=2"`
 }
 
 type TLSTransportParameterHandler struct {
-	NegotiatedVersion uint32
-	InitialVersion    uint32
 	QuicTransportParameters
 	*EncryptedExtensionsTransportParameters
 	ReceivedParameters *QuicTransportParameters
 }
 
-func NewTLSTransportParameterHandler(negotiatedVersion uint32, initialVersion uint32) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{NegotiatedVersion: negotiatedVersion, InitialVersion: initialVersion, QuicTransportParameters:
-		QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10, AckDelayExponent: 3}}
+func NewTLSTransportParameterHandler() *TLSTransportParameterHandler {
+	return &TLSTransportParameterHandler{QuicTransportParameters: QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 1, IdleTimeout: 10000, AckDelayExponent: 3}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter
@@ -128,7 +122,7 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	for _, p := range h.QuicTransportParameters.AdditionalParameters {
 		parameters = append(parameters, p)
 	}
-	return syntax.Marshal(ClientHelloTransportParameters{h.InitialVersion, TransportParameterList(parameters)})
+	return syntax.Marshal(ClientHelloTransportParameters{TransportParameterList(parameters)})
 }
 
 func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
@@ -143,43 +137,43 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 	receivedParameters := QuicTransportParameters{}
 	receivedParameters.ToJSON = make(map[string]interface{})
 
-	for _, p := range h.EncryptedExtensionsTransportParameters.Parameters {
+	for _, p := range h.EncryptedExtensionsTransportParameters.TransportParameterList {
 		switch p.ParameterType {
 		case OriginalConnectionId:
 			receivedParameters.OriginalConnectionId = ConnectionID(p.Value)
 			receivedParameters.ToJSON["original_connection_id"] = ConnectionID(p.Value)
 		case IdleTimeout:
-			receivedParameters.IdleTimeout, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.IdleTimeout, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
 		case StatelessResetToken:
 			receivedParameters.StatelessResetToken = p.Value
 			receivedParameters.ToJSON["stateless_reset_token"] = receivedParameters.StatelessResetToken
 		case MaxPacketSize:
-			receivedParameters.MaxPacketSize, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxPacketSize, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
 		case InitialMaxData:
-			receivedParameters.MaxData, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxData, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
 		case InitialMaxStreamDataBidiLocal:
-			receivedParameters.MaxStreamDataBidiLocal, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataBidiLocal, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_stream_data_bidi_local"] = receivedParameters.MaxStreamDataBidiLocal
 		case InitialMaxStreamDataBidiRemote:
-			receivedParameters.MaxStreamDataBidiRemote, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataBidiRemote, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_stream_data_bidi_remote"] = receivedParameters.MaxStreamDataBidiRemote
 		case InitialMaxStreamDataUni:
-			receivedParameters.MaxStreamDataUni, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataUni, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_stream_data_uni"] = receivedParameters.MaxStreamDataUni
 		case InitialMaxStreamsBidi:
-			receivedParameters.MaxBidiStreams, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxBidiStreams, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_streams_bidi"] = receivedParameters.MaxBidiStreams
 		case InitialMaxStreamsUni:
-			receivedParameters.MaxUniStreams, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxUniStreams, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["initial_max_streams_uni"] = receivedParameters.MaxUniStreams
 		case AckDelayExponent:
-			receivedParameters.AckDelayExponent, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.AckDelayExponent, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
 		case MaxAckDelay:
-			receivedParameters.MaxAckDelay, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxAckDelay, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
 			receivedParameters.ToJSON["max_ack_delay"] = receivedParameters.MaxAckDelay
 		case DisableMigration:
 			receivedParameters.DisableMigration = true

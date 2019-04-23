@@ -44,52 +44,52 @@ const (
 )
 
 // ReadVarIntValue reads a number in the QUIC varint format
-func ReadVarIntValue(b io.ByteReader) (uint64, error) {
+func ReadVarIntValue(b io.ByteReader) (uint64, int, error) {
 	firstByte, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	// the first two bits of the first byte encode the length
 	len := 1 << ((firstByte & 0xc0) >> 6)
 	b1 := firstByte & (0xff - 0xc0)
 	if len == 1 {
-		return uint64(b1), nil
+		return uint64(b1), 1, nil
 	}
 	b2, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if len == 2 {
-		return uint64(b2) + uint64(b1)<<8, nil
+		return uint64(b2) + uint64(b1)<<8, 2, nil
 	}
 	b3, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	b4, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if len == 4 {
-		return uint64(b4) + uint64(b3)<<8 + uint64(b2)<<16 + uint64(b1)<<24, nil
+		return uint64(b4) + uint64(b3)<<8 + uint64(b2)<<16 + uint64(b1)<<24, 4, nil
 	}
 	b5, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	b6, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	b7, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	b8, err := b.ReadByte()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return uint64(b8) + uint64(b7)<<8 + uint64(b6)<<16 + uint64(b5)<<24 + uint64(b4)<<32 + uint64(b3)<<40 + uint64(b2)<<48 + uint64(b1)<<56, nil
+	return uint64(b8) + uint64(b7)<<8 + uint64(b6)<<16 + uint64(b5)<<24 + uint64(b4)<<32 + uint64(b3)<<40 + uint64(b2)<<48 + uint64(b1)<<56, 8, nil
 }
 
 // WriteVarInt writes a number in the QUIC varint format

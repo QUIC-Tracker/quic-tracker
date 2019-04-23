@@ -215,13 +215,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	return frame
 }
 func (c *Connection) TransitionTo(version uint32, ALPN string) {
-	var prevVersion uint32
-	if c.Version == 0 {
-		prevVersion = QuicVersion
-	} else {
-		prevVersion = c.Version
-	}
-	c.TLSTPHandler = NewTLSTransportParameterHandler(version, prevVersion)
+	c.TLSTPHandler = NewTLSTransportParameterHandler()
 	c.Version = version
 	c.ALPN = ALPN
 	c.Tls = pigotls.NewConnection(c.ServerName, c.ALPN, c.ResumptionTicket)

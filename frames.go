@@ -189,18 +189,18 @@ func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	buffer.ReadByte() // Discard frame byte
 
 	frame.LargestAcknowledged = ReadPacketNumber(buffer)
-	frame.AckDelay, _ = ReadVarIntValue(buffer)
-	frame.AckRangeCount, _ = ReadVarIntValue(buffer)
+	frame.AckDelay, _, _ = ReadVarIntValue(buffer)
+	frame.AckRangeCount, _, _ = ReadVarIntValue(buffer)
 
 	firstBlock := AckRange{}
-	firstBlock.AckRange, _ = ReadVarIntValue(buffer)
+	firstBlock.AckRange, _, _ = ReadVarIntValue(buffer)
 	frame.AckRanges = append(frame.AckRanges, firstBlock)
 
 	var i uint64
 	for i = 0; i < frame.AckRangeCount; i++ {
 		ack := AckRange{}
-		ack.Gap, _ = ReadVarIntValue(buffer)
-		ack.AckRange, _ = ReadVarIntValue(buffer)
+		ack.Gap, _, _ = ReadVarIntValue(buffer)
+		ack.AckRange, _, _ = ReadVarIntValue(buffer)
 		frame.AckRanges = append(frame.AckRanges, ack)
 	}
 	return frame
@@ -225,9 +225,9 @@ func (frame AckECNFrame) FrameLength() uint16         { return frame.AckFrame.Fr
 func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
 	frame := &AckECNFrame{*ReadAckFrame(buffer), 0, 0, 0}
 
-	frame.ECT0Count, _ = ReadVarIntValue(buffer)
-	frame.ECT1Count, _ = ReadVarIntValue(buffer)
-	frame.ECTCECount, _ = ReadVarIntValue(buffer)
+	frame.ECT0Count, _, _ = ReadVarIntValue(buffer)
+	frame.ECT1Count, _, _ = ReadVarIntValue(buffer)
+	frame.ECTCECount, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -249,9 +249,9 @@ func (frame ResetStream) FrameLength() uint16         { return 1 + uint16(VarInt
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	buffer.ReadByte() // Discard frame type
-	frame.StreamId, _ = ReadVarIntValue(buffer)
+	frame.StreamId, _, _ = ReadVarIntValue(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.ApplicationErrorCode)
-	frame.FinalSize, _ = ReadVarIntValue(buffer)
+	frame.FinalSize, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -271,7 +271,7 @@ func (frame StopSendingFrame) FrameLength() uint16         { return 1 + uint16(V
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.StreamId, _ = ReadVarIntValue(buffer)
+	frame.StreamId, _, _ = ReadVarIntValue(buffer)
 	binary.Read(buffer, binary.BigEndian, &frame.ApplicationErrorCode)
 	return frame
 }
@@ -294,8 +294,8 @@ func (frame CryptoFrame) FrameLength() uint16         { return 1 + uint16(VarInt
 func ReadCryptoFrame(buffer *bytes.Reader, conn *Connection) *CryptoFrame {
 	frame := new(CryptoFrame)
 	ReadVarIntValue(buffer) // Discards frame type
-	frame.Offset, _ = ReadVarIntValue(buffer)
-	frame.Length, _ = ReadVarIntValue(buffer)
+	frame.Offset, _, _ = ReadVarIntValue(buffer)
+	frame.Length, _, _ = ReadVarIntValue(buffer)
 	frame.CryptoData = make([]byte, frame.Length)
 	buffer.Read(frame.CryptoData)
 
@@ -323,7 +323,7 @@ func (frame NewTokenFrame) FrameLength() uint16         { return 1 + uint16(VarI
 func ReadNewTokenFrame(buffer *bytes.Reader, conn *Connection) *NewTokenFrame {
 	frame := new(NewTokenFrame)
 	ReadVarIntValue(buffer) // Discard frame type
-	tokenLength, _ := ReadVarIntValue(buffer)
+	tokenLength, _, _ := ReadVarIntValue(buffer)
 	frame.Token = make([]byte, tokenLength)
 	buffer.Read(frame.Token)
 	return frame
@@ -380,12 +380,12 @@ func ReadStreamFrame(buffer *bytes.Reader, conn *Connection) *StreamFrame {
 	frame.LenBit = (typeByte & 0x02) == 0x02
 	frame.OffBit = (typeByte & 0x04) == 0x04
 
-	frame.StreamId, _ = ReadVarIntValue(buffer)
+	frame.StreamId, _, _ = ReadVarIntValue(buffer)
 	if frame.OffBit {
-		frame.Offset, _ = ReadVarIntValue(buffer)
+		frame.Offset, _, _ = ReadVarIntValue(buffer)
 	}
 	if frame.LenBit {
-		frame.Length, _ = ReadVarIntValue(buffer)
+		frame.Length, _, _ = ReadVarIntValue(buffer)
 	} else {
 		frame.Length = uint64(buffer.Len())
 	}
@@ -422,7 +422,7 @@ func (frame MaxDataFrame) FrameLength() uint16         { return 1 + uint16(VarIn
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.MaximumData, _ = ReadVarIntValue(buffer)
+	frame.MaximumData, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -442,8 +442,8 @@ func (frame MaxStreamDataFrame) FrameLength() uint16         { return 1 + uint16
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.StreamId, _ = ReadVarIntValue(buffer)
-	frame.MaximumStreamData, _ = ReadVarIntValue(buffer)
+	frame.StreamId, _, _ = ReadVarIntValue(buffer)
+	frame.MaximumStreamData, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -470,7 +470,7 @@ func (frame MaxStreamsFrame) FrameLength() uint16         { return 1 + uint16(Va
 func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamsFrame {
 	frame := new(MaxStreamsFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.MaximumStreams, _ = ReadVarIntValue(buffer)
+	frame.MaximumStreams, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -488,7 +488,7 @@ func (frame DataBlockedFrame) FrameLength() uint16         { return 1 + uint16(V
 func NewBlockedFrame(buffer *bytes.Reader) *DataBlockedFrame {
 	frame := new(DataBlockedFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.DataLimit, _ = ReadVarIntValue(buffer)
+	frame.DataLimit, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -508,8 +508,8 @@ func (frame StreamDataBlockedFrame) FrameLength() uint16         { return 1 + ui
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamDataBlockedFrame {
 	frame := new(StreamDataBlockedFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.StreamId, _ = ReadVarIntValue(buffer)
-	frame.StreamDataLimit, _ = ReadVarIntValue(buffer)
+	frame.StreamId, _, _ = ReadVarIntValue(buffer)
+	frame.StreamDataLimit, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -536,7 +536,7 @@ func (frame StreamsBlockedFrame) FrameLength() uint16         { return 1 + uint1
 func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamsBlockedFrame {
 	frame := new(StreamsBlockedFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.StreamLimit, _ = ReadVarIntValue(buffer)
+	frame.StreamLimit, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -560,7 +560,7 @@ func (frame NewConnectionIdFrame) FrameLength() uint16         { return 1 + uint
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	buffer.ReadByte() // Discard frame type
-	frame.Sequence, _ = ReadVarIntValue(buffer)
+	frame.Sequence, _, _ = ReadVarIntValue(buffer)
 	frame.Length, _ = buffer.ReadByte()
 	frame.ConnectionId = make([]byte, frame.Length, frame.Length)
 	buffer.Read(frame.ConnectionId)
@@ -582,7 +582,7 @@ func (frame RetireConnectionId) FrameLength() uint16         { return 1 + uint16
 func ReadRetireConnectionId(buffer *bytes.Reader) *RetireConnectionId {
 	frame := new(RetireConnectionId)
 	buffer.ReadByte() // Discard frame byte
-	frame.SequenceNumber, _ = ReadVarIntValue(buffer)
+	frame.SequenceNumber, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 
@@ -650,8 +650,8 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	buffer.ReadByte() // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.ErrorCode)
-	frame.ErrorFrameType, _ = ReadVarIntValue(buffer)
-	frame.ReasonPhraseLength, _ = ReadVarIntValue(buffer)
+	frame.ErrorFrameType, _, _ = ReadVarIntValue(buffer)
+	frame.ReasonPhraseLength, _, _ = ReadVarIntValue(buffer)
 	if frame.ReasonPhraseLength > 0 {
 		reasonBytes := make([]byte, frame.ReasonPhraseLength, frame.ReasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
@@ -682,7 +682,7 @@ func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 	frame := new(ApplicationCloseFrame)
 	buffer.ReadByte() // Discard frame type
 	binary.Read(buffer, binary.BigEndian, &frame.errorCode)
-	frame.reasonPhraseLength, _ = ReadVarIntValue(buffer)
+	frame.reasonPhraseLength, _, _ = ReadVarIntValue(buffer)
 	if frame.reasonPhraseLength > 0 {
 		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)

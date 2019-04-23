@@ -75,7 +75,7 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 	a.peerControlStreamID = HTTPNoStream
 	peerControlStream := make(chan interface{}, 1000)
 	peerControlStreamBuffer := new(bytes.Buffer)
-	a.conn.Streams.Send(a.controlStreamID, []byte{'C'}, false)
+	a.conn.Streams.Send(a.controlStreamID, []byte{http3.StreamTypeControl}, false)
 	a.sendFrameOnStream(http3.NewSETTINGS(nil), a.controlStreamID, false)
 
 	a.streamData = make(chan streamData)
@@ -97,7 +97,7 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
 						if s.Offset == 0 && s.StreamId&0x2 == 2 {
-							if s.StreamData[0] == 'C' {
+							if s.StreamData[0] == http3.StreamTypeControl {
 								if a.peerControlStreamID != HTTPNoStream {
 									a.Logger.Printf("Peer attempted to open another control stream on stream %d\n", s.StreamId)
 									continue
@@ -150,9 +150,9 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 					}
 					settingsReceived = true
 					for _, s := range f.Settings {
-						if s.Identifier == http3.SETTINGS_HEADER_TABLE_SIZE {
+						if s.Identifier.Value == http3.SETTINGS_HEADER_TABLE_SIZE {
 							settingsHeaderTableSize = s.Value.Value
-						} else if s.Identifier == http3.SETTINGS_QPACK_BLOCKED_STREAMS {
+						} else if s.Identifier.Value == http3.SETTINGS_QPACK_BLOCKED_STREAMS {
 							settingsQPACKBlockedStreams = s.Value.Value
 						}
 					}
@@ -194,15 +194,19 @@ func (a *HTTP3Agent) sendFrameOnStream(frame http3.HTTPFrame, streamID uint64, f
 	a.conn.Streams.Send(streamID, buf.Bytes(), fin)
 }
 func (a *HTTP3Agent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
-	var l VarInt
-	var err error
-	for l, err = peekVarInt(buffer); err == nil && buffer.Len() >= l.Length+1+int(l.Value); l, err = peekVarInt(buffer) {
-		reader := bytes.NewReader(buffer.Next(l.Length + 1 + int(l.Value)))
-		frame := http3.ReadHTTPFrame(reader)
-		a.FrameReceived.Submit(HTTP3FrameReceived{streamID, frame})
-	}
-	if err == nil {
-		a.Logger.Printf("Unable to parse %d byte-long frame on stream %d, %d bytes missing\n", l.Value, streamID, int(l.Value)-(buffer.Len()-l.Length-1))
+	r := bytes.NewReader(buffer.Bytes())
+	t, err1 := ReadVarInt(r)
+	l, err2 := ReadVarInt(r)
+
+	if err1 == nil && err2 == nil {
+		if buffer.Len() >= t.Length + l.Length + int(l.Value) {
+			r = bytes.NewReader(buffer.Next(t.Length + l.Length + int(l.Value)))
+			f := http3.ReadHTTPFrame(r)
+			a.FrameReceived.Submit(HTTP3FrameReceived{streamID, f})
+			a.attemptDecoding(streamID, buffer)
+		} else {
+			a.Logger.Printf("Unable to parse %d byte-long frame on stream %d, %d bytes missing\n", t.Value, streamID, int(t.Value)-(buffer.Len()-t.Length-1))
+		}
 	}
 }
 func (a *HTTP3Agent) checkResponse(response *HTTP3Response) {
@@ -238,6 +242,7 @@ func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[str
 	a.responseBuffer[streamID] = response
 
 	go func() { // Pipes the data from the response stream to the agent
+		defer stream.ReadChan.Unregister(streamChan)
 		for {
 			select {
 			case i := <-streamChan:
@@ -256,7 +261,6 @@ func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[str
 			}
 
 		}
-		stream.ReadChan.Unregister(streamChan)
 	}()
 
 	a.QPACK.EncodeHeaders <- DecodedHeaders{streamID, hdrs}

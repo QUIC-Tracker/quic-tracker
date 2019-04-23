@@ -36,6 +36,8 @@ type QPACKAgent struct {
 
 const (
 	QPACKNoStream uint64 = math.MaxUint64
+	QPACKEncoderStreamValue = 0x2
+	QPACKDecoderStreamValue = 0x3
 )
 
 func (a *QPACKAgent) Run(conn *Connection) {
@@ -87,7 +89,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
 						if s.Offset == 0 && s.StreamId&0x2 == 2 {
-							if s.StreamData[0] == 'H' {
+							if s.StreamData[0] == QPACKEncoderStreamValue {
 								if peerEncoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another encoder stream on stream %d\n", s.StreamId)
 									continue
@@ -98,7 +100,7 @@ func (a *QPACKAgent) Run(conn *Connection) {
 								if s.Length > 1 {
 									peerEncoderStream <- s.StreamData[1:]
 								}
-							} else if s.StreamData[0] == 'h' {
+							} else if s.StreamData[0] == QPACKDecoderStreamValue {
 								if peerDecoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another decoder stream on stream %d\n", s.StreamId)
 									continue
@@ -162,8 +164,8 @@ func (a *QPACKAgent) Run(conn *Connection) {
 	}()
 
 	if !a.DisableStreams {
-		conn.Streams.Send(a.EncoderStreamID, []byte{'H'}, false)
-		conn.Streams.Send(a.DecoderStreamID, []byte{'h'}, false)
+		conn.Streams.Send(a.EncoderStreamID, []byte{QPACKEncoderStreamValue}, false)
+		conn.Streams.Send(a.DecoderStreamID, []byte{QPACKDecoderStreamValue}, false)
 	}
 }
 func (a *QPACKAgent) InitEncoder(headerTableSize uint, dynamicTablesize uint, maxRiskedStreams uint, opts uint32) {

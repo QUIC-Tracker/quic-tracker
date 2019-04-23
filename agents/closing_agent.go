@@ -18,7 +18,7 @@ type ClosingAgent struct {
 func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and AC
 	a.Init("ClosingAgent", conn.OriginalDestinationCID)
 	a.conn = conn
-	a.IdleDuration = time.Duration(a.conn.TLSTPHandler.IdleTimeout) * time.Second
+	a.IdleDuration = time.Duration(a.conn.TLSTPHandler.IdleTimeout) * time.Millisecond
 	a.IdleTimeout = time.NewTimer(a.IdleDuration)
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)

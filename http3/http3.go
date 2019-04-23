@@ -2,7 +2,6 @@ package http3
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/lib"
@@ -10,8 +9,8 @@ import (
 )
 
 const (
-	StreamTypeControl = 0x43
-	StreamTypePush    = 0x50
+	StreamTypeControl = 0x00
+	StreamTypePush    = 0x01
 )
 
 const (
@@ -26,10 +25,9 @@ const (
 )
 
 func ReadHTTPFrame(buffer *bytes.Reader) HTTPFrame {
-	l, _ := ReadVarInt(buffer)
-	typeByte, _ := buffer.ReadByte()
-	buffer.Seek(-int64(l.Length)-1, io.SeekCurrent)
-	switch typeByte {
+	typeByte, _ := ReadVarInt(buffer)
+	_, _ = buffer.Seek(-int64(typeByte.Length), io.SeekCurrent)
+	switch typeByte.Value {
 	case FrameTypeDATA:
 		return ReadDATA(buffer)
 	case FrameTypeHEADERS:
@@ -52,32 +50,32 @@ func ReadHTTPFrame(buffer *bytes.Reader) HTTPFrame {
 }
 
 type HTTPFrame interface {
-	FrameType() uint8
+	FrameType() uint64
 	Name() string
 	WriteTo(buffer *bytes.Buffer)
 	WireLength() uint64
 }
 
 type HTTPFrameHeader struct {
+	Type   VarInt
 	Length VarInt
-	Type   uint8
 }
 
-func (h *HTTPFrameHeader) FrameType() uint8 {
-	return h.Type
+func (h *HTTPFrameHeader) FrameType() uint64 {
+	return h.Type.Value
 }
 func (h *HTTPFrameHeader) WriteTo(buffer *bytes.Buffer) {
+	buffer.Write(h.Type.Encode())
 	buffer.Write(h.Length.Encode())
-	buffer.WriteByte(h.Type)
 }
 func (h *HTTPFrameHeader) WireLength() uint64 {
-	return uint64(h.Length.Length + 1) + h.Length.Value
+	return uint64(h.Length.Length + h.Type.Length) + h.Length.Value
 }
 
 func ReadHTTPFrameHeader(buffer *bytes.Reader) HTTPFrameHeader {
 	f := HTTPFrameHeader{}
+	f.Type, _ = ReadVarInt(buffer)
 	f.Length, _ = ReadVarInt(buffer)
-	f.Type, _ = buffer.ReadByte()
 	return f
 }
 
@@ -98,7 +96,7 @@ func ReadDATA(buffer *bytes.Reader) *DATA {
 	return &f
 }
 func NewDATA(payload []byte) *DATA {
-	return &DATA{HTTPFrameHeader{NewVarInt(uint64(len(payload))), FrameTypeDATA}, payload}
+	return &DATA{HTTPFrameHeader{NewVarInt(FrameTypeDATA), NewVarInt(uint64(len(payload)))}, payload}
 }
 
 type HEADERS struct {
@@ -118,7 +116,7 @@ func ReadHEADERS(buffer *bytes.Reader) *HEADERS {
 	return &f
 }
 func NewHEADERS(headerBlock []byte) *HEADERS {
-	return &HEADERS{HTTPFrameHeader{NewVarInt(uint64(len(headerBlock))), FrameTypeHEADERS}, headerBlock}
+	return &HEADERS{HTTPFrameHeader{NewVarInt(FrameTypeHEADERS), NewVarInt(uint64(len(headerBlock)))}, headerBlock}
 }
 
 const (
@@ -171,7 +169,7 @@ func NewPRIORITY(prioritizedType uint8,
 	weight uint8,
 ) *PRIORITY {
 	return &PRIORITY{
-		HTTPFrameHeader{NewVarInt(uint64(1 + lib.VarIntLen(prioritizedElementID) + lib.VarIntLen(elementDependencyID) + 1)), FrameTypePRIORITY},
+		HTTPFrameHeader{NewVarInt(FrameTypePRIORITY), NewVarInt(uint64(1 + lib.VarIntLen(prioritizedElementID) + lib.VarIntLen(elementDependencyID) + 1))},
 		prioritizedType,
 		dependencyType,
 		0,
@@ -199,23 +197,23 @@ func ReadCANCEL_PUSH(buffer *bytes.Reader) *CANCEL_PUSH {
 }
 func NewCANCEL_PUSH(pushID uint64) *CANCEL_PUSH {
 	return &CANCEL_PUSH{
-		HTTPFrameHeader{NewVarInt(uint64(lib.VarIntLen(pushID))), FrameTypeCANCEL_PUSH},
+		HTTPFrameHeader{NewVarInt(FrameTypeCANCEL_PUSH), NewVarInt(uint64(lib.VarIntLen(pushID)))},
 		NewVarInt(pushID),
 	}
 }
 
 type Setting struct {
-	Identifier uint16
+	Identifier VarInt
 	Value      VarInt
 }
 
 func (s Setting) WriteTo(buffer *bytes.Buffer) {
-	binary.Write(buffer, binary.BigEndian, s.Identifier)
+	buffer.Write(s.Identifier.Encode())
 	buffer.Write(s.Value.Encode())
 }
 func ReadSetting(buffer *bytes.Reader) Setting {
 	s := Setting{}
-	binary.Read(buffer, binary.BigEndian, &s.Identifier)
+	s.Identifier, _ = ReadVarInt(buffer)
 	s.Value, _ = ReadVarInt(buffer)
 	return s
 }
@@ -255,7 +253,7 @@ func NewSETTINGS(settings []Setting) *SETTINGS {
 		length += s.Value.Length + 2
 	}
 	return &SETTINGS{
-		HTTPFrameHeader{NewVarInt(uint64(length)), FrameTypeSETTINGS},
+		HTTPFrameHeader{NewVarInt(FrameTypeSETTINGS), NewVarInt(uint64(length))},
 		settings,
 	}
 }
@@ -280,7 +278,7 @@ func ReadPUSH_PROMISE(buffer *bytes.Reader) *PUSH_PROMISE {
 }
 func NewPUSH_PROMISE(pushID uint64, headerBlock []byte) *PUSH_PROMISE {
 	return &PUSH_PROMISE{
-		HTTPFrameHeader{NewVarInt(uint64(lib.VarIntLen(pushID) + len(headerBlock))), FrameTypePUSH_PROMISE},
+		HTTPFrameHeader{NewVarInt(FrameTypePUSH_PROMISE), NewVarInt(uint64(lib.VarIntLen(pushID) + len(headerBlock)))},
 		NewVarInt(pushID),
 		headerBlock,
 	}
@@ -303,7 +301,7 @@ func ReadGOAWAY(buffer *bytes.Reader) *GOAWAY {
 }
 func NewGOAWAY(streamID uint64) *GOAWAY {
 	return &GOAWAY{
-		HTTPFrameHeader{NewVarInt(uint64(lib.VarIntLen(streamID))), FrameTypeGOAWAY},
+		HTTPFrameHeader{NewVarInt(FrameTypeGOAWAY), NewVarInt(uint64(lib.VarIntLen(streamID)))},
 		NewVarInt(streamID),
 	}
 }
@@ -325,7 +323,7 @@ func ReadMAX_PUSH_ID(buffer *bytes.Reader) *MAX_PUSH_ID {
 }
 func NewMAX_PUSH_ID(pushID uint64) *MAX_PUSH_ID {
 	return &MAX_PUSH_ID{
-		HTTPFrameHeader{NewVarInt(uint64(lib.VarIntLen(pushID))), FrameTypeMAX_PUSH_ID},
+		HTTPFrameHeader{NewVarInt(FrameTypeMAX_PUSH_ID), NewVarInt(uint64(lib.VarIntLen(pushID)))},
 		NewVarInt(pushID),
 	}
 }

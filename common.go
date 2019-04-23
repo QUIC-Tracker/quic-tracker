@@ -36,22 +36,23 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	_ "github.com/mpiraux/ls-qpack-go"
 	"github.com/mpiraux/pigotls"
+	"io"
 	"math"
 	"net"
 	"time"
 )
 
 // TODO: Reconsider the use of global variables
-var QuicVersion uint32 = 0xff000012 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-18"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
-var QuicH3ALPNToken = "h3-18"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
+var QuicVersion uint32 = 0xff000013 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-19"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicH3ALPNToken = "h3-19"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MaximumVersion         = 0xff000012
-	MinimumVersion         = 0xff000011
+	MaximumVersion         = 0xff000013
+	MinimumVersion         = 0xff000013
 )
 
 // errors
@@ -65,7 +66,7 @@ const (
 type PacketNumber uint64
 
 func ReadPacketNumber (buffer *bytes.Reader) PacketNumber {
-	v, _ := ReadVarIntValue(buffer)
+	v, _, _ := ReadVarIntValue(buffer)
 	return PacketNumber(v)
 }
 
@@ -124,15 +125,12 @@ type VarInt struct {
 func NewVarInt(value uint64) VarInt {
 	return VarInt{value, VarIntLen(value)}
 }
-func ReadVarInt(buffer *bytes.Reader) (VarInt, error) {
-	v := VarInt{Length: buffer.Len()}
-	i, err := ReadVarIntValue(buffer)
+func ReadVarInt(buffer io.ByteReader) (VarInt, error) {
+	i, l, err := ReadVarIntValue(buffer)
 	if err != nil {
 		return VarInt{}, err
 	}
-	v.Length -= buffer.Len()
-	v.Value = i
-	return v, nil
+	return VarInt{Value: i, Length: l}, nil
 }
 
 func (v VarInt) Encode() []byte {

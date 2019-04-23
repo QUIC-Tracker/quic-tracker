@@ -38,15 +38,15 @@ func (s *HTTP3ReservedStreamsScenario) Run(conn *qt.Connection, trace *qt.Trace,
 	}
 
 	payload := []byte("Hello, world!")
-	unknownFrame1 := http3.UnknownFrame{http3.HTTPFrameHeader{qt.NewVarInt(uint64(len(payload))), 0xb}, payload}
-	unknownFrame2 := http3.UnknownFrame{http3.HTTPFrameHeader{qt.NewVarInt(0), 0xb + 0x1f}, nil}
+	unknownFrame1 := http3.UnknownFrame{HTTPFrameHeader: http3.HTTPFrameHeader{Type: qt.NewVarInt(0x21), Length: qt.NewVarInt(uint64(len(payload)))}, OpaquePayload: payload}
+	unknownFrame2 := http3.UnknownFrame{HTTPFrameHeader: http3.HTTPFrameHeader{Type: qt.NewVarInt(0x21 + 0x1f), Length: qt.NewVarInt(0)}}
 
 	buf := new(bytes.Buffer)
 	unknownFrame1.WriteTo(buf)
 	unknownFrame2.WriteTo(buf)
 
-	conn.Streams.Send(6, []byte{0x1f}, false)
-	conn.Streams.Send(10, []byte{0x1f * 3}, false)
+	conn.Streams.Send(6, []byte{0x21}, false)
+	conn.Streams.Send(10, []byte{0x21 + (0x1f * 3)}, false)
 	conn.Streams.Send(6, buf.Bytes(), false)
 	conn.Streams.Send(10, buf.Bytes(), false)
 

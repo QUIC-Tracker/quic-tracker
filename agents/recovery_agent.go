@@ -85,6 +85,10 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					if len(frames) > 0 {
 						a.retransmissionBuffer[p.PNSpace()][p.Header().PacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
 					}
+					if p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType) {
+						a.Logger.Println("Connection is closing")
+						return
+					}
 				}
 			case i := <-eLAvailable:
 				eL := i.(DirectionalEncryptionLevel)
@@ -93,6 +97,8 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
 					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
 				}
+			case <-a.conn.ConnectionClosed:
+				return
 			case <-a.close:
 				return
 			}

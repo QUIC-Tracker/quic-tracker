@@ -25,7 +25,8 @@ func (s *SpinBitScenario) Run(conn *Connection, trace *Trace, preferredPath stri
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	http := connAgents.AddHTTPAgent()
+	responseChan := http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	var lastServerSpin SpinBit
 	spins := 0
@@ -48,6 +49,10 @@ forLoop:
 				if conn.Streams.Get(0).ReadClosed && !conn.Streams.Get(4).WriteClosed {
 					conn.SendHTTP09GETRequest(preferredPath, 4)
 				}
+			}
+		case r := <-responseChan:
+			if r != nil {
+				http.SendRequest(preferredPath, "GET", trace.Host, nil)
 			}
 		case <-conn.ConnectionClosed:
 			break forLoop

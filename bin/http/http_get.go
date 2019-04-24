@@ -1,16 +1,15 @@
 package main
 
 import (
-	m "github.com/QUIC-Tracker/quic-tracker"
-	"flag"
-	"strings"
-	"fmt"
 	"encoding/json"
+	"flag"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/agents"
+	"github.com/davecgh/go-spew/spew"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"github.com/davecgh/go-spew/spew"
+	"strings"
 	"time"
 )
 
@@ -28,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	t := time.NewTimer(time.Duration(*timeout) * time.Second)
-	conn, err := m.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, *h3)
+	conn, err := qt.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, "hq", *h3)
 	if err != nil {
 		panic(err)
 	}
@@ -36,12 +35,12 @@ func main() {
 		conn.TLSTPHandler.MaxUniStreams = 3
 	}
 
-	pcap, err := m.StartPcapCapture(conn, *netInterface)
+	pcap, err := qt.StartPcapCapture(conn, *netInterface)
 	if err != nil {
 		panic(err)
 	}
 
-	trace := m.NewTrace("http_get", 1, *address)
+	trace := qt.NewTrace("http_get", 1, *address)
 	trace.AttachTo(conn)
 	defer func() {
 		trace.Complete(conn)
@@ -50,7 +49,7 @@ func main() {
 			trace.Results["pcap_error"] = err.Error()
 		}
 
-		var t []m.Trace
+		var t []qt.Trace
 		t = append(t, *trace)
 		out, err := json.Marshal(t)
 		if err != nil {
@@ -82,37 +81,19 @@ func main() {
 
 	defer conn.CloseConnection(false, 0, "")
 
+	var httpAgent agents.HTTPAgent
+
 	if !*h3 {
-		conn.Streams.Send(0, []byte(fmt.Sprintf("GET %s\r\n", *path)), true)
-
-		incomingPackets := make(chan interface{}, 1000)
-		conn.IncomingPackets.Register(incomingPackets)
-
-		for {
-			select {
-			case <-incomingPackets:
-				if conn.Streams.Get(0).ReadClosed {
-					spew.Dump(conn.Streams.Get(0).ReadData)
-					return
-				}
-			case <-t.C:
-				return
-			}
-
-		}
+		httpAgent = &agents.HTTP09Agent{}
 	} else {
-		http3 := &agents.HTTP3Agent{}
-		Agents.Add(http3)
+		httpAgent = &agents.HTTP3Agent{}
+	}
+	Agents.Add(httpAgent)
 
-		responseReceived := http3.HTTPResponseReceived.RegisterNewChan(1000)
-
-		http3.SendRequest(*path, "GET", trace.Host, nil)
-
-		select {
-		case r := <-responseReceived:
-			spew.Dump(r)
-		case <-t.C:
-			return
-		}
+	select {
+	case r := <-httpAgent.SendRequest(*path, "GET", trace.Host, nil):
+		spew.Dump(r)
+	case <-t.C:
+		return
 	}
 }

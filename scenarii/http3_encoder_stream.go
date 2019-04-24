@@ -40,8 +40,6 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	}
 
 	frameReceived := http.FrameReceived.RegisterNewChan(1000)
-	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
-
 forLoop:
 	for {
 		select {
@@ -60,7 +58,7 @@ forLoop:
 	}
 
 	<-time.NewTimer(200 * time.Millisecond).C
-	http.SendRequest(preferredPath, "GET", trace.Host, nil)
+	responseReceived := http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3ES_RequestTimeout
 	select {

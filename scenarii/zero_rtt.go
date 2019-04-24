@@ -58,7 +58,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 	rh, sh, token := conn.ReceivedPacketHandler, conn.SentPacketHandler, conn.Token
 
 	var err error
-	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6, false)
+	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6, conn.ALPN, false)
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	conn.Token = token
@@ -86,7 +86,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 
 	// TODO: Handle stateless connection
 
-	conn.SendHTTP09GETRequest(preferredPath, 0) // TODO: Verify that this get sent in a 0-RTT packet
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil) // TODO: Verify that this get sent in a 0-RTT packet
 
 	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	for {
@@ -97,11 +97,10 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 					if !s.waitFor0RTT(conn, trace, encryptionLevelsAvailable) {
 						return
 					}
-					conn.SendHTTP09GETRequest(preferredPath, 0)
+					responseChan = connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 				}
-				if conn.Streams.Get(0).ReadClosed {
-					trace.ErrorCode = 0
-				}
+			case <-responseChan:
+				trace.ErrorCode = 0
 			case <-conn.ConnectionClosed:
 				return
 			case <-s.Timeout():

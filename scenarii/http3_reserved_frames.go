@@ -47,9 +47,7 @@ func (s *HTTP3ReservedFramesScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	conn.Streams.Send(0, buf.Bytes(), false)
 
-	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
-
-	http.SendRequest(preferredPath, "GET", trace.Host, nil)
+	responseReceived := http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3RF_RequestTimeout
 	select {

@@ -36,8 +36,7 @@ func (s *HTTP3UniStreamsLimitsScenario) Run(conn *qt.Connection, trace *qt.Trace
 		return
 	}
 
-	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
-	http.SendRequest(preferredPath, "GET", trace.Host, nil)
+	responseReceived := http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3USFC_RequestTimeout
 	select {

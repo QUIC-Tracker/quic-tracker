@@ -44,7 +44,7 @@ func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, pre
 	errors := make(map[uint8]string)
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	var connectionCloseReceived bool
 
@@ -71,6 +71,8 @@ forLoop:
 					}
 				}
 			}
+		case <-responseChan:
+			break forLoop
 		case <-conn.ConnectionClosed:
 			break forLoop
 		case <-s.Timeout():

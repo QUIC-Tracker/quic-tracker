@@ -1,19 +1,20 @@
 package main
 
 import (
-	"os"
+	"encoding/json"
+	"flag"
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	s "github.com/QUIC-Tracker/quic-tracker/scenarii"
-	"flag"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
-	"encoding/json"
 )
 
 func main() {
 	host := flag.String("host", "", "The host endpoint to run the test against.")
 	path := flag.String("path", "/index.html", "The path to request when performing tests that needs data to be sent.")
+	alpn := flag.String("alpn", "hq", "The ALPN prefix to use when connecting ot the endpoint.")
 	scenarioName := flag.String("scenario", "", "The particular scenario to run.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
@@ -35,7 +36,7 @@ func main() {
 
 	trace := qt.NewTrace(scenario.Name(), scenario.Version(), *host)
 
-	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6(), scenario.HTTP3()) // Raw IPv6 are not handled correctly
+	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6(), *alpn, scenario.HTTP3()) // Raw IPv6 are not handled correctly
 
 	if err == nil {
 		var pcap *exec.Cmd

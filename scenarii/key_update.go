@@ -24,8 +24,6 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredP
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
-
 	// TODO: Move this to crypto.go
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
 	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
@@ -37,15 +35,13 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredP
 	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderWrite = oldState.HeaderWrite
 	conn.KeyPhaseIndex++
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 
 forLoop:
 	for {
 		select {
-		case <-incomingPackets:
-			if conn.Streams.Get(0).ReadClosed {
-				s.Finished()
-			}
+		case <-responseChan:
+			s.Finished()
 		case <-conn.ConnectionClosed:
 			break forLoop
 		case <-s.Timeout():

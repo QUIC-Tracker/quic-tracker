@@ -46,7 +46,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 	trace.ErrorCode = CM_HostDidNotMigrate // Assume it until proven wrong
 
 	for {
@@ -60,10 +60,8 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 			if fp, ok := p.(qt.Framer); ok && fp.Contains(qt.PathChallengeType) {
 				trace.ErrorCode = 0
 			}
-
-			if conn.Streams.Get(0).ReadClosed {
-				s.Finished()
-			}
+		case <-responseChan:
+			s.Finished()
 		case <-conn.ConnectionClosed:
 			return
 		case <-s.Timeout():

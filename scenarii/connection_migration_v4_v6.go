@@ -86,7 +86,7 @@ firstFlight:
 
 	incPackets = conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 	trace.ErrorCode = CM46_HostDidNotMigrate // Assume it until proven wrong
 
 	for {
@@ -105,9 +105,8 @@ firstFlight:
 				trace.ErrorCode = 0
 			}
 
-			if conn.Streams.Get(0).ReadClosed {
-				s.Finished()
-			}
+		case <-responseChan:
+			s.Finished()
 		case <-conn.ConnectionClosed:
 			return
 		case <-s.Timeout():

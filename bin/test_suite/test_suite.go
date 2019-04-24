@@ -96,16 +96,17 @@ func main() {
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "\t")
 			host, path := line[0], line[1]
-			port, err := strconv.Atoi(line[2])
+			h3port, err := strconv.Atoi(line[2])
 			if err != nil {
 				println(err)
 				continue
 			}
+			preferredALPN := line[3]
 
 			if scenario.HTTP3() {
 				split := strings.Split(host, ":")
 				host, _ = split[0], split[1]
-				host = fmt.Sprintf("%s:%d", host, port)
+				host = fmt.Sprintf("%s:%d", host, h3port)
 			}
 
 			<-semaphore
@@ -135,7 +136,7 @@ func main() {
 				crashTrace := GetCrashTrace(scenario, host) // Prepare one just in case
 				start := time.Now()
 
-				args := []string{"run", scenarioRunnerFilename, "-host", host, "-path", path, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
+				args := []string{"run", scenarioRunnerFilename, "-host", host, "-path", path, "-alpn", preferredALPN, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
 				if *debug {
 					args = append(args, "-debug")
 				}

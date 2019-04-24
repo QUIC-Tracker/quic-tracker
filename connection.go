@@ -254,7 +254,7 @@ func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
 	}
 	return udpConn, nil
 }
-func NewDefaultConnection(address string, serverName string, resumptionTicket []byte, useIPv6 bool, negotiateHTTP3 bool) (*Connection, error) {
+func NewDefaultConnection(address string, serverName string, resumptionTicket []byte, useIPv6 bool, preferredALPN string, negotiateHTTP3 bool) (*Connection, error) {
 	scid := make([]byte, 8, 8)
 	dcid := make([]byte, 8, 8)
 	rand.Read(scid)
@@ -280,6 +280,7 @@ func NewDefaultConnection(address string, serverName string, resumptionTicket []
 	if negotiateHTTP3 {
 		c = NewConnection(serverName, QuicVersion, QuicH3ALPNToken, scid, dcid, udpConn, resumptionTicket)
 	} else {
+		QuicALPNToken = fmt.Sprintf("%s-%02d", preferredALPN, QuicVersion & 0xff)
 		c = NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionTicket)
 	}
 

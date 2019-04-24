@@ -85,9 +85,13 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					if len(frames) > 0 {
 						a.retransmissionBuffer[p.PNSpace()][p.Header().PacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
 					}
-					if p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType) {
-						a.Logger.Println("Connection is closing")
-						return
+					if (p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType)) && (len(a.retransmissionBuffer[PNSpaceInitial]) > 0 || len(a.retransmissionBuffer[PNSpaceHandshake]) > 0 || len(a.retransmissionBuffer[PNSpaceAppData]) > 0) {
+						a.Logger.Println("Connection is closing, emptying retransmit buffers")
+						a.retransmissionBuffer = map[PNSpace]map[PacketNumber]RetransmittableFrames{
+							PNSpaceInitial:   make(map[PacketNumber]RetransmittableFrames),
+							PNSpaceHandshake: make(map[PacketNumber]RetransmittableFrames),
+							PNSpaceAppData:   make(map[PacketNumber]RetransmittableFrames),
+						}
 					}
 				}
 			case i := <-eLAvailable:
@@ -98,7 +102,14 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
 				}
 			case <-a.conn.ConnectionClosed:
-				return
+				if len(a.retransmissionBuffer[PNSpaceInitial]) > 0 || len(a.retransmissionBuffer[PNSpaceHandshake]) > 0 || len(a.retransmissionBuffer[PNSpaceAppData]) > 0 {
+					a.Logger.Println("Connection is closing, emptying retransmit buffers")
+					a.retransmissionBuffer = map[PNSpace]map[PacketNumber]RetransmittableFrames{
+						PNSpaceInitial:   make(map[PacketNumber]RetransmittableFrames),
+						PNSpaceHandshake: make(map[PacketNumber]RetransmittableFrames),
+						PNSpaceAppData:   make(map[PacketNumber]RetransmittableFrames),
+					}
+				}
 			case <-a.close:
 				return
 			}

@@ -26,7 +26,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
-	conn.SendHTTP09GETRequest(preferredPath, 0)
+	connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	var ackOnlyPackets []qt.PacketNumber
 

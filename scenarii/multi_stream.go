@@ -33,15 +33,15 @@ func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
 	for i := uint64(0); i < conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
-		conn.SendHTTP09GETRequest(preferredPath, uint64(i*4))
+		connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 	}
 
 forLoop:
 	for {
 		select {
 		case <-incPackets:
-			for _, stream := range conn.Streams.GetAll() {
-				if !stream.ReadClosed {
+			for streamId, stream := range conn.Streams.GetAll() {
+				if qt.IsBidi(streamId) && !stream.ReadClosed {
 					allClosed = false
 					break
 				}
@@ -59,7 +59,7 @@ forLoop:
 
 	allClosed = true
 	for streamId, stream := range conn.Streams.GetAll() {
-		if streamId != 0 && !stream.ReadClosed {
+		if qt.IsBidi(streamId) && streamId != 0 && !stream.ReadClosed {
 			allClosed = false
 			break
 		}

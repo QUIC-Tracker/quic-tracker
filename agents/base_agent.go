@@ -13,6 +13,7 @@ import (
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -186,6 +187,17 @@ func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint16, rea
 	a.(*ClosingAgent).Close(quicLayer, errorCode, reasonPhrase)
 	a.Join()
 	c.StopAll()
+}
+
+func (c *ConnectionAgents) AddHTTPAgent() HTTPAgent {
+	var agent HTTPAgent
+	if strings.HasPrefix(c.conn.ALPN, "h3") {
+		agent = &HTTP3Agent{DisableQPACKStreams: true}
+	} else {
+		agent = &HTTP09Agent{}
+	}
+	c.Add(agent)
+	return agent
 }
 
 // Returns the agents needed for a basic QUIC connection to operate

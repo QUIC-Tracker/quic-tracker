@@ -35,9 +35,7 @@ func (s *HTTP3GETScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPa
 		return
 	}
 
-	responseReceived := http.HTTPResponseReceived.RegisterNewChan(1000)
-
-	http.SendRequest(preferredPath, "GET", trace.Host, nil)
+	responseReceived := http.SendRequest(preferredPath, "GET", trace.Host, nil)
 
 	trace.ErrorCode = H3G_RequestTimeout
 	select {

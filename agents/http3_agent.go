@@ -2,7 +2,6 @@ package agents
 
 import (
 	"bytes"
-	"errors"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/http3"
 	"github.com/davecgh/go-spew/spew"
@@ -17,6 +16,7 @@ type HTTP3Response struct {
 	headersRemaining int
 	totalProcessed   uint64
 	totalReceived    uint64
+	responseChan	 chan HTTPResponse
 }
 
 func (r HTTP3Response) Complete() bool {
@@ -39,10 +39,10 @@ type streamData struct {
 type HTTP3Agent struct {
 	BaseAgent
 	conn                 *Connection
-	DisableQPACKStreams	 bool
+	DisableQPACKStreams  bool
 	QPACK                QPACKAgent
 	QPACKEncoderOpts     uint32
-	HTTPResponseReceived Broadcaster //type: HTTP3Response
+	httpResponseReceived Broadcaster //type: HTTP3Response
 	FrameReceived        Broadcaster //type: HTTP3FrameReceived
 	streamData           chan streamData
 	streamDataBuffer     map[uint64]*bytes.Buffer
@@ -62,7 +62,7 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 	a.QPACK = QPACKAgent{EncoderStreamID: 6, DecoderStreamID: 10, DisableStreams: a.DisableQPACKStreams}
 	a.QPACK.Run(conn)
 
-	a.HTTPResponseReceived = NewBroadcaster(1000)
+	a.httpResponseReceived = NewBroadcaster(1000)
 	a.FrameReceived = NewBroadcaster(1000)
 
 	frameReceived := a.FrameReceived.RegisterNewChan(1000)
@@ -211,11 +211,12 @@ func (a *HTTP3Agent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 }
 func (a *HTTP3Agent) checkResponse(response *HTTP3Response) {
 	if response.Complete() {
-		a.HTTPResponseReceived.Submit(*response)
+		response.responseChan <- response
+		a.httpResponseReceived.Submit(*response)
 		a.Logger.Printf("A %d-byte long response on stream %d is complete\n", response.totalProcessed, response.streamID)
 	}
 }
-func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[string]string) {
+func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[string]string) chan HTTPResponse {
 	if headers == nil {
 		headers = make(map[string]string)
 	}
@@ -238,7 +239,7 @@ func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[str
 	stream := a.conn.Streams.Get(streamID)
 	streamChan := stream.ReadChan.RegisterNewChan(1000)
 	a.streamDataBuffer[streamID] = new(bytes.Buffer)
-	response := &HTTP3Response{HTTP09Response: HTTP09Response{streamID: streamID}}
+	response := &HTTP3Response{HTTP09Response: HTTP09Response{streamID: streamID}, responseChan: make(chan HTTPResponse, 1)}
 	a.responseBuffer[streamID] = response
 
 	go func() { // Pipes the data from the response stream to the agent
@@ -265,11 +266,9 @@ func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[str
 
 	a.QPACK.EncodeHeaders <- DecodedHeaders{streamID, hdrs}
 	a.nextRequestStream += 4
+	return response.responseChan
 }
 
-func peekVarInt(buffer *bytes.Buffer) (VarInt, error) {
-	if buffer.Len() == 0 {
-		return VarInt{}, errors.New("no more byte to read")
-	}
-	return ReadVarInt(bytes.NewReader(buffer.Bytes()))
+func (a *HTTP3Agent) HTTPResponseReceived() Broadcaster {
+	return a.httpResponseReceived
 }

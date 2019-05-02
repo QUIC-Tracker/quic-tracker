@@ -90,7 +90,13 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotiationPacket
 	binary.Read(buffer, binary.BigEndian, &p.Version)
 	CIDL, _ := buffer.ReadByte()
 	DCIL := 3 + ((CIDL & 0xf0) >> 4)
+	if DCIL == 3 {
+		DCIL = 0
+	}
 	SCIL := 3 + (CIDL & 0xf)
+	if SCIL == 3 {
+		SCIL = 0
+	}
 	p.DestinationCID = make([]byte, DCIL, DCIL)
 	binary.Read(buffer, binary.BigEndian, &p.DestinationCID)
 	p.SourceCID = make([]byte, SCIL, SCIL)

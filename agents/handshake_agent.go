@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"time"
 )
@@ -71,7 +70,6 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
-						spew.Dump(tlsTP)
 						conn.TransitionTo(QuicVersion, alpn)
 						conn.TLSTPHandler = tlsTP
 						conn.Token = p.RetryToken

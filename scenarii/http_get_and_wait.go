@@ -2,6 +2,7 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
+	"strings"
 
 	"fmt"
 )
@@ -17,6 +18,7 @@ const (
 	SGW_TooLowStreamIdBidiToSendRequest = 8
 	SGW_DidntReceiveTheRequestedData    = 9
 	SGW_AnsweredOnUnannouncedStream     = 10
+	SGW_EndpointDoesNotSupportHQ		= 11
 )
 
 type SimpleGetAndWaitScenario struct {
@@ -28,6 +30,11 @@ func NewSimpleGetAndWaitScenario() *SimpleGetAndWaitScenario {
 }
 
 func (s *SimpleGetAndWaitScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
+	if !strings.Contains(conn.ALPN, "hq") {
+		trace.ErrorCode = SGW_EndpointDoesNotSupportHQ
+		return
+	}
+
 	conn.TLSTPHandler.MaxBidiStreams = 0
 	conn.TLSTPHandler.MaxUniStreams = 0
 

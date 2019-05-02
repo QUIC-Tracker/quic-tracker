@@ -10,7 +10,7 @@ const (
 	AV_TLSHandshakeFailed       = 1
 	AV_SentMoreThan3Datagrams   = 2
 	AV_SentMoreThan3TimesAmount = 3
-	AV_HostTimedOut = 3
+	AV_HostTimedOut = 4
 )
 
 type AddressValidationScenario struct {

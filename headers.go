@@ -107,7 +107,13 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	binary.Read(buffer, binary.BigEndian, &h.Version)
 	CIDL, _ := buffer.ReadByte()
 	DCIL := 3 + ((CIDL & 0xf0) >> 4)
+	if DCIL == 3 {
+		DCIL = 0
+	}
 	SCIL := 3 + (CIDL & 0xf)
+	if SCIL == 3 {
+		SCIL = 0
+	}
 	h.DestinationCID = make([]byte, DCIL, DCIL)
 	binary.Read(buffer, binary.BigEndian, &h.DestinationCID)
 	h.SourceCID = make([]byte, SCIL, SCIL)

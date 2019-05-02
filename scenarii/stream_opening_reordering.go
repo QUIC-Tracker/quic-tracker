@@ -1,15 +1,17 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
 	"fmt"
+	qt "github.com/QUIC-Tracker/quic-tracker"
+	"strings"
 
 	"time"
 )
 
 const (
-	SOR_TLSHandshakeFailed = 1
-	SOR_HostDidNotRespond  = 2
+	SOR_TLSHandshakeFailed       = 1
+	SOR_HostDidNotRespond        = 2
+	SOR_EndpointDoesNotSupportHQ = 3
 )
 
 type StreamOpeningReorderingScenario struct {
@@ -20,6 +22,11 @@ func NewStreamOpeningReorderingScenario() *StreamOpeningReorderingScenario {
 	return &StreamOpeningReorderingScenario{AbstractScenario{name: "stream_opening_reordering", version: 2}}
 }
 func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
+	if !strings.Contains(conn.ALPN, "hq") {
+		trace.ErrorCode = SOR_EndpointDoesNotSupportHQ
+		return
+	}
+
 	connAgents := s.CompleteHandshake(conn, trace, SOR_TLSHandshakeFailed)
 	if connAgents == nil {
 		return

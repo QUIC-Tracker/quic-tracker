@@ -19,7 +19,7 @@ import (
 
 type Agent interface {
 	Name() string
-	Init(name string, SCID ConnectionID)
+	Init(name string, ODCID ConnectionID)
 	Run(conn *Connection)
 	Stop()
 	Restart()

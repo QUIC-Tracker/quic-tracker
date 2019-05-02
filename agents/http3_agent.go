@@ -4,7 +4,6 @@ import (
 	"bytes"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/http3"
-	"github.com/davecgh/go-spew/spew"
 	"math"
 )
 
@@ -165,7 +164,10 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 					}
 					a.QPACK.InitEncoder(uint(settingsHeaderTableSize), dynamicTableSize, uint(settingsQPACKBlockedStreams), a.QPACKEncoderOpts)
 				default:
-					spew.Dump(fr)
+					if response, ok := a.responseBuffer[fr.StreamID]; ok {
+						response.totalProcessed += f.WireLength()
+						continue
+					}
 				}
 			case i := <-decodedHeaders:
 				dHdrs := i.(DecodedHeaders)

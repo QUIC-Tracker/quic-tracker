@@ -3,6 +3,7 @@ package scenarii
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
+	"strings"
 )
 
 const (
@@ -12,6 +13,7 @@ const (
 	FC_NotEnoughDataAvailable      = 4
 	FC_RespectedLimitsButNoBlocked = 5  // After discussing w/ the implementers, it is not reasonable to expect a STREAM_BLOCKED or a BLOCKED frame to be sent.
 										// These frames should be sent to signal poor window size w.r.t. to the RTT
+	FC_EndpointDoesNotSupportHQ    = 6
 )
 
 type FlowControlScenario struct {
@@ -22,6 +24,11 @@ func NewFlowControlScenario() *FlowControlScenario {
 	return &FlowControlScenario{AbstractScenario{name: "flow_control", version: 2}}
 }
 func (s *FlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
+	if !strings.Contains(conn.ALPN, "hq") {
+		trace.ErrorCode = FC_EndpointDoesNotSupportHQ
+		return
+	}
+
 	conn.TLSTPHandler.MaxStreamDataBidiLocal = 80
 
 	connAgents := s.CompleteHandshake(conn, trace, FC_TLSHandshakeFailed)

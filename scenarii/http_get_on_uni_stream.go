@@ -2,6 +2,7 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
+	"strings"
 )
 
 const (
@@ -11,6 +12,7 @@ const (
 	GS2_ReceivedDataOnUnauthorizedStream      = 4
 	GS2_AnswersToARequestOnAForbiddenStreamID = 5 // This is hard to disambiguate sometimes, we don't check anymore
 	GS2_DidNotCloseTheConnection              = 6
+	GS2_EndpointDoesNotSupportHQ              = 7
 )
 
 type GetOnStream2Scenario struct {
@@ -24,6 +26,11 @@ func NewGetOnStream2Scenario() *GetOnStream2Scenario {
 func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.TLSTPHandler.MaxBidiStreams = 1
 	conn.TLSTPHandler.MaxUniStreams = 1
+
+	if !strings.Contains(conn.ALPN, "hq") {
+		trace.ErrorCode = GS2_EndpointDoesNotSupportHQ
+		return
+	}
 
 	connAgents := s.CompleteHandshake(conn, trace, GS2_TLSHandshakeFailed)
 	if connAgents == nil {
@@ -48,7 +55,7 @@ func (s *GetOnStream2Scenario) Run(conn *qt.Connection, trace *qt.Trace, preferr
 				for _, f := range p.GetFrames() {
 					switch f := f.(type) {
 					case *qt.StreamFrame:
-						if f.StreamId == 2 {
+						if f.StreamId == 2 && f.Length > 0 {
 							trace.MarkError(GS2_ReceivedDataOnStream2, "", p)
 							s.Finished()
 						} else if f.StreamId > 3 {

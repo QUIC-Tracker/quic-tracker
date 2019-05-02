@@ -2,6 +2,7 @@ package scenarii
 
 import (
 	qt "github.com/QUIC-Tracker/quic-tracker"
+	"strings"
 
 	"time"
 	"github.com/QUIC-Tracker/quic-tracker/agents"
@@ -58,7 +59,7 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 	rh, sh, token := conn.ReceivedPacketHandler, conn.SentPacketHandler, conn.Token
 
 	var err error
-	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6, conn.ALPN, false)
+	conn, err = qt.NewDefaultConnection(conn.Host.String(), conn.ServerName, ticket, s.ipv6, "hq", strings.Contains(conn.ALPN, "h3"))
 	conn.ReceivedPacketHandler = rh
 	conn.SentPacketHandler = sh
 	conn.Token = token

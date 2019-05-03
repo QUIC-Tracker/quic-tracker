@@ -172,8 +172,9 @@ func (c *Connection) ProcessVersionNegotation(vn *VersionNegotiationPacket) erro
 	}
 	QuicVersion = version
 	QuicALPNToken = fmt.Sprintf("%s-%02d", strings.Split(c.ALPN, "-")[0], version & 0xff)
+	_, err := rand.Read(c.DestinationCID)
 	c.TransitionTo(QuicVersion, QuicALPNToken)
-	return nil
+	return err
 }
 func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack frame based on the packet numbers received
 	sort.Sort(PacketNumberQueue(c.AckQueue[space]))

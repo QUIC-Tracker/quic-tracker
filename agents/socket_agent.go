@@ -84,10 +84,8 @@ func (a *SocketAgent) Run(conn *Connection) {
 				}
 
 				conn.IncomingPayloads.Submit(p)
-			case shouldRestart := <-a.close:
-				if !shouldRestart {
-					conn.UdpConnection.Close()
-				}
+			case <-a.close:
+				conn.UdpConnection.Close()
 				return
 			}
 		}

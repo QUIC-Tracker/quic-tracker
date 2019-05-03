@@ -123,9 +123,13 @@ func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgen
 				for _, a := range agents {
 					a.Restart()
 					a.Join()
-					a.Run(conn)
 				}
 				conn.ConnectionRestart = make(chan bool, 1)
+				conn.UdpConnection.Close()
+				conn.UdpConnection, _ = EstablishUDPConnection(conn.Host)
+				for _, a := range agents {
+					a.Run(conn)
+				}
 				close(conn.ConnectionRestarted)
 				conn.Logger.Printf("Restarting all agents: done\n")
 			case <-conn.ConnectionClosed:

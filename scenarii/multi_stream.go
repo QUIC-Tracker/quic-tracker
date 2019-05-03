@@ -59,7 +59,7 @@ forLoop:
 
 	allClosed = true
 	for streamId, stream := range conn.Streams.GetAll() {
-		if qt.IsBidi(streamId) && streamId != 0 && !stream.ReadClosed {
+		if qt.IsBidi(streamId) && !stream.ReadClosed {
 			allClosed = false
 			break
 		}

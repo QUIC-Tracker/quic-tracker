@@ -11,3 +11,4 @@ quicker.edm.uhasselt.be:4433	/index.html	4433	hq
 ralith.com:4433	/index.html	4433	hq
 http3-test.litespeedtech.com:4433	/index.html	4433	h3
 quic.tech:4433	/index.html	8443	hq
+quic.aiortc.org:4433	/	4433	hq

@@ -38,7 +38,7 @@ forLoop:
 			switch p := i.(type) {
 			case *ProtectedPacket:
 				hdr := p.Header().(*ShortHeader)
-				if hdr.PacketNumber() > conn.LastSpinNumber {
+				if hdr.PacketNumber() >= conn.LastSpinNumber {
 					if hdr.SpinBit != lastServerSpin {
 						lastServerSpin = hdr.SpinBit
 						spins++

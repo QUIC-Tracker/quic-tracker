@@ -32,8 +32,9 @@ func (s *MultiStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, preferre
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
+	httpAgent := connAgents.AddHTTPAgent()
 	for i := uint64(0); i < conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams && i < 4; i++ {
-		connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
+		httpAgent.SendRequest(preferredPath, "GET", trace.Host, nil)
 	}
 
 forLoop:
@@ -68,10 +69,12 @@ forLoop:
 	if !allClosed {
 		trace.ErrorCode = MS_NotAllStreamsWereClosed
 		for streamId, stream := range conn.Streams.GetAll() {
-			trace.Results[fmt.Sprintf("stream_%d_rec_offset", streamId)] = stream.ReadOffset
-			trace.Results[fmt.Sprintf("stream_%d_snd_offset", streamId)] = stream.WriteOffset
-			trace.Results[fmt.Sprintf("stream_%d_snd_closed", streamId)] = stream.WriteClosed
-			trace.Results[fmt.Sprintf("stream_%d_rec_closed", streamId)] = stream.ReadClosed
+			if qt.IsBidi(streamId) {
+				trace.Results[fmt.Sprintf("stream_%d_rec_offset", streamId)] = stream.ReadOffset
+				trace.Results[fmt.Sprintf("stream_%d_snd_offset", streamId)] = stream.WriteOffset
+				trace.Results[fmt.Sprintf("stream_%d_snd_closed", streamId)] = stream.WriteClosed
+				trace.Results[fmt.Sprintf("stream_%d_rec_closed", streamId)] = stream.ReadClosed
+			}
 		}
 	}
 }

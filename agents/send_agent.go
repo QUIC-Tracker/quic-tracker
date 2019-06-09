@@ -122,7 +122,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 	}()
 }
 
-var elOrder = []DirectionalEncryptionLevel{{EncryptionLevel1RTT, false}, {EncryptionLevel0RTT, false}, {EncryptionLevelHandshake, false}, {EncryptionLevelInitial, false}}
+var elOrder = []DirectionalEncryptionLevel{{EncryptionLevel1RTT, false}, {EncryptionLevelHandshake, false}, {EncryptionLevelInitial, false}}
 var elAppDataOrder = []DirectionalEncryptionLevel{{EncryptionLevel1RTT, false}, {EncryptionLevel0RTT, false}}
 
 func chooseBestEncryptionLevel(elAvailable map[DirectionalEncryptionLevel]bool, restrictAppData bool) EncryptionLevel {

@@ -60,7 +60,7 @@ func (a *AckAgent) Run(conn *Connection) {
 				}
 			case args := <-a.requestFrame: // TODO: Keep track of the ACKs and their packet to shorten the ack blocks once received by the peer
 				pnSpace := EncryptionLevelToPNSpace[args.level]
-				if a.DisableAcks[pnSpace] || args.level == EncryptionLevelBest || args.level == EncryptionLevelBestAppData {
+				if a.DisableAcks[pnSpace] || args.level == EncryptionLevelBest || args.level == EncryptionLevelBestAppData || args.level == EncryptionLevel0RTT {
 					a.frames <- nil
 					break
 				}

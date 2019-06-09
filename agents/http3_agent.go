@@ -95,18 +95,23 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 				if p.PNSpace() == PNSpaceAppData {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
-						if s.Offset == 0 && s.StreamId&0x2 == 2 {
-							if s.StreamData[0] == http3.StreamTypeControl {
+						if s.Offset == 0 && IsUni(s.StreamId) {
+							streamType, err := ReadVarInt(bytes.NewReader(s.StreamData))
+							if err != nil { // TODO: Handle stream types spanning two frames
+								a.Logger.Printf("Error when parsing stream type: %s\n", err.Error())
+							} else if streamType.Value == http3.StreamTypeControl {
 								if a.peerControlStreamID != HTTPNoStream {
 									a.Logger.Printf("Peer attempted to open another control stream on stream %d\n", s.StreamId)
 									continue
 								}
 								a.peerControlStreamID = s.StreamId
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerControlStream)
-								if s.Length > 1 {
-									peerControlStream <- s.StreamData[1:] // Submits the rest as normal control stream data
+								if s.Length > uint64(streamType.Length) {
+									peerControlStream <- s.StreamData[streamType.Length:] // Submits the rest as normal control stream data
 								}
 								a.Logger.Printf("Peer opened control stream on stream %d\n", s.StreamId)
+							} else {
+								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)
 							}
 						}
 					}
@@ -207,7 +212,7 @@ func (a *HTTP3Agent) attemptDecoding(streamID uint64, buffer *bytes.Buffer) {
 			a.FrameReceived.Submit(HTTP3FrameReceived{streamID, f})
 			a.attemptDecoding(streamID, buffer)
 		} else {
-			a.Logger.Printf("Unable to parse %d byte-long frame on stream %d, %d bytes missing\n", t.Value, streamID, int(t.Value)-(buffer.Len()-t.Length-1))
+			a.Logger.Printf("Unable to parse %d byte-long frame on stream %d, %d bytes missing\n", t.Value, streamID, int(l.Value)-(buffer.Len()-l.Length-t.Length))
 		}
 	}
 }

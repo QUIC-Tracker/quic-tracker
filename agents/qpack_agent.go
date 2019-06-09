@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"bytes"
 	. "github.com/QUIC-Tracker/quic-tracker"
 	"github.com/mpiraux/ls-qpack-go"
 	"math"
@@ -88,8 +89,11 @@ func (a *QPACKAgent) Run(conn *Connection) {
 				if p.PNSpace() == PNSpaceAppData {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
-						if s.Offset == 0 && s.StreamId&0x2 == 2 {
-							if s.StreamData[0] == QPACKEncoderStreamValue {
+						if s.Offset == 0 && IsUni(s.StreamId) {
+							streamType, err := ReadVarInt(bytes.NewReader(s.StreamData))
+							if err != nil { // TODO: Handle stream types spanning two frames
+								a.Logger.Printf("Error when parsing stream type: %s\n", err.Error())
+							} else if streamType.Value == QPACKEncoderStreamValue {
 								if peerEncoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another encoder stream on stream %d\n", s.StreamId)
 									continue
@@ -97,10 +101,10 @@ func (a *QPACKAgent) Run(conn *Connection) {
 								peerEncoderStreamId = s.StreamId
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerEncoderStream)
 								a.Logger.Printf("Peer opened encoder stream on stream %d\n", s.StreamId)
-								if s.Length > 1 {
-									peerEncoderStream <- s.StreamData[1:]
+								if s.Length > uint64(streamType.Length) {
+									peerEncoderStream <- s.StreamData[streamType.Length:]
 								}
-							} else if s.StreamData[0] == QPACKDecoderStreamValue {
+							} else if streamType.Value == QPACKDecoderStreamValue {
 								if peerDecoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another decoder stream on stream %d\n", s.StreamId)
 									continue
@@ -108,9 +112,11 @@ func (a *QPACKAgent) Run(conn *Connection) {
 								peerDecoderStreamId = s.StreamId
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerDecoderStream)
 								a.Logger.Printf("Peer opened decoder stream on stream %d\n", s.StreamId)
-								if s.Length > 1 {
-									peerDecoderStream <- s.StreamData[1:]
+								if s.Length > uint64(streamType.Length) {
+									peerDecoderStream <- s.StreamData[streamType.Length:]
 								}
+							} else {
+								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)
 							}
 						}
 					}

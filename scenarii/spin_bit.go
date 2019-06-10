@@ -47,7 +47,7 @@ forLoop:
 					conn.LastSpinNumber = hdr.PacketNumber()
 				}
 				if conn.Streams.Get(0).ReadClosed && !conn.Streams.Get(4).WriteClosed {
-					conn.SendHTTP09GETRequest(preferredPath, 4)
+					http.SendRequest(preferredPath, "GET", trace.Host, nil)
 				}
 			}
 		case r := <-responseChan:

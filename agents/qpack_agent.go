@@ -99,22 +99,24 @@ func (a *QPACKAgent) Run(conn *Connection) {
 									continue
 								}
 								peerEncoderStreamId = s.StreamId
-								conn.Streams.Get(s.StreamId).ReadChan.Register(peerEncoderStream)
+								stream := conn.Streams.Get(peerEncoderStreamId)
 								a.Logger.Printf("Peer opened encoder stream on stream %d\n", s.StreamId)
-								if s.Length > uint64(streamType.Length) {
-									peerEncoderStream <- s.StreamData[streamType.Length:]
+								if len(stream.ReadData) > streamType.Length {
+									peerEncoderStream <- stream.ReadData[streamType.Length:]
 								}
+								conn.Streams.Get(s.StreamId).ReadChan.Register(peerEncoderStream)
 							} else if streamType.Value == QPACKDecoderStreamValue {
 								if peerDecoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another decoder stream on stream %d\n", s.StreamId)
 									continue
 								}
 								peerDecoderStreamId = s.StreamId
-								conn.Streams.Get(s.StreamId).ReadChan.Register(peerDecoderStream)
+								stream := conn.Streams.Get(peerEncoderStreamId)
 								a.Logger.Printf("Peer opened decoder stream on stream %d\n", s.StreamId)
-								if s.Length > uint64(streamType.Length) {
-									peerDecoderStream <- s.StreamData[streamType.Length:]
+								if len(stream.ReadData) > streamType.Length {
+									peerDecoderStream <- stream.ReadData[streamType.Length:]
 								}
+								conn.Streams.Get(s.StreamId).ReadChan.Register(peerDecoderStream)
 							} else {
 								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)
 							}

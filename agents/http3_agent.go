@@ -105,10 +105,11 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 									continue
 								}
 								a.peerControlStreamID = s.StreamId
-								conn.Streams.Get(s.StreamId).ReadChan.Register(peerControlStream)
-								if s.Length > uint64(streamType.Length) {
-									peerControlStream <- s.StreamData[streamType.Length:] // Submits the rest as normal control stream data
+								stream := conn.Streams.Get(a.peerControlStreamID)
+								if len(stream.ReadData) > streamType.Length {
+									peerControlStream <- stream.ReadData[streamType.Length:]
 								}
+								conn.Streams.Get(s.StreamId).ReadChan.Register(peerControlStream)
 								a.Logger.Printf("Peer opened control stream on stream %d\n", s.StreamId)
 							} else {
 								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)

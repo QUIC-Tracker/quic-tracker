@@ -5,7 +5,7 @@ kazuhooku.com:4433	/notfound	8433	hq
 quic.westus.cloudapp.azure.com:4433	/index.html	443	hq
 fb.mvfst.net:4433	/index.html	4433	hq
 cloudflare-quic.com:443	/index.html	443	h3
-208.85.208.226:4433	/t1.html	4433	hq
+204.134.187.194:4433	/t1.html	4433	h3
 test.privateoctopus.com:4433	/	4433	hq
 quicker.edm.uhasselt.be:4433	/index.html	4433	hq
 ralith.com:4433	/index.html	4433	hq

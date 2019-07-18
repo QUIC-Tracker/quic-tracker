@@ -58,7 +58,7 @@ func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and
 	}()
 }
 
-func (a *ClosingAgent) Close(quicLayer bool, errorCode uint16, reasonPhrase string) {
+func (a *ClosingAgent) Close(quicLayer bool, errorCode uint64, reasonPhrase string) {
 	if !a.closing {
 		a.closing = true
 		a.conn.CloseConnection(quicLayer, errorCode, reasonPhrase)

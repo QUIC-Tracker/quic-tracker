@@ -88,17 +88,10 @@ func ReadVersionNegotationPacket(buffer *bytes.Reader) *VersionNegotiationPacket
 	}
 	p.UnusedField = b & 0x7f
 	binary.Read(buffer, binary.BigEndian, &p.Version)
-	CIDL, _ := buffer.ReadByte()
-	DCIL := 3 + ((CIDL & 0xf0) >> 4)
-	if DCIL == 3 {
-		DCIL = 0
-	}
-	SCIL := 3 + (CIDL & 0xf)
-	if SCIL == 3 {
-		SCIL = 0
-	}
+	DCIL, _ := buffer.ReadByte()
 	p.DestinationCID = make([]byte, DCIL, DCIL)
 	binary.Read(buffer, binary.BigEndian, &p.DestinationCID)
+	SCIL, _ := buffer.ReadByte()
 	p.SourceCID = make([]byte, SCIL, SCIL)
 	binary.Read(buffer, binary.BigEndian, &p.SourceCID)
 	for {
@@ -258,10 +251,7 @@ func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
 	h := ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
 	p.header = h
-	OCIDL := h.lowerBits & 0x0f
-	if OCIDL > 0 {
-		OCIDL += 3
-	}
+	OCIDL, _ := buffer.ReadByte()
 	p.OriginalDestinationCID = make([]byte, OCIDL)
 	buffer.Read(p.OriginalDestinationCID)
 	p.RetryToken = make([]byte, buffer.Len())

@@ -74,8 +74,9 @@ func (h *LongHeader) Encode() []byte {
 	typeByte |= uint8(h.truncatedPN.Length) - 1
 	binary.Write(buffer, binary.BigEndian, typeByte)
 	binary.Write(buffer, binary.BigEndian, h.Version)
-	buffer.WriteByte((h.DestinationCID.CIDL() << 4) | h.SourceCID.CIDL())
+	buffer.WriteByte(h.DestinationCID.CIDL())
 	binary.Write(buffer, binary.BigEndian, h.DestinationCID)
+	buffer.WriteByte(h.SourceCID.CIDL())
 	binary.Write(buffer, binary.BigEndian, h.SourceCID)
 	if h.packetType == Initial {
 		buffer.Write(h.TokenLength.Encode())
@@ -93,7 +94,7 @@ func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
 func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
 func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
 func (h *LongHeader) HeaderLength() int {
-	length := 6 + len(h.DestinationCID) + len(h.SourceCID) + h.Length.Length + h.truncatedPN.Length
+	length := 7 + len(h.DestinationCID) + len(h.SourceCID) + h.Length.Length + h.truncatedPN.Length
 	if h.packetType == Initial {
 		length += h.TokenLength.Length + len(h.Token)
 	}
@@ -105,17 +106,10 @@ func ReadLongHeader(buffer *bytes.Reader, conn *Connection) *LongHeader {
 	h.lowerBits = typeByte & 0x0F
 	h.packetType = PacketType(typeByte - 0xC0) >> 4
 	binary.Read(buffer, binary.BigEndian, &h.Version)
-	CIDL, _ := buffer.ReadByte()
-	DCIL := 3 + ((CIDL & 0xf0) >> 4)
-	if DCIL == 3 {
-		DCIL = 0
-	}
-	SCIL := 3 + (CIDL & 0xf)
-	if SCIL == 3 {
-		SCIL = 0
-	}
+	DCIL, _ := buffer.ReadByte()
 	h.DestinationCID = make([]byte, DCIL, DCIL)
 	binary.Read(buffer, binary.BigEndian, &h.DestinationCID)
+	SCIL, _ := buffer.ReadByte()
 	h.SourceCID = make([]byte, SCIL, SCIL)
 	binary.Read(buffer, binary.BigEndian, &h.SourceCID)
 	if h.packetType == Initial {

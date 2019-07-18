@@ -88,7 +88,7 @@ func (a *StreamAgent) close(streamId uint64) error {
 	return errors.New("cannot close server uni stream")
 }
 
-func (a *StreamAgent) reset(streamId uint64, appErrorCode uint16) error {
+func (a *StreamAgent) reset(streamId uint64, appErrorCode uint64) error {
 	s := a.conn.Streams.Get(streamId)
 	if IsClient(streamId) || IsBidi(streamId) {
 		if s.WriteClosed {
@@ -102,7 +102,7 @@ func (a *StreamAgent) reset(streamId uint64, appErrorCode uint16) error {
 	return errors.New("cannot reset server uni stream")
 }
 
-func (a *StreamAgent) stopSending(streamId uint64, appErrorCode uint16) error {
+func (a *StreamAgent) stopSending(streamId uint64, appErrorCode uint64) error {
 	if IsServer(streamId) || IsBidi(streamId) {
 		if _, present := a.conn.Streams.Has(streamId); !present && IsServer(streamId) {
 			return errors.New("cannot ask to stop sending on non-ready server stream")

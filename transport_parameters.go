@@ -22,8 +22,9 @@ const (
 	InitialMaxStreamsUni                                   = 0x0009
 	AckDelayExponent                                       = 0x000a
 	MaxAckDelay                                            = 0x000b
-	DisableMigration                                       = 0x000c // TODO: Handle this parameter
+	DisableMigration                                       = 0x000c
 	PreferredAddress                                       = 0x000d // TODO: Handle this parameter
+	ActiveConnectionIdLimit								   = 0x000e
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
@@ -41,6 +42,7 @@ type QuicTransportParameters struct {  // A set of QUIC transport parameters val
 	MaxAckDelay				uint64
 	DisableMigration        bool
 	PreferredAddress        []byte
+	ActiveConnectionIdLimit uint64
 	AdditionalParameters    TransportParameterList
 	ToJSON                  map[string]interface{}
 }
@@ -80,7 +82,7 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler() *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{QuicTransportParameters: QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 3, IdleTimeout: 10000, AckDelayExponent: 3}}
+	return &TLSTransportParameterHandler{QuicTransportParameters: QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 3, IdleTimeout: 10000, AckDelayExponent: 3, ActiveConnectionIdLimit: 4}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter
@@ -119,6 +121,7 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	addParameter(InitialMaxStreamsBidi, h.QuicTransportParameters.MaxBidiStreams)
 	addParameter(InitialMaxStreamsUni, h.QuicTransportParameters.MaxUniStreams)
 	addParameter(IdleTimeout, h.QuicTransportParameters.IdleTimeout)
+	addParameter(ActiveConnectionIdLimit, h.QuicTransportParameters.ActiveConnectionIdLimit)
 	for _, p := range h.QuicTransportParameters.AdditionalParameters {
 		parameters = append(parameters, p)
 	}
@@ -180,7 +183,10 @@ func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
 			receivedParameters.ToJSON["disable_migration"] = true
 		case PreferredAddress:
 			receivedParameters.PreferredAddress = p.Value
-			receivedParameters.ToJSON["preferredAddress"] = receivedParameters.PreferredAddress
+			receivedParameters.ToJSON["preferred_address"] = receivedParameters.PreferredAddress
+		case ActiveConnectionIdLimit:
+			receivedParameters.ActiveConnectionIdLimit, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.ToJSON["active_connection_id_limit"] = receivedParameters.ActiveConnectionIdLimit
 		default:
 			receivedParameters.AdditionalParameters.AddParameter(p)
 			receivedParameters.ToJSON[fmt.Sprintf("%x", p.ParameterType)] = p.Value

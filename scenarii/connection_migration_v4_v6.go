@@ -15,6 +15,8 @@ const (
 	CM46_HostDidNotValidateNewPath = 4
 	CM46_NoNewCIDReceived		   = 5
 	CM46_NoNewCIDUsed			   = 6
+	CM46_MigrationIsDisabled 	   = 7
+	CM46_NoCIDAllowed	     	   = 8
 )
 
 
@@ -34,11 +36,21 @@ func (s *ConnectionMigrationv4v6Scenario) Run(conn *qt.Connection, trace *qt.Tra
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
+	if conn.TLSTPHandler.ReceivedParameters.DisableMigration {
+		trace.ErrorCode = CM46_MigrationIsDisabled
+		return
+	}
+
+	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit == 0 {
+		trace.ErrorCode = CM46_NoCIDAllowed
+		return
+	}
+
 	scid := make([]byte, 8)
 	var resetToken [16]byte
 	rand.Read(scid)
 	rand.Read(resetToken[:])
-	conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{ 1, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
+	conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{1, 0, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
 	firstFlightTimer := time.NewTimer(3 * time.Second)
 
 	var ncid qt.ConnectionID

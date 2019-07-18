@@ -15,6 +15,7 @@ const (
 	NCI_HostDidNotAnswerToNewCID = 3
 	NCI_HostDidNotAdaptCID       = 4
 	NCI_HostSentInvalidCIDLength = 5
+	NCI_NoCIDAllowed			 = 6
 )
 
 type NewConnectionIDScenario struct {
@@ -32,6 +33,11 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
+
+	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit == 0 {
+		trace.ErrorCode = NCI_NoCIDAllowed
+		return
+	}
 
 	trace.ErrorCode = NCI_HostDidNotProvideCID
 
@@ -73,7 +79,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 						trace.ErrorCode = NCI_HostDidNotAnswerToNewCID // Assume it did not answer until proven otherwise
 						conn.DestinationCID = nci.ConnectionId
 						conn.SourceCID = scid
-						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{ 1, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
+						conn.FrameQueue.Submit(qt.QueuedFrame{&qt.NewConnectionIdFrame{1, 0, uint8(len(scid)), scid, resetToken}, qt.EncryptionLevelBest})
 						conn.SendHTTP09GETRequest(preferredPath, 0)
 						expectingResponse = true
 					}

@@ -234,7 +234,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
 	c.Streams = Streams{streams: make(map[uint64]*Stream), lock: &sync.Mutex{}, input: &c.StreamInput}
 }
-func (c *Connection) CloseConnection(quicLayer bool, errCode uint16, reasonPhrase string) {
+func (c *Connection) CloseConnection(quicLayer bool, errCode uint64, reasonPhrase string) {
 	if quicLayer {
 		c.FrameQueue.Submit(QueuedFrame{&ConnectionCloseFrame{errCode,0, uint64(len(reasonPhrase)), reasonPhrase}, EncryptionLevelBest})
 	} else {

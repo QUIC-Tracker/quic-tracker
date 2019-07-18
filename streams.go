@@ -41,7 +41,7 @@ type StreamInput struct {
 	Close        bool
 	Reset        bool
 	StopSending  bool
-	AppErrorCode uint16
+	AppErrorCode uint64
 }
 
 type Streams struct {
@@ -82,11 +82,11 @@ func (s Streams) Close(streamId uint64) {
 	s.input.Submit(StreamInput{StreamId: streamId, Data: nil, Close: true})
 }
 
-func (s Streams) Reset(streamId uint64, appErrorCode uint16) {
+func (s Streams) Reset(streamId uint64, appErrorCode uint64) {
 	s.input.Submit(StreamInput{StreamId: streamId, AppErrorCode: appErrorCode, Reset: true})
 }
 
-func (s Streams) StopSending(streamId uint64, appErrorCode uint16) {
+func (s Streams) StopSending(streamId uint64, appErrorCode uint64) {
 	s.input.Submit(StreamInput{StreamId: streamId, AppErrorCode: appErrorCode, StopSending: true})
 }
 

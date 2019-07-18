@@ -21,13 +21,14 @@ func main() {
 	address := flag.String("address", "", "The address to connect to")
 	useIPv6 := flag.Bool("6", false, "Use IPV6")
 	path := flag.String("path", "/index.html", "The path to request")
+	alpn := flag.String("alpn", "hq", "The ALPN prefix to use when connecting ot the endpoint.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap")
 	timeout := flag.Int("timeout", 10, "The number of seconds after which the program will timeout")
 	h3 := flag.Bool("3", false, "Use HTTP/3 instead of HTTP/0.9")
 	flag.Parse()
 
 	t := time.NewTimer(time.Duration(*timeout) * time.Second)
-	conn, err := qt.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, "hq", *h3)
+	conn, err := qt.NewDefaultConnection(*address, (*address)[:strings.LastIndex(*address, ":")], nil, *useIPv6, *alpn, *h3)
 	if err != nil {
 		panic(err)
 	}

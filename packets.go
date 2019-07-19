@@ -20,22 +20,31 @@ type Packet interface {
 	PNSpace() PNSpace
 	EncryptionLevel() EncryptionLevel
 	ShortString() string
-	ReceiveContext() ReceiveContext
-	SetContext(ctx ReceiveContext)
+	ReceiveContext() PacketContext
+	SetReceiveContext(ctx PacketContext)
+	SendContext() PacketContext
+	SetSendContext(ctx PacketContext)
 }
 
 type abstractPacket struct {
-	header Header
-	receiveContext ReceiveContext
+	header         Header
+	receiveContext PacketContext
+	sendContext    PacketContext
 }
 func (p abstractPacket) Header() Header {
 	return p.header
 }
-func (p abstractPacket) ReceiveContext() ReceiveContext {
+func (p abstractPacket) ReceiveContext() PacketContext {
 	return p.receiveContext
 }
-func (p *abstractPacket) SetContext(ctx ReceiveContext) {
+func (p *abstractPacket) SetReceiveContext(ctx PacketContext) {
 	p.receiveContext = ctx
+}
+func (p abstractPacket) SendContext() PacketContext {
+	return p.sendContext
+}
+func (p *abstractPacket) SetSendContext(ctx PacketContext) {
+	p.sendContext = ctx
 }
 func (p abstractPacket) EncodeHeader() []byte {
 	return p.header.Encode()

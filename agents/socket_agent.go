@@ -50,6 +50,7 @@ func (a *SocketAgent) Run(conn *Connection) {
 			sm.Payload = make([]byte, i)
 			copy(sm.Payload, recBuf[:i])
 			sm.RemoteAddr = addr
+			sm.DatagramSize = uint16(len(sm.Payload))
 
 			if a.ecn {
 				ecn, err := findECNValue(oob[:oobn])

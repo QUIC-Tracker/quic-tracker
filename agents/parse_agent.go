@@ -75,6 +75,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					hLen := header.HeaderLength()
 					var packet Packet
 					var cleartext []byte
+					var consumed int
 					switch header.PacketType() {
 					case Handshake, Initial:
 						lHeader := header.(*LongHeader)
@@ -99,7 +100,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							packet = ReadHandshakePacket(bytes.NewReader(cleartext), a.conn)
 						}
 
-						off += hLen + pLen
+						consumed = hLen + pLen
 					case ShortHeaderPacket: // Packets with a short header always include a 1-RTT protected payload.
 						payload := cryptoState.Read.Decrypt(ciphertext[hLen:], uint64(header.PacketNumber()), ciphertext[:hLen])
 						if payload == nil {
@@ -108,11 +109,11 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						}
 						cleartext = append(append(cleartext, ic.Payload[off:off+hLen]...), payload...)
 						packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
-						off = len(ic.Payload)
+						consumed = len(ic.Payload)
 					case Retry:
 						cleartext = ciphertext
 						packet = ReadRetryPacket(bytes.NewReader(cleartext), a.conn)
-						off = len(ic.Payload)
+						consumed = len(ic.Payload)
 					default:
 						a.Logger.Printf("Packet type is unknown, the first byte is %x\n", ciphertext[0])
 						break packetSelect
@@ -127,7 +128,11 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						}
 					}
 
-					packet.SetContext(ic.ReceiveContext)
+					off += consumed
+
+					ctx := ic.PacketContext
+					ctx.PacketSize = uint16(consumed)
+					packet.SetReceiveContext(ctx)
 					a.conn.IncomingPackets.Submit(packet)
 					a.SaveCleartextPacket(cleartext, packet.Pointer())
 

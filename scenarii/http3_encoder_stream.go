@@ -31,6 +31,7 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 		return
 	}
 	defer connAgents.CloseConnection(false, 0, "")
+	frameReceived := http.FrameReceived.RegisterNewChan(1000)
 
 	if conn.TLSTPHandler.ReceivedParameters.MaxUniStreams < 3 || conn.TLSTPHandler.ReceivedParameters.MaxBidiStreams == 0 {
 		trace.ErrorCode = H3ES_NotEnoughStreamsAvailable
@@ -39,21 +40,22 @@ func (s *HTTP3EncoderStreamScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 		return
 	}
 
-	frameReceived := http.FrameReceived.RegisterNewChan(1000)
-forLoop:
-	for {
-		select {
-		case i := <-frameReceived:
-			fr := i.(agents.HTTP3FrameReceived)
-			switch fr.Frame.(type) {
-			case *http3.SETTINGS:
-				break forLoop
+	if http.ReceivedSettings == nil {
+	forLoop:
+		for {
+			select {
+			case i := <-frameReceived:
+				fr := i.(agents.HTTP3FrameReceived)
+				switch fr.Frame.(type) {
+				case *http3.SETTINGS:
+					break forLoop
+				}
+			case <-conn.ConnectionClosed:
+				return
+			case <-s.Timeout():
+				trace.ErrorCode = H3ES_SETTINGSNotSent
+				return
 			}
-		case <-conn.ConnectionClosed:
-			return
-		case <-s.Timeout():
-			trace.ErrorCode = H3ES_SETTINGSNotSent
-			return
 		}
 	}
 

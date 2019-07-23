@@ -43,6 +43,7 @@ type HTTP3Agent struct {
 	QPACKEncoderOpts     uint32
 	httpResponseReceived Broadcaster //type: HTTP3Response
 	FrameReceived        Broadcaster //type: HTTP3FrameReceived
+	ReceivedSettings     *http3.SETTINGS
 	streamData           chan streamData
 	streamDataBuffer     map[uint64]*bytes.Buffer
 	responseBuffer       map[uint64]*HTTP3Response
@@ -81,7 +82,6 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 	a.streamDataBuffer = make(map[uint64]*bytes.Buffer)
 	a.responseBuffer = make(map[uint64]*HTTP3Response)
 
-	var settingsReceived bool
 	settingsHeaderTableSize := uint64(4096)
 	settingsQPACKBlockedStreams := uint64(100)
 
@@ -149,11 +149,11 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 					response.totalProcessed += f.WireLength()
 					a.checkResponse(response)
 				case *http3.SETTINGS:
-					if settingsReceived {
+					if a.ReceivedSettings != nil {
 						a.Logger.Printf("Received a SETTINGS frame for the second time!\n")
 						continue
 					}
-					settingsReceived = true
+					a.ReceivedSettings = f
 					for _, s := range f.Settings {
 						if s.Identifier.Value == http3.SETTINGS_HEADER_TABLE_SIZE {
 							settingsHeaderTableSize = s.Value.Value

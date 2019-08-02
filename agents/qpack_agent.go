@@ -89,23 +89,24 @@ func (a *QPACKAgent) Run(conn *Connection) {
 				if p.PNSpace() == PNSpaceAppData {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
-						if s.Offset == 0 && IsUni(s.StreamId) {
-							streamType, err := ReadVarInt(bytes.NewReader(s.StreamData))
-							if err != nil { // TODO: Handle stream types spanning two frames
+						if s.Offset < 4 && IsUni(s.StreamId) && s.StreamId != peerEncoderStreamId && s.StreamId != peerDecoderStreamId {
+							stream := conn.Streams.Get(s.StreamId)
+							qpackStreamType, err := ReadVarInt(bytes.NewReader(stream.ReadData))
+							if err != nil {
 								a.Logger.Printf("Error when parsing stream type: %s\n", err.Error())
-							} else if streamType.Value == QPACKEncoderStreamValue {
+							} else if qpackStreamType.Value == QPACKEncoderStreamValue {
 								if peerEncoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another encoder stream on stream %d\n", s.StreamId)
 									continue
 								}
 								peerEncoderStreamId = s.StreamId
-								stream := conn.Streams.Get(peerEncoderStreamId)
+
 								a.Logger.Printf("Peer opened encoder stream on stream %d\n", s.StreamId)
-								if len(stream.ReadData) > streamType.Length {
-									peerEncoderStream <- stream.ReadData[streamType.Length:]
+								if len(stream.ReadData) > qpackStreamType.Length {
+									peerEncoderStream <- stream.ReadData[qpackStreamType.Length:]
 								}
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerEncoderStream)
-							} else if streamType.Value == QPACKDecoderStreamValue {
+							} else if qpackStreamType.Value == QPACKDecoderStreamValue {
 								if peerDecoderStreamId != QPACKNoStream {
 									a.Logger.Printf("Peer attempted to open another decoder stream on stream %d\n", s.StreamId)
 									continue
@@ -113,12 +114,12 @@ func (a *QPACKAgent) Run(conn *Connection) {
 								peerDecoderStreamId = s.StreamId
 								stream := conn.Streams.Get(peerEncoderStreamId)
 								a.Logger.Printf("Peer opened decoder stream on stream %d\n", s.StreamId)
-								if len(stream.ReadData) > streamType.Length {
-									peerDecoderStream <- stream.ReadData[streamType.Length:]
+								if len(stream.ReadData) > qpackStreamType.Length {
+									peerDecoderStream <- stream.ReadData[qpackStreamType.Length:]
 								}
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerDecoderStream)
 							} else {
-								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)
+								a.Logger.Printf("Unknown stream type %d, ignoring it\n", qpackStreamType.Value)
 							}
 						}
 					}

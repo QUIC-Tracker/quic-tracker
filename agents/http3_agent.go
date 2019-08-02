@@ -95,24 +95,24 @@ func (a *HTTP3Agent) Run(conn *Connection) {
 				if p.PNSpace() == PNSpaceAppData {
 					for _, f := range p.(Framer).GetAll(StreamType) {
 						s := f.(*StreamFrame)
-						if s.Offset == 0 && IsUni(s.StreamId) {
-							streamType, err := ReadVarInt(bytes.NewReader(s.StreamData))
-							if err != nil { // TODO: Handle stream types spanning two frames
+						if s.Offset < 4 && IsUni(s.StreamId) && s.StreamId != a.peerControlStreamID {
+							stream := conn.Streams.Get(s.StreamId)
+							httpStreamType, err := ReadVarInt(bytes.NewReader(stream.ReadData))
+							if err != nil {
 								a.Logger.Printf("Error when parsing stream type: %s\n", err.Error())
-							} else if streamType.Value == http3.StreamTypeControl {
+							} else if httpStreamType.Value == http3.StreamTypeControl {
 								if a.peerControlStreamID != HTTPNoStream {
 									a.Logger.Printf("Peer attempted to open another control stream on stream %d\n", s.StreamId)
 									continue
 								}
 								a.peerControlStreamID = s.StreamId
-								stream := conn.Streams.Get(a.peerControlStreamID)
-								if len(stream.ReadData) > streamType.Length {
-									peerControlStream <- stream.ReadData[streamType.Length:]
+								if len(stream.ReadData) > httpStreamType.Length {
+									peerControlStream <- stream.ReadData[httpStreamType.Length:]
 								}
 								conn.Streams.Get(s.StreamId).ReadChan.Register(peerControlStream)
 								a.Logger.Printf("Peer opened control stream on stream %d\n", s.StreamId)
 							} else {
-								a.Logger.Printf("Unknown stream type %d, ignoring it\n", streamType.Value)
+								a.Logger.Printf("Unknown stream type %d, ignoring it\n", httpStreamType.Value)
 							}
 						}
 					}

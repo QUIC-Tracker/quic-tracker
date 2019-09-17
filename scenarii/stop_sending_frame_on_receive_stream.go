@@ -46,7 +46,7 @@ func (s *StopSendingOnReceiveStreamScenario) Run(conn *qt.Connection, trace *qt.
 			case qt.Framer:
 				if p.Contains(qt.ConnectionCloseType) {
 					cc := p.GetFirst(qt.ConnectionCloseType).(*qt.ConnectionCloseFrame)
-					if cc.ErrorCode != qt.ERR_STREAM_STATE_ERROR {
+					if cc.ErrorCode != qt.ERR_STREAM_STATE_ERROR && cc.ErrorCode != qt.ERR_PROTOCOL_VIOLATION {
 						trace.MarkError(SSRS_CloseTheConnectionWithWrongError, fmt.Sprintf("Expected 0x%02x, got 0x%02x", qt.ERR_STREAM_STATE_ERROR, cc.ErrorCode), p)
 						trace.Results["connection_closed_error_code"] = fmt.Sprintf("0x%x", cc.ErrorCode)
 						return

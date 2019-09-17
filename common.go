@@ -43,16 +43,16 @@ import (
 )
 
 // TODO: Reconsider the use of global variables
-var QuicVersion uint32 = 0xff000016 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-22"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
-var QuicH3ALPNToken = "h3-22"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
+var QuicVersion uint32 = 0xff000017 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-23"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicH3ALPNToken = "h3-23"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MaximumVersion         = 0xff000016
-	MinimumVersion         = 0xff000016
+	MaximumVersion         = 0xff000017
+	MinimumVersion         = 0xff000017
 )
 
 // errors

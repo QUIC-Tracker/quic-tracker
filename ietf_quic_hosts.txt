@@ -11,6 +11,6 @@ quicker.edm.uhasselt.be:4433	/index.html	4433	hq
 ralith.com:4433	/index.html	4433	hq
 http3-test.litespeedtech.com:4433	/index.html	4433	h3
 quic.tech:4433	/index.html	8443	hq
-quic.aiortc.org:443	/	4433	hq
+quic.aiortc.org:443	/	443	hq
 quic.seemann.io:443	/	443	h3
 pandora.cm.in.tum.de:4433	/index.html	4433	hq

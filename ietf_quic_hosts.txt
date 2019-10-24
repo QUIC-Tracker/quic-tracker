@@ -2,6 +2,7 @@ quic.rocks:4433	/index.html	4433	hq
 nghttp2.org:4433	/index.html	4433	h3
 quant.eggert.org:4433	/index.html	4433	hq
 h2o.examp1e.net:443	/notfound	443	h3
+quic.examp1e.net:4433	/notfound	4433	hq
 quic.westus.cloudapp.azure.com:4433	/index.html	443	hq
 fb.mvfst.net:4433	/index.html	4433	hq
 cloudflare-quic.com:443	/index.html	443	h3

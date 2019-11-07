@@ -151,7 +151,7 @@ func (a *RecoveryAgent) RetransmitBatch(batch RetransmitBatch) {
 		if b.Level == EncryptionLevelInitial && (len(b.Frames) > 200 || b.Frames[0].FrameType() == StreamType) { // Simple heuristic to detect first Initial packet
 			packet := NewInitialPacket(a.conn)
 			packet.Frames = b.Frames
-			a.conn.SendPacket(packet, EncryptionLevelInitial)
+			a.conn.SendPacket.Submit(PacketToSend{Packet: packet, EncryptionLevel: EncryptionLevelInitial})
 			return
 		}
 		for _, f := range b.Frames {

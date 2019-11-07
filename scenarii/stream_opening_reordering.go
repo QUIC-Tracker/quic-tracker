@@ -45,8 +45,8 @@ func (s *StreamOpeningReorderingScenario) Run(conn *qt.Connection, trace *qt.Tra
 	pp2 := qt.NewProtectedPacket(conn)
 	pp2.Frames = append(pp2.Frames, qt.NewStreamFrame(0, uint64(len(payload)), []byte{}, true))
 
-	conn.SendPacket(pp2, qt.EncryptionLevel1RTT)
-	conn.SendPacket(pp1, qt.EncryptionLevel1RTT)
+	conn.DoSendPacket(pp2, qt.EncryptionLevel1RTT)
+	conn.DoSendPacket(pp1, qt.EncryptionLevel1RTT)
 
 forLoop:
 	for {

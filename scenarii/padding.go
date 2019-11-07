@@ -37,7 +37,7 @@ func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 			initialPacket.Frames = append(initialPacket.Frames, new(qt.PaddingFrame))
 		}
 
-		conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)
+		conn.DoSendPacket(initialPacket, qt.EncryptionLevelInitial)
 	}
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)

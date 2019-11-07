@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	"github.com/mpiraux/pigotls"
 	"log"
 	"net"
@@ -48,6 +47,7 @@ type Connection struct {
 	TransportParameters       Broadcaster //type: QuicTransportParameters
 
 	PreparePacket 			  Broadcaster //type: EncryptionLevel
+	SendPacket 			      Broadcaster //type: PacketToSend
 	StreamInput               Broadcaster //type: StreamInput
 
 	ConnectionClosed 		  chan bool
@@ -82,10 +82,9 @@ func (c *Connection) nextPacketNumber(space PNSpace) PacketNumber {  // TODO: Th
 	c.PacketNumber[space]++
 	return pn
 }
-func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
+func (c *Connection) EncodeAndEncrypt(packet Packet, level EncryptionLevel) []byte {
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
-		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
 		cryptoState := c.CryptoStates[level]
 
 		payload := packet.EncodePayload()
@@ -109,12 +108,27 @@ func (c *Connection) SendPacket(packet Packet, level EncryptionLevel) {
 			packetBytes[pnOffset+i] ^= mask[1+i]
 		}
 
-		c.UdpConnection.Write(packetBytes)
+		return packetBytes
+	default:
+		// Clients do not send cleartext packets
+	}
+	return nil
+}
 
-		if c.SentPacketHandler != nil {
-			c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
-		}
-		c.OutgoingPackets.Submit(packet)
+func (c *Connection) PacketWasSent(packet Packet) {
+	if c.SentPacketHandler != nil {
+		c.SentPacketHandler(packet.Encode(packet.EncodePayload()), packet.Pointer())
+	}
+	c.OutgoingPackets.Submit(packet)
+}
+func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
+	switch packet.PNSpace() {
+	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
+		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
+
+		c.UdpConnection.Write(c.EncodeAndEncrypt(packet, level))
+
+		c.PacketWasSent(packet)
 	default:
 		// Clients do not send cleartext packets
 	}
@@ -150,11 +164,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	initialPacket := NewInitialPacket(c)
 	initialPacket.Frames = append(initialPacket.Frames, cryptoFrame)
-	payloadLen := len(initialPacket.EncodePayload())
-	paddingLength := initialLength - (len(initialPacket.header.Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + c.CryptoStates[EncryptionLevelInitial].Write.Overhead())
-	for i := 0; i < paddingLength; i++ {
-		initialPacket.Frames = append(initialPacket.Frames, new(PaddingFrame))
-	}
+	initialPacket.PadTo(initialLength - c.CryptoStates[EncryptionLevelInitial].Write.Overhead())
 
 	return initialPacket
 }
@@ -311,6 +321,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.ConnectionRestart = make(chan bool, 1)
 	c.ConnectionRestarted = make(chan bool, 1)
 	c.PreparePacket = NewBroadcaster(1000)
+	c.SendPacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)

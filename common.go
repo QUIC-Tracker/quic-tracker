@@ -250,3 +250,8 @@ type QueuedFrame struct {
 	Frame
 	EncryptionLevel
 }
+
+type PacketToSend struct {
+	Packet
+	EncryptionLevel
+}

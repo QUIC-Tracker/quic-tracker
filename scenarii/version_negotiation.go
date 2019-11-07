@@ -32,7 +32,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 	conn.Version = ForceVersionNegotiation
 	trace.ErrorCode = VN_Timeout
 	initial := conn.GetInitialPacket()
-	conn.SendPacket(initial, qt.EncryptionLevelInitial)
+	conn.DoSendPacket(initial, qt.EncryptionLevelInitial)
 
 	threshold := 3
 	vnCount := 0
@@ -54,7 +54,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 					trace.Results["supported_versions"] = p.SupportedVersions // TODO: Compare versions announced ?
 					newInitial := qt.NewInitialPacket(conn)
 					newInitial.Frames = initial.Frames
-					conn.SendPacket(newInitial, qt.EncryptionLevelInitial)
+					conn.DoSendPacket(newInitial, qt.EncryptionLevelInitial)
 				}
 			case qt.Packet:
 				trace.MarkError(VN_NotAnsweringToVN, "", p)

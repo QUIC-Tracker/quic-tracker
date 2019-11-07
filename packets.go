@@ -125,6 +125,7 @@ type Framer interface {
 	OnlyContains(frameType FrameType) bool
 	GetFirst(frameType FrameType) Frame
 	GetAll(frameType FrameType) []Frame
+	PadTo(length int)
 }
 type FramePacket struct {
 	abstractPacket
@@ -180,6 +181,21 @@ func (p *FramePacket) GetAll(frameType FrameType) []Frame {
 		}
 	}
 	return frames
+}
+func (p *FramePacket) PadTo(length int) {
+	switch h := p.Header().(type) {
+	case *LongHeader:
+		h.Length = NewVarInt(uint64(len(p.EncodePayload())))
+	}
+	currentLen := len(p.Encode(p.EncodePayload()))
+	for currentLen < length {
+		p.AddFrame(new(PaddingFrame))
+		switch h := p.Header().(type) {
+		case *LongHeader:
+			h.Length = NewVarInt(h.Length.Value + 1)
+		}
+		currentLen = len(p.Encode(p.EncodePayload()))
+	}
 }
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {

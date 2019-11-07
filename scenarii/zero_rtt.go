@@ -79,15 +79,12 @@ func (s *ZeroRTTScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 	incPackets = conn.IncomingPackets.RegisterNewChan(1000)
 	encryptionLevelsAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
 
-	handshakeAgent.InitiateHandshake()
+	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil) // TODO: Verify that this get effectively sent in a 0-RTT packet
+	handshakeAgent.InitiateHandshake() // TODO: Handle stateless connection
 
 	if !s.waitFor0RTT(conn, trace, encryptionLevelsAvailable) {
 		return
 	}
-
-	// TODO: Handle stateless connection
-
-	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil) // TODO: Verify that this get sent in a 0-RTT packet
 
 	trace.ErrorCode = ZR_DidntReceiveTheRequestedData
 	for {

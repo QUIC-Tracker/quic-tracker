@@ -78,5 +78,5 @@ func sendUnsupportedInitial(conn *qt.Connection) {
 			frame.CryptoData = bytes.Replace(frame.CryptoData, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x03, 0x04}, []byte{0x0, 0x2b, 0x0, 0x03, 0x2, 0x7f, 0x00}, 1)
 		}
 	}
-	conn.SendPacket(initialPacket, qt.EncryptionLevelInitial)
+	conn.DoSendPacket(initialPacket, qt.EncryptionLevelInitial)
 }

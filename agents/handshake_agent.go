@@ -55,7 +55,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 			select {
 			case <-a.sendInitial:
 				a.Logger.Println("Sending first Initial packet")
-				conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
+				conn.SendPacket.Submit(PacketToSend{Packet: conn.GetInitialPacket(), EncryptionLevel: EncryptionLevelInitial})
 			case p := <-incPackets:
 				switch p := p.(type) {
 				case *VersionNegotiationPacket:
@@ -128,7 +128,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				tlsStatus = a.TLSAgent.TLSStatus.RegisterNewChan(10)
 				socketStatus = a.SocketAgent.SocketStatus.RegisterNewChan(10)
 				conn.ConnectionRestarted = make(chan bool, 1)
-				conn.SendPacket(conn.GetInitialPacket(), EncryptionLevelInitial)
+				conn.SendPacket.Submit(PacketToSend{Packet: conn.GetInitialPacket(), EncryptionLevel: EncryptionLevelInitial})
 			case <-a.close:
 				return
 			}

@@ -11,14 +11,16 @@ import (
 // It also merge the ACK frames inside a given packet before sending.
 type SendingAgent struct {
 	BaseAgent
-	MTU           uint16
-	FrameProducer []FrameProducer
+	MTU                 uint16
+	FrameProducer       []FrameProducer
+	DontCoalesceZeroRTT bool
 }
 
 func (a *SendingAgent) Run(conn *Connection) {
 	a.Init("SendingAgent", conn.OriginalDestinationCID)
 
 	preparePacket := conn.PreparePacket.RegisterNewChan(100)
+	sendPacket := conn.SendPacket.RegisterNewChan(100)
 	newEncryptionLevelAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
 
 	encryptionLevels := []EncryptionLevel{EncryptionLevelInitial, EncryptionLevel0RTT, EncryptionLevelHandshake, EncryptionLevel1RTT}
@@ -39,7 +41,9 @@ func (a *SendingAgent) Run(conn *Connection) {
 		}
 	}
 
-	fillAndSendPacket := func(packet Framer, level EncryptionLevel) {
+	initialSent := false
+
+	fillPacket := func(packet Framer, level EncryptionLevel) Framer {
 		spaceLeft := int(a.MTU) - packet.Header().HeaderLength() - conn.CryptoStates[level].Write.Overhead()
 
 	addFrame:
@@ -70,9 +74,9 @@ func (a *SendingAgent) Run(conn *Connection) {
 		if len(packet.GetFrames()) == 0 {
 			a.Logger.Printf("Preparing a packet for encryption level %s resulted in an empty packet, discarding\n", level.String())
 			conn.PacketNumber[packet.PNSpace()]-- // Avoids PN skipping
-		} else {
-			conn.SendPacket(packet, level)
+			return nil
 		}
+		return packet
 	}
 
 	go func() {
@@ -94,16 +98,31 @@ func (a *SendingAgent) Run(conn *Connection) {
 					timersArmed[eL] = true
 				}
 			case <-timers[EncryptionLevelInitial].C:
-				fillAndSendPacket(NewInitialPacket(conn), EncryptionLevelInitial)
+				p := fillPacket(NewInitialPacket(conn), EncryptionLevelInitial)
+				if p != nil {
+					initialSent = true
+					conn.DoSendPacket(p, EncryptionLevelInitial)
+				}
 				timersArmed[EncryptionLevelInitial] = false
 			case <-timers[EncryptionLevel0RTT].C:
-				fillAndSendPacket(NewZeroRTTProtectedPacket(conn), EncryptionLevel0RTT)
+				if initialSent {
+					p := fillPacket(NewZeroRTTProtectedPacket(conn), EncryptionLevel0RTT)
+					if p != nil {
+						conn.DoSendPacket(p, EncryptionLevel0RTT)
+					}
+				}
 				timersArmed[EncryptionLevel0RTT] = false
 			case <-timers[EncryptionLevelHandshake].C:
-				fillAndSendPacket(NewHandshakePacket(conn), EncryptionLevelHandshake)
+				p := fillPacket(NewHandshakePacket(conn), EncryptionLevelHandshake)
+				if p != nil {
+					conn.DoSendPacket(p, EncryptionLevelHandshake)
+				}
 				timersArmed[EncryptionLevelHandshake] = false
 			case <-timers[EncryptionLevel1RTT].C:
-				fillAndSendPacket(NewProtectedPacket(conn), EncryptionLevel1RTT)
+				p := fillPacket(NewProtectedPacket(conn), EncryptionLevel1RTT)
+				if p != nil {
+					conn.DoSendPacket(p, EncryptionLevel1RTT)
+				}
 				timersArmed[EncryptionLevel1RTT] = false
 			case i := <-newEncryptionLevelAvailable:
 				dEL := i.(DirectionalEncryptionLevel)
@@ -115,6 +134,35 @@ func (a *SendingAgent) Run(conn *Connection) {
 				bestEncryptionLevels[EncryptionLevelBest] = chooseBestEncryptionLevel(encryptionLevelsAvailable, false)
 				bestEncryptionLevels[EncryptionLevelBestAppData] = chooseBestEncryptionLevel(encryptionLevelsAvailable, true)
 				timers[eL].Reset(2 * time.Millisecond)
+			case i := <-sendPacket:
+				p := i.(PacketToSend)
+				if p.EncryptionLevel == EncryptionLevelInitial && p.Packet.Header().PacketType() == Initial {
+					initial := p.Packet.(*InitialPacket)
+					if !a.DontCoalesceZeroRTT && bestEncryptionLevels[EncryptionLevelBestAppData] == EncryptionLevel0RTT {
+						// Try to prepare a 0-RTT packet and squeeze it after the Initial
+						zp := NewZeroRTTProtectedPacket(conn)
+						fillPacket(zp, EncryptionLevel0RTT)
+						if len(zp.GetFrames()) > 0 {
+							zpBytes := conn.EncodeAndEncrypt(zp, EncryptionLevel0RTT)
+							initialFrames := initial.GetFrames()
+							initialLength := len(conn.EncodeAndEncrypt(initial, EncryptionLevelInitial))
+							initial.Frames = nil
+							for _, f := range initialFrames {
+								if f.FrameType() != PaddingFrameType {
+									initial.Frames = append(initial.Frames, f)
+								}
+							}
+							initial.PadTo(initialLength - len(zpBytes))
+							coalescedPackets := append(conn.EncodeAndEncrypt(initial, EncryptionLevelInitial), zpBytes...)
+							conn.UdpConnection.Write(coalescedPackets)
+							conn.PacketWasSent(initial)
+							conn.PacketWasSent(zp)
+							continue
+						}
+					}
+					initialSent = true
+				}
+				conn.DoSendPacket(p.Packet, p.EncryptionLevel)
 			case <-a.close:
 				return
 			}

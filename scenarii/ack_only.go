@@ -53,7 +53,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 				}
 
 				packet.AddFrame(ackFrame)
-				conn.SendPacket(packet, packet.EncryptionLevel())
+				conn.DoSendPacket(packet, packet.EncryptionLevel())
 				if p.PNSpace() == qt.PNSpaceAppData {
 					ackOnlyPackets = append(ackOnlyPackets, packet.Header().PacketNumber())
 				}

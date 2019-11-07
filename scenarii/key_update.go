@@ -24,6 +24,28 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredP
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
+	conn.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PingFrame), EncryptionLevel: qt.EncryptionLevel1RTT})
+	ackedPackets := conn.PacketAcknowledged.RegisterNewChan(10)
+forLoop1:
+	for {
+		select {
+		case i := <-ackedPackets:
+			switch a := i.(type) {
+			case qt.PacketAcknowledged:
+				if a.PNSpace == qt.PNSpaceAppData {
+					conn.PacketAcknowledged.Unregister(ackedPackets)
+					break forLoop1
+				}
+			}
+		case <-conn.ConnectionClosed:
+			trace.ErrorCode = KU_TLSHandshakeFailed
+			return
+		case <-s.Timeout():
+			trace.ErrorCode = KU_TLSHandshakeFailed
+			return
+		}
+	}
+
 	// TODO: Move this to crypto.go
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
 	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
@@ -37,15 +59,15 @@ func (s *KeyUpdateScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredP
 
 	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 
-forLoop:
+forLoop2:
 	for {
 		select {
 		case <-responseChan:
 			s.Finished()
 		case <-conn.ConnectionClosed:
-			break forLoop
+			break forLoop2
 		case <-s.Timeout():
-			break forLoop
+			break forLoop2
 		}
 	}
 

@@ -49,6 +49,7 @@ type Connection struct {
 	PreparePacket 			  Broadcaster //type: EncryptionLevel
 	SendPacket 			      Broadcaster //type: PacketToSend
 	StreamInput               Broadcaster //type: StreamInput
+	PacketAcknowledged        Broadcaster //type: PacketAcknowledged
 
 	ConnectionClosed 		  chan bool
 	ConnectionRestart 	  	  chan bool // Triggered when receiving a Retry or a VN packet
@@ -323,6 +324,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.PreparePacket = NewBroadcaster(1000)
 	c.SendPacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
+	c.PacketAcknowledged = NewBroadcaster(1000)
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 

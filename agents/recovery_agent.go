@@ -11,6 +11,7 @@ type RecoveryAgent struct {
 	BaseAgent
 	conn                 *Connection
 	retransmissionBuffer map[PNSpace]map[PacketNumber]RetransmittableFrames
+	packetsSent 		 map[PNSpace]map[PacketNumber]bool
 	TimerValue           time.Duration
 }
 
@@ -22,6 +23,11 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 		PNSpaceInitial:   make(map[PacketNumber]RetransmittableFrames),
 		PNSpaceHandshake: make(map[PacketNumber]RetransmittableFrames),
 		PNSpaceAppData:   make(map[PacketNumber]RetransmittableFrames),
+	}
+	a.packetsSent = map[PNSpace]map[PacketNumber]bool{
+		PNSpaceInitial:   make(map[PacketNumber]bool),
+		PNSpaceHandshake: make(map[PacketNumber]bool),
+		PNSpaceAppData:   make(map[PacketNumber]bool),
 	}
 	retransmissionTicker := time.NewTicker(100 * time.Millisecond)
 
@@ -81,6 +87,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 			case i := <-outgoingPackets:
 				switch p := i.(type) {
 				case Framer:
+					a.packetsSent[p.PNSpace()][p.Header().PacketNumber()] = true
 					frames := p.GetRetransmittableFrames()
 					if len(frames) > 0 {
 						a.retransmissionBuffer[p.PNSpace()][p.Header().PacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
@@ -117,15 +124,24 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 	}()
 }
 
+func (a *RecoveryAgent) PacketAcknowledged(packet PacketNumber, space PNSpace) {
+	if _, ok := a.packetsSent[space][packet]; !ok {
+		a.Logger.Printf("Unknown packet %d (%s) was acknowledged\n", packet, space)
+		return
+	}
+	buffer := a.retransmissionBuffer[space]
+	delete(buffer, packet)
+	a.conn.PacketAcknowledged.Submit(PacketAcknowledged{PacketNumber: packet, PNSpace: space})
+}
+
 func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch { // Triggers fast retransmit and removes frames scheduled to be retransmitted
 	threshold := uint64(1000)
 	var frames RetransmitBatch
-	currentPacketNumber := ack.LargestAcknowledged
 	buffer := a.retransmissionBuffer[space]
-	delete(buffer, currentPacketNumber)
+	currentPacketNumber := ack.LargestAcknowledged
+	a.PacketAcknowledged(currentPacketNumber, space)
 	for i := uint64(0); i < ack.AckRanges[0].AckRange && i < threshold; i++ {
-		currentPacketNumber--
-		delete(buffer, currentPacketNumber)
+		a.PacketAcknowledged(currentPacketNumber, space)
 	}
 	for _, ackBlock := range ack.AckRanges[1:] {
 		for i := uint64(0); i <= ackBlock.Gap && i < threshold; i++ { // See https://tools.ietf.org/html/draft-ietf-quic-transport-10#section-8.15.1
@@ -136,8 +152,7 @@ func (a *RecoveryAgent) ProcessAck(ack *AckFrame, space PNSpace) RetransmitBatch
 			delete(buffer, currentPacketNumber)
 		}
 		for i := uint64(0); i < ackBlock.AckRange && i < threshold; i++ {
-			currentPacketNumber--
-			delete(buffer, currentPacketNumber)
+			a.PacketAcknowledged(currentPacketNumber, space)
 		}
 	}
 	return frames

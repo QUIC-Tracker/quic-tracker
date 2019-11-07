@@ -251,6 +251,11 @@ type QueuedFrame struct {
 	EncryptionLevel
 }
 
+type PacketAcknowledged struct {
+	PacketNumber
+	PNSpace
+}
+
 type PacketToSend struct {
 	Packet
 	EncryptionLevel

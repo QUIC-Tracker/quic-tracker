@@ -129,5 +129,6 @@ func GetAllScenarii() map[string]Scenario {
 		"server_flow_control":        NewServerFlowControlScenario(),
 		"connection_migration_v4_v6": NewConnectionMigrationv4v6Scenario(),
 		"zero_length_cid": 			  NewZeroLengthCID(),
+		"multi_packet_client_hello":  NewMultiPacketClientHello(),
 	}
 }

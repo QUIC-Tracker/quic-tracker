@@ -47,8 +47,8 @@ forLoop1:
 	}
 
 	// TODO: Move this to crypto.go
-	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
-	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "traffic upd", nil, conn.Tls.HashDigestSize(), pigotls.BaseLabel)
+	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "ku", nil, conn.Tls.HashDigestSize(), pigotls.QuicBaseLabel)
+	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "ku", nil, conn.Tls.HashDigestSize(), pigotls.QuicBaseLabel)
 
 	oldState := conn.CryptoStates[qt.EncryptionLevel1RTT]
 

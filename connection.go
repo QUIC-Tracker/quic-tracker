@@ -30,8 +30,6 @@ type Connection struct {
 
 	CryptoStates   map[EncryptionLevel]*CryptoState
 
-	ExporterSecret []byte
-
 	ReceivedPacketHandler func([]byte, unsafe.Pointer)
 	SentPacketHandler     func([]byte, unsafe.Pointer)
 

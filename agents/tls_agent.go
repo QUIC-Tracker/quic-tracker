@@ -103,7 +103,6 @@ func (a *TLSAgent) Run(conn *Connection) {
 						if !notCompleted && conn.CryptoStates[EncryptionLevel1RTT] == nil {
 							a.Logger.Printf("Handshake has completed, installing protected crypto {read=%s, write=%s}\n", hex.EncodeToString(conn.Tls.ProtectedReadSecret()), hex.EncodeToString(conn.Tls.ProtectedWriteSecret()))
 							conn.CryptoStates[EncryptionLevel1RTT] = NewProtectedCryptoState(conn.Tls, conn.Tls.ProtectedReadSecret(), conn.Tls.ProtectedWriteSecret())
-							conn.ExporterSecret = conn.Tls.ExporterSecret()
 
 							// TODO: Check negotiated ALPN ?
 

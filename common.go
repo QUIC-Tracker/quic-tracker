@@ -26,7 +26,7 @@
 // QUIC-Tracker is licensed under the GNU Affero General Public License version 3. You can find its terms in the
 // LICENSE file, or at https://www.gnu.org/licenses/agpl.txt.
 //
-// Copyright (C) 2017-2019  Maxime Piraux
+// Copyright (C) 2017-2020  Maxime Piraux
 //
 package quictracker
 
@@ -43,15 +43,15 @@ import (
 )
 
 // TODO: Reconsider the use of global variables
-var QuicVersion uint32 = 0xff000018 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
-var QuicALPNToken = "hq-24"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
-var QuicH3ALPNToken = "h3-24"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
+var QuicVersion uint32 = 0xff000019 // See https://tools.ietf.org/html/draft-ietf-quic-transport-08#section-4
+var QuicALPNToken = "hq-25"         // See https://www.ietf.org/mail-archive/web/quic/current/msg01882.html
+var QuicH3ALPNToken = "h3-25"       // See https://tools.ietf.org/html/draft-ietf-quic-http-17#section-2.1
 
 const (
 	MinimumInitialLength   = 1252
 	MinimumInitialLengthv6 = 1232
 	MaxUDPPayloadSize      = 65507
-	MaximumVersion         = 0xff000018
+	MaximumVersion         = 0xff000019
 	MinimumVersion         = 0xff000018
 )
 
@@ -205,6 +205,11 @@ type ConnectionID []byte
 
 func (c ConnectionID) CIDL() uint8 {
 	return uint8(len(c))
+}
+
+func (c ConnectionID) WriteTo(buffer *bytes.Buffer) {
+	buffer.WriteByte(c.CIDL())
+	buffer.Write(c)
 }
 
 func min(a, b uint64) uint64 {

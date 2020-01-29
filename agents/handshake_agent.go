@@ -29,6 +29,7 @@ type HandshakeAgent struct {
 	SocketAgent      *SocketAgent
 	HandshakeStatus  Broadcaster //type: HandshakeStatus
 	IgnoreRetry 	 bool
+	DontDropKeys     bool
 	sendInitial		 chan bool
 	receivedRetry    bool
 }
@@ -66,6 +67,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					close(conn.ConnectionRestart)
 				case *RetryPacket:
+					// TODO: Validate this, https://tools.ietf.org/html/draft-ietf-quic-tls-25#section-5.8
 					if !a.IgnoreRetry && bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
@@ -86,12 +88,19 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						a.Logger.Printf("Received first Initial packet from server, switching DCID to %s\n", hex.EncodeToString(conn.DestinationCID))
 					}
+					if p.Contains(HandshakeDoneType) {
+						a.HandshakeStatus.Submit(HandshakeStatus{true, tlsPacket, nil})
+						conn.IncomingPackets.Unregister(incPackets)
+						if !a.DontDropKeys {
+							// TODO: Drop crypto contexts accordingly
+						}
+					}
 				default:
 					a.HandshakeStatus.Submit(HandshakeStatus{false, p.(Packet), errors.New("received incorrect packet type during handshake")})
 				}
 				pingTimer.Reset(time.Duration(conn.SmoothedRTT + conn.RTTVar) * time.Microsecond)
 			case p := <-outPackets:
-				if !tlsCompleted {
+				if !tlsCompleted || conn.Version >= 0xff000019 {
 					break
 				}
 				switch p := p.(type) {

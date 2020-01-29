@@ -1,6 +1,8 @@
 package quictracker
 
 import (
+	"bytes"
+	"encoding/binary"
 	"github.com/mpiraux/pigotls"
 )
 
@@ -76,6 +78,26 @@ type CryptoState struct {
 	Write       *pigotls.AEAD
 	HeaderRead  *pigotls.Cipher
 	HeaderWrite *pigotls.Cipher
+}
+
+type RetryPseudoPacket struct {
+	OriginalDestinationCID ConnectionID
+	UnusedByte byte
+	Version uint32
+	DestinationCID ConnectionID
+	SourceCID ConnectionID
+	RetryToken []byte
+}
+
+func (r *RetryPseudoPacket) Encode() []byte {
+	buf := bytes.NewBuffer(nil)
+	r.OriginalDestinationCID.WriteTo(buf)
+	buf.WriteByte(r.UnusedByte)
+	binary.Write(buf, binary.BigEndian, &r.Version)
+	r.DestinationCID.WriteTo(buf)
+	r.SourceCID.WriteTo(buf)
+	buf.Write(r.RetryToken)
+	return buf.Bytes()
 }
 
 func (s *CryptoState) InitRead(tls *pigotls.Connection, readSecret []byte) {

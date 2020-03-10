@@ -2,29 +2,29 @@ package quictracker
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/QUIC-Tracker/quic-tracker/lib"
-	"github.com/bifurcation/mint/syntax"
 )
 
-type TransportParametersType uint16
+type TransportParametersType uint64
 
 const (
-	OriginalConnectionId           TransportParametersType = 0x0000
-	IdleTimeout                                            = 0x0001
-	StatelessResetToken                                    = 0x0002
-	MaxPacketSize                                          = 0x0003
-	InitialMaxData                                         = 0x0004
-	InitialMaxStreamDataBidiLocal                          = 0x0005
-	InitialMaxStreamDataBidiRemote                         = 0x0006
-	InitialMaxStreamDataUni                                = 0x0007
-	InitialMaxStreamsBidi                                  = 0x0008
-	InitialMaxStreamsUni                                   = 0x0009
-	AckDelayExponent                                       = 0x000a
-	MaxAckDelay                                            = 0x000b
-	DisableMigration                                       = 0x000c
-	PreferredAddress                                       = 0x000d // TODO: Handle this parameter
-	ActiveConnectionIdLimit								   = 0x000e
+	OriginalConnectionId           TransportParametersType = 0x00
+	IdleTimeout                                            = 0x01
+	StatelessResetToken                                    = 0x02
+	MaxPacketSize                                          = 0x03
+	InitialMaxData                                         = 0x04
+	InitialMaxStreamDataBidiLocal                          = 0x05
+	InitialMaxStreamDataBidiRemote                         = 0x06
+	InitialMaxStreamDataUni                                = 0x07
+	InitialMaxStreamsBidi                                  = 0x08
+	InitialMaxStreamsUni                                   = 0x09
+	AckDelayExponent                                       = 0x0a
+	MaxAckDelay                                            = 0x0b
+	DisableMigration                                       = 0x0c
+	PreferredAddress                                       = 0x0d // TODO: Handle this parameter
+	ActiveConnectionIdLimit                                = 0x0e
 )
 
 type QuicTransportParameters struct {  // A set of QUIC transport parameters value
@@ -67,10 +67,6 @@ func (list *TransportParameterList) AddParameter(p TransportParameter) {
 	*list = append(*list, p)
 }
 
-type ClientHelloTransportParameters struct {
-	TransportParameterList `tls:"head=2"`
-}
-
 type EncryptedExtensionsTransportParameters struct {
 	TransportParameterList  `tls:"head=2"`
 }
@@ -105,6 +101,8 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 				return
 			}
 			parameters = append(parameters, TransportParameter{parametersType, []byte{val}})
+		case []byte:
+			parameters = append(parameters, TransportParameter{parametersType, val})
 		case bool:
 			if !val {
 				return
@@ -128,71 +126,104 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	for _, p := range h.QuicTransportParameters.AdditionalParameters {
 		parameters = append(parameters, p)
 	}
-	return syntax.Marshal(ClientHelloTransportParameters{TransportParameterList(parameters)})
+
+	data := bytes.NewBuffer(make([]byte, 0, 65535))
+	for _, p := range parameters {
+		_, err := data.Write(lib.EncodeVarInt(uint64(p.ParameterType)))
+		if err != nil {
+			return nil, err
+		}
+		_, err = data.Write(lib.EncodeVarInt(uint64(len(p.Value))))
+		if err != nil {
+			return nil, err
+		}
+		_, err = data.Write(p.Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return data.Bytes(), nil
 }
 
 func (h *TLSTransportParameterHandler) ReceiveExtensionData(data []byte) error {
+	// TODO: Check for duplicates ?
 	if h.EncryptedExtensionsTransportParameters == nil {
 		h.EncryptedExtensionsTransportParameters = &EncryptedExtensionsTransportParameters{}
-	}
-	_, err := syntax.Unmarshal(data, h.EncryptedExtensionsTransportParameters)
-	if err != nil {
-		return err
 	}
 
 	receivedParameters := QuicTransportParameters{}
 	receivedParameters.ToJSON = make(map[string]interface{})
 
-	for _, p := range h.EncryptedExtensionsTransportParameters.TransportParameterList {
-		switch p.ParameterType {
+	buf := bytes.NewBuffer(data)
+
+	for buf.Len() > 0 {
+		pType, err := ReadVarInt(buf)
+		if err != nil {
+			return err
+		}
+		pLen, err := ReadVarInt(buf)
+		if err != nil {
+			return err
+		}
+		pData := make([]byte, pLen.Value)
+		nRead, err := buf.Read(pData)
+		if err != nil {
+			return err
+		}
+		if uint64(nRead) != pLen.Value {
+			return errors.New("end of TPs blob before parameter value")
+		}
+		pDataBuf := bytes.NewBuffer(pData)
+		switch TransportParametersType(pType.Value) {
 		case OriginalConnectionId:
-			receivedParameters.OriginalConnectionId = ConnectionID(p.Value)
-			receivedParameters.ToJSON["original_connection_id"] = ConnectionID(p.Value)
+			receivedParameters.OriginalConnectionId = ConnectionID(pDataBuf.Bytes())
+			receivedParameters.ToJSON["original_connection_id"] = ConnectionID(pData)
 		case IdleTimeout:
-			receivedParameters.IdleTimeout, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.IdleTimeout, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["idle_timeout"] = receivedParameters.IdleTimeout
 		case StatelessResetToken:
-			receivedParameters.StatelessResetToken = p.Value
+			receivedParameters.StatelessResetToken = pDataBuf.Bytes()
 			receivedParameters.ToJSON["stateless_reset_token"] = receivedParameters.StatelessResetToken
 		case MaxPacketSize:
-			receivedParameters.MaxPacketSize, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxPacketSize, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["max_packet_size"] = receivedParameters.MaxPacketSize
 		case InitialMaxData:
-			receivedParameters.MaxData, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxData, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_data"] = receivedParameters.MaxData
 		case InitialMaxStreamDataBidiLocal:
-			receivedParameters.MaxStreamDataBidiLocal, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataBidiLocal, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_stream_data_bidi_local"] = receivedParameters.MaxStreamDataBidiLocal
 		case InitialMaxStreamDataBidiRemote:
-			receivedParameters.MaxStreamDataBidiRemote, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataBidiRemote, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_stream_data_bidi_remote"] = receivedParameters.MaxStreamDataBidiRemote
 		case InitialMaxStreamDataUni:
-			receivedParameters.MaxStreamDataUni, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxStreamDataUni, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_stream_data_uni"] = receivedParameters.MaxStreamDataUni
 		case InitialMaxStreamsBidi:
-			receivedParameters.MaxBidiStreams, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxBidiStreams, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_streams_bidi"] = receivedParameters.MaxBidiStreams
 		case InitialMaxStreamsUni:
-			receivedParameters.MaxUniStreams, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxUniStreams, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["initial_max_streams_uni"] = receivedParameters.MaxUniStreams
 		case AckDelayExponent:
-			receivedParameters.AckDelayExponent, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.AckDelayExponent, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["ack_delay_exponent"] = receivedParameters.AckDelayExponent
 		case MaxAckDelay:
-			receivedParameters.MaxAckDelay, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.MaxAckDelay, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["max_ack_delay"] = receivedParameters.MaxAckDelay
 		case DisableMigration:
 			receivedParameters.DisableMigration = true
 			receivedParameters.ToJSON["disable_migration"] = true
 		case PreferredAddress:
-			receivedParameters.PreferredAddress = p.Value
+			receivedParameters.PreferredAddress = pDataBuf.Bytes()
 			receivedParameters.ToJSON["preferred_address"] = receivedParameters.PreferredAddress
 		case ActiveConnectionIdLimit:
-			receivedParameters.ActiveConnectionIdLimit, _, err = lib.ReadVarIntValue(bytes.NewReader(p.Value))
+			receivedParameters.ActiveConnectionIdLimit, _, err = lib.ReadVarIntValue(pDataBuf)
 			receivedParameters.ToJSON["active_connection_id_limit"] = receivedParameters.ActiveConnectionIdLimit
 		default:
+			p := TransportParameter{ParameterType: TransportParametersType(pType.Value), Value: pDataBuf.Bytes()}
 			receivedParameters.AdditionalParameters.AddParameter(p)
-			receivedParameters.ToJSON[fmt.Sprintf("%x", p.ParameterType)] = p.Value
+			receivedParameters.ToJSON[fmt.Sprintf("%x", p.ParameterType)] = pDataBuf.Bytes()
 		}
 		if err != nil {
 			return err

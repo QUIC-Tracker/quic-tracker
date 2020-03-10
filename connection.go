@@ -18,8 +18,9 @@ import (
 type Connection struct {
 	ServerName    string
 	UdpConnection *net.UDPConn
-	UseIPv6        bool
-	Host           *net.UDPAddr
+	UseIPv6       bool
+	Host          *net.UDPAddr
+	InterfaceMTU  int
 
 	Tls           *pigotls.Connection
 	TLSTPHandler  *TLSTransportParameterHandler

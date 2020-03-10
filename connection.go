@@ -294,6 +294,37 @@ func NewDefaultConnection(address string, serverName string, resumptionTicket []
 		c = NewConnection(serverName, QuicVersion, QuicALPNToken, scid, dcid, udpConn, resumptionTicket)
 	}
 
+	var headerOverhead = 8
+	if useIPv6 {
+		headerOverhead += 40
+	} else {
+		headerOverhead += 20
+	}
+
+	lAddr := udpConn.LocalAddr().(*net.UDPAddr)
+	itfs, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+findMTU:
+	for _, e := range itfs {
+		addrs , err := e.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range addrs {
+			switch ipNet := a.(type) {
+			case *net.IPNet:
+				if ipNet.IP.Equal(lAddr.IP) {
+					c.InterfaceMTU = e.MTU
+					c.TLSTPHandler.MaxPacketSize = uint64(c.InterfaceMTU - headerOverhead)
+					break findMTU
+				}
+			}
+		}
+	}
+
 	c.UseIPv6 = useIPv6
 	c.Host = udpAddr
 	return c, nil

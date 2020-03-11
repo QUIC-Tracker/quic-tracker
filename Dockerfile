@@ -1,5 +1,5 @@
 FROM golang:1.11-alpine
-RUN apk add --no-cache make cmake gcc g++ git openssl openssl-dev perl-test-harness-utils tcpdump libpcap libpcap-dev libbsd-dev
+RUN apk add --no-cache make cmake gcc g++ git openssl openssl-dev perl-test-harness-utils tcpdump libpcap libpcap-dev libbsd-dev perl-scope-guard perl-test-tcp
 RUN mkdir -p /go/src/github.com/QUIC-Tracker/quic-tracker
 ADD . /go/src/github.com/QUIC-Tracker/quic-tracker 
 WORKDIR /go/src/github.com/QUIC-Tracker/quic-tracker

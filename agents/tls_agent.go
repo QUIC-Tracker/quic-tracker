@@ -26,8 +26,12 @@ func (a *TLSAgent) Run(conn *Connection) {
 	a.TLSStatus = NewBroadcaster(10)
 	a.ResumptionTicket = NewBroadcaster(10)
 
-	encryptionLevels := []DirectionalEncryptionLevel{{EncryptionLevelHandshake, false}, {EncryptionLevelHandshake, true}, {EncryptionLevel1RTT, false}, {EncryptionLevel1RTT, true}}
-	encryptionLevelsAvailable := make(map[DirectionalEncryptionLevel]bool)
+	encryptionLevels := []*DirectionalEncryptionLevel{
+		{EncryptionLevel: EncryptionLevelHandshake},
+		{EncryptionLevel: EncryptionLevelHandshake, Read: true},
+		{EncryptionLevel: EncryptionLevel1RTT},
+		{EncryptionLevel: EncryptionLevel1RTT, Read: true},
+	}
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 
@@ -117,9 +121,9 @@ func (a *TLSAgent) Run(conn *Connection) {
 						}
 
 						for _, e := range encryptionLevels {
-							if !encryptionLevelsAvailable[e] && conn.CryptoStates[e.EncryptionLevel] != nil && ((e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderRead != nil) || (!e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderWrite != nil)) {
-								encryptionLevelsAvailable[e] = true
-								conn.EncryptionLevelsAvailable.Submit(e)
+							if !e.Available && conn.CryptoStates[e.EncryptionLevel] != nil && ((e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderRead != nil) || (!e.Read && conn.CryptoStates[e.EncryptionLevel].HeaderWrite != nil)) {
+								e.Available = true
+								conn.EncryptionLevels.Submit(*e)
 							}
 						}
 

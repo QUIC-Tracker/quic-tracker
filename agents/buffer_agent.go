@@ -12,7 +12,7 @@ func (a *BufferAgent) Run(conn *Connection) {
 	a.Init("BufferAgent", conn.OriginalDestinationCID)
 
 	uPChan := conn.UnprocessedPayloads.RegisterNewChan(1000)
-	eLChan := conn.EncryptionLevelsAvailable.RegisterNewChan(1000)
+	eLChan := conn.EncryptionLevels.RegisterNewChan(1000)
 
 	unprocessedPayloads := make(map[EncryptionLevel][]IncomingPayload)
 	encryptionLevelsAvailable := make(map[EncryptionLevel]bool)
@@ -31,7 +31,7 @@ func (a *BufferAgent) Run(conn *Connection) {
 				}
 			case i := <-eLChan:
 				dEL := i.(DirectionalEncryptionLevel)
-				if dEL.Read {
+				if dEL.Available && dEL.Read {
 					eL := dEL.EncryptionLevel
 					encryptionLevelsAvailable[eL] = true
 					if len(unprocessedPayloads[eL]) > 0 {
@@ -40,6 +40,7 @@ func (a *BufferAgent) Run(conn *Connection) {
 					for _, uP := range unprocessedPayloads[eL] {
 						conn.IncomingPayloads.Submit(uP)
 					}
+					unprocessedPayloads[eL] = nil
 				}
 			case <-a.close:
 				return

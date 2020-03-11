@@ -37,13 +37,13 @@ type Connection struct {
 	CryptoStreams       CryptoStreams  // TODO: It should be a parent class without closing states
 	Streams             Streams
 
-	IncomingPackets           Broadcaster //type: Packet
-	OutgoingPackets           Broadcaster //type: Packet
-	IncomingPayloads          Broadcaster //type: IncomingPayload
-	UnprocessedPayloads       Broadcaster //type: UnprocessedPayload
-	EncryptionLevelsAvailable Broadcaster //type: DirectionalEncryptionLevel
-	FrameQueue                Broadcaster //type: QueuedFrame
-	TransportParameters       Broadcaster //type: QuicTransportParameters
+	IncomingPackets     Broadcaster //type: Packet
+	OutgoingPackets     Broadcaster //type: Packet
+	IncomingPayloads    Broadcaster //type: IncomingPayload
+	UnprocessedPayloads Broadcaster //type: UnprocessedPayload
+	EncryptionLevels    Broadcaster //type: DirectionalEncryptionLevel
+	FrameQueue          Broadcaster //type: QueuedFrame
+	TransportParameters Broadcaster //type: QuicTransportParameters
 
 	PreparePacket 			  Broadcaster //type: EncryptionLevel
 	SendPacket 			      Broadcaster //type: PacketToSend
@@ -152,7 +152,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 	if len(c.Tls.ZeroRTTSecret()) > 0 {
 		c.Logger.Printf("0-RTT secret is available, installing crypto state")
 		c.CryptoStates[EncryptionLevel0RTT] = NewProtectedCryptoState(c.Tls, nil, c.Tls.ZeroRTTSecret())
-		c.EncryptionLevelsAvailable.Submit(DirectionalEncryptionLevel{EncryptionLevel0RTT, false})
+		c.EncryptionLevels.Submit(DirectionalEncryptionLevel{EncryptionLevel: EncryptionLevel0RTT, Read: false, Available: true})
 	}
 
 	var initialLength int
@@ -345,7 +345,7 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.OutgoingPackets = NewBroadcaster(1000)
 	c.IncomingPayloads = NewBroadcaster(1000)
 	c.UnprocessedPayloads = NewBroadcaster(1000)
-	c.EncryptionLevelsAvailable = NewBroadcaster(10)
+	c.EncryptionLevels = NewBroadcaster(10)
 	c.FrameQueue = NewBroadcaster(1000)
 	c.TransportParameters = NewBroadcaster(10)
 	c.ConnectionClosed = make(chan bool, 1)

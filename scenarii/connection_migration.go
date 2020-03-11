@@ -43,7 +43,7 @@ func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, 
 
 	connAgents.Get("SocketAgent").Run(conn)
 	connAgents.Get("SendingAgent").Run(conn)
-	conn.EncryptionLevelsAvailable.Submit(qt.DirectionalEncryptionLevel{qt.EncryptionLevel1RTT, false})
+	conn.EncryptionLevels.Submit(qt.DirectionalEncryptionLevel{EncryptionLevel: qt.EncryptionLevel1RTT, Available: true})
 
 	incPackets := conn.IncomingPackets.RegisterNewChan(1000)
 

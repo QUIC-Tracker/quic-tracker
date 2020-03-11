@@ -11,9 +11,10 @@ import (
 // It also merge the ACK frames inside a given packet before sending.
 type SendingAgent struct {
 	BaseAgent
-	MTU                 uint16
-	FrameProducer       []FrameProducer
-	DontCoalesceZeroRTT bool
+	MTU                         uint16
+	FrameProducer               []FrameProducer
+	DontCoalesceZeroRTT         bool
+	KeepDroppedEncryptionLevels bool
 }
 
 func (a *SendingAgent) Run(conn *Connection) {
@@ -21,23 +22,28 @@ func (a *SendingAgent) Run(conn *Connection) {
 
 	preparePacket := conn.PreparePacket.RegisterNewChan(100)
 	sendPacket := conn.SendPacket.RegisterNewChan(100)
-	newEncryptionLevelAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
+	elChan := conn.EncryptionLevels.RegisterNewChan(10)
 
-	encryptionLevels := []EncryptionLevel{EncryptionLevelInitial, EncryptionLevel0RTT, EncryptionLevelHandshake, EncryptionLevel1RTT}
-	encryptionLevelsAvailable := map[DirectionalEncryptionLevel]bool{
-		{EncryptionLevelNone, false}:    true,
-		{EncryptionLevelInitial, false}: true,
+	encryptionLevels := map[DirectionalEncryptionLevel]bool{
+		{EncryptionLevel: EncryptionLevelInitial, Available: true}:    true,
+		{EncryptionLevel: EncryptionLevelNone, Available: true}:       true,
+		{EncryptionLevel: EncryptionLevel0RTT, Available: false}:      true,
+		{EncryptionLevel: EncryptionLevelHandshake, Available: false}: true,
+		{EncryptionLevel: EncryptionLevel1RTT, Available: false}:      true,
 	}
-	bestEncryptionLevels := map[EncryptionLevel]EncryptionLevel {
+	bestEncryptionLevels := map[EncryptionLevel]EncryptionLevel{
 		EncryptionLevelBest: EncryptionLevelInitial,
 	}
 	timers := make(map[EncryptionLevel]*time.Timer)
 	timersArmed := make(map[EncryptionLevel]bool)
-	for _, el := range encryptionLevels {
-		timers[el] = time.NewTimer(0)
-		timersArmed[el] = false
-		if !timers[el].Stop() {
-			<-timers[el].C
+	for dEL := range encryptionLevels {
+		el := dEL.EncryptionLevel
+		if dEL.EncryptionLevel != EncryptionLevelNone {
+			timers[el] = time.NewTimer(0)
+			timersArmed[el] = false
+			if !timers[el].Stop() {
+				<-timers[el].C
+			}
 		}
 	}
 
@@ -84,16 +90,16 @@ func (a *SendingAgent) Run(conn *Connection) {
 		defer close(a.closed)
 		for {
 			select {
-			case i :=<-preparePacket:
+			case i := <-preparePacket:
 				eL := i.(EncryptionLevel)
 
 				if eL == EncryptionLevelBest || eL == EncryptionLevelBestAppData {
-					nEL := chooseBestEncryptionLevel(encryptionLevelsAvailable, eL == EncryptionLevelBestAppData)
+					nEL := chooseBestEncryptionLevel(encryptionLevels, eL == EncryptionLevelBestAppData)
 					bestEncryptionLevels[eL] = nEL
 					a.Logger.Printf("Chose %s as new encryption level for %s\n", nEL, eL)
 					eL = nEL
 				}
-				if encryptionLevelsAvailable[DirectionalEncryptionLevel{eL, false}] && !timersArmed[eL] {
+				if encryptionLevels[DirectionalEncryptionLevel{EncryptionLevel: eL, Read: false, Available: true}] && !timersArmed[eL] {
 					timers[eL].Reset(2 * time.Millisecond)
 					timersArmed[eL] = true
 				}
@@ -124,16 +130,25 @@ func (a *SendingAgent) Run(conn *Connection) {
 					conn.DoSendPacket(p, EncryptionLevel1RTT)
 				}
 				timersArmed[EncryptionLevel1RTT] = false
-			case i := <-newEncryptionLevelAvailable:
+			case i := <-elChan:
 				dEL := i.(DirectionalEncryptionLevel)
 				if dEL.Read {
 					continue
 				}
 				eL := dEL.EncryptionLevel
-				encryptionLevelsAvailable[dEL] = true
-				bestEncryptionLevels[EncryptionLevelBest] = chooseBestEncryptionLevel(encryptionLevelsAvailable, false)
-				bestEncryptionLevels[EncryptionLevelBestAppData] = chooseBestEncryptionLevel(encryptionLevelsAvailable, true)
-				timers[eL].Reset(2 * time.Millisecond)
+				t := timers[eL]
+				if !dEL.Available && !a.KeepDroppedEncryptionLevels {
+					a.Logger.Println("Dropping encryption level", eL.String())
+					encryptionLevels[dEL] = true
+					t.Stop()
+				} else if dEL.Available {
+					encryptionLevels[dEL] = true
+					dEL.Available = false
+					delete(encryptionLevels, dEL)
+					bestEncryptionLevels[EncryptionLevelBest] = chooseBestEncryptionLevel(encryptionLevels, false)
+					bestEncryptionLevels[EncryptionLevelBestAppData] = chooseBestEncryptionLevel(encryptionLevels, true)
+					t.Reset(2 * time.Millisecond)
+				}
 			case i := <-sendPacket:
 				p := i.(PacketToSend)
 				if p.EncryptionLevel == EncryptionLevelInitial && p.Packet.Header().PacketType() == Initial {
@@ -170,21 +185,21 @@ func (a *SendingAgent) Run(conn *Connection) {
 	}()
 }
 
-var elOrder = []DirectionalEncryptionLevel{{EncryptionLevel1RTT, false}, {EncryptionLevelHandshake, false}, {EncryptionLevelInitial, false}}
-var elAppDataOrder = []DirectionalEncryptionLevel{{EncryptionLevel1RTT, false}, {EncryptionLevel0RTT, false}}
+var elOrder = []EncryptionLevel{EncryptionLevel1RTT, EncryptionLevelHandshake, EncryptionLevelInitial}
+var elAppDataOrder = []EncryptionLevel{EncryptionLevel1RTT, EncryptionLevel0RTT}
 
-func chooseBestEncryptionLevel(elAvailable map[DirectionalEncryptionLevel]bool, restrictAppData bool) EncryptionLevel {
+func chooseBestEncryptionLevel(eLs map[DirectionalEncryptionLevel]bool, restrictAppData bool) EncryptionLevel {
 	order := elOrder
 	if restrictAppData {
 		order = elAppDataOrder
 	}
-	for _, dEL := range order {
-		if elAvailable[dEL] {
-			return dEL.EncryptionLevel
+	for _, eL := range order {
+		if eLs[DirectionalEncryptionLevel{EncryptionLevel: eL, Available: true}] {
+			return eL
 		}
 	}
 	if restrictAppData {
 		return EncryptionLevel1RTT
 	}
-	return order[len(order)-1].EncryptionLevel
+	return order[len(order)-1]
 }

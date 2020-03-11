@@ -69,8 +69,9 @@ var EpochToEncryptionLevel = map[pigotls.Epoch]EncryptionLevel {
 }
 
 type DirectionalEncryptionLevel struct {
-	EncryptionLevel
+	EncryptionLevel EncryptionLevel
 	Read bool
+	Available bool
 }
 
 type CryptoState struct {

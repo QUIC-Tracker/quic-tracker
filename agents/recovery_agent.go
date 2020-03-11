@@ -33,7 +33,7 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 	outgoingPackets := conn.OutgoingPackets.RegisterNewChan(1000)
-	eLAvailable := conn.EncryptionLevelsAvailable.RegisterNewChan(10)
+	eLAvailable := conn.EncryptionLevels.RegisterNewChan(10)
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")
@@ -103,9 +103,17 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 				}
 			case i := <-eLAvailable:
 				eL := i.(DirectionalEncryptionLevel)
-				if eL.EncryptionLevel == EncryptionLevel1RTT { // Handshake has completed, empty the retransmission buffers
+				if eL.Available && eL.EncryptionLevel == EncryptionLevel1RTT { // Handshake has completed, empty the retransmission buffers
 					a.Logger.Println("Handshake has completed, emptying the two retransmission buffers")
 					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
+					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
+				}
+				if !eL.Available && eL.EncryptionLevel == EncryptionLevelInitial {
+					a.Logger.Println("Dropping Initial encryption level, emptying the retransmission buffer")
+					a.retransmissionBuffer[PNSpaceInitial] = make(map[PacketNumber]RetransmittableFrames)
+				}
+				if !eL.Available && eL.EncryptionLevel == EncryptionLevelHandshake {
+					a.Logger.Println("Dropping Handshake encryption level, emptying the retransmission buffer")
 					a.retransmissionBuffer[PNSpaceHandshake] = make(map[PacketNumber]RetransmittableFrames)
 				}
 			case <-a.conn.ConnectionClosed:

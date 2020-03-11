@@ -92,6 +92,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						a.HandshakeStatus.Submit(HandshakeStatus{true, tlsPacket, nil})
 						conn.IncomingPackets.Unregister(incPackets)
 						if !a.DontDropKeys {
+							conn.EncryptionLevels.Submit(DirectionalEncryptionLevel{EncryptionLevel: EncryptionLevelInitial, Available: false})
+							conn.EncryptionLevels.Submit(DirectionalEncryptionLevel{EncryptionLevel: EncryptionLevelHandshake, Available: false})
 							// TODO: Drop crypto contexts accordingly
 						}
 					}

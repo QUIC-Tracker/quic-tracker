@@ -220,8 +220,9 @@ type InitialPacket struct {
 }
 func (p *InitialPacket) GetRetransmittableFrames() []Frame {
 	var frames []Frame
+	hasCrypto := p.Contains(CryptoType)
 	for _, frame := range p.Frames {
-		if frame.shouldBeRetransmitted() || frame.FrameType() == PaddingFrameType {
+		if frame.shouldBeRetransmitted() || (hasCrypto && frame.FrameType() == PaddingFrameType) {
 			frames = append(frames, frame)
 		}
 	}

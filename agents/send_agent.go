@@ -106,6 +106,14 @@ func (a *SendingAgent) Run(conn *Connection) {
 			case <-timers[EncryptionLevelInitial].C:
 				p := fillPacket(NewInitialPacket(conn), EncryptionLevelInitial)
 				if p != nil {
+					var initialLength int
+					if conn.UseIPv6 {
+						initialLength = MinimumInitialLengthv6
+					} else {
+						initialLength = MinimumInitialLength
+					}
+					initialLength -= conn.CryptoStates[EncryptionLevelInitial].Write.Overhead()
+					p.PadTo(initialLength)
 					initialSent = true
 					conn.DoSendPacket(p, EncryptionLevelInitial)
 				}
@@ -175,6 +183,14 @@ func (a *SendingAgent) Run(conn *Connection) {
 							continue
 						}
 					}
+					var initialLength int
+					if conn.UseIPv6 {
+						initialLength = MinimumInitialLengthv6
+					} else {
+						initialLength = MinimumInitialLength
+					}
+					initialLength -= conn.CryptoStates[EncryptionLevelInitial].Write.Overhead()
+					initial.PadTo(initialLength)
 					initialSent = true
 				}
 				conn.DoSendPacket(p.Packet, p.EncryptionLevel)

@@ -209,7 +209,7 @@ func (p *FramePacket) PadTo(length int) {
 func (p *FramePacket) ShouldBeAcknowledged() bool {
 	for _, frame := range p.Frames {
 		switch frame.FrameType() {
-		case AckType, PaddingFrameType, ConnectionCloseType, ApplicationCloseType:
+		case AckType, AckECNType, PaddingFrameType, ConnectionCloseType, ApplicationCloseType:
 		default:
 			return true
 		}

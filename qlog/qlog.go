@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	TimeUnits       = time.Millisecond
-	TimeUnitsString = "ms"
+	TimeUnits       = time.Microsecond
+	TimeUnitsString = "us"
 )
 
 type StreamType string

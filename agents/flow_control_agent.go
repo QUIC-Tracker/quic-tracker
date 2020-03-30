@@ -196,12 +196,12 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 				// First check that the stream can be opened
 				if IsBidiClient(args.StreamId) && !bidiStreamsBlocked && (a.RemoteFC.StreamsBidi == 0 || GetMaxBidiClient(a.RemoteFC.StreamsBidi) < args.StreamId) {
 					bidiStreamsBlocked = true
-					conn.FrameQueue.Submit(QueuedFrame{StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi}, EncryptionLevelBestAppData})
+					conn.FrameQueue.Submit(QueuedFrame{&StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi}, EncryptionLevelBestAppData})
 					a.creditsReserved <- 0
 					break
 				} else if IsUniClient(args.StreamId) && !uniStreamsBlocked && (a.RemoteFC.StreamsUni == 0 || GetMaxUniClient(a.RemoteFC.StreamsUni) < args.StreamId) {
 					uniStreamsBlocked = false
-					conn.FrameQueue.Submit(QueuedFrame{StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni}, EncryptionLevelBestAppData})
+					conn.FrameQueue.Submit(QueuedFrame{&StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni}, EncryptionLevelBestAppData})
 					a.creditsReserved <- 0
 					break
 				}
@@ -226,12 +226,12 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 
 				if !blockedStreams[args.StreamId] && (stream.WriteReserved >= stream.WriteLimit || (creditReserved < args.Credit)) {
 					blockedStreams[args.StreamId] = true
-					conn.FrameQueue.Submit(QueuedFrame{StreamDataBlockedFrame{args.StreamId, stream.WriteLimit}, EncryptionLevelBestAppData})
+					conn.FrameQueue.Submit(QueuedFrame{&StreamDataBlockedFrame{args.StreamId, stream.WriteLimit}, EncryptionLevelBestAppData})
 				}
 
 				if !dataBlocked && dataReserved >= a.LocalFC.MaxData {
 					dataBlocked = true
-					conn.FrameQueue.Submit(QueuedFrame{DataBlockedFrame{stream.WriteLimit}, EncryptionLevelBestAppData})
+					conn.FrameQueue.Submit(QueuedFrame{&DataBlockedFrame{stream.WriteLimit}, EncryptionLevelBestAppData})
 				}
 
 				a.creditsReserved <- creditReserved
@@ -242,24 +242,24 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 				}
 				var allFrames []Frame
 				if dataLimitsChanged {
-					allFrames = append(allFrames, MaxDataFrame{a.LocalFC.MaxData})
+					allFrames = append(allFrames, &MaxDataFrame{a.LocalFC.MaxData})
 					dataLimitsChanged = false
 				}
 				for streamId, limit := range streamsDataLimits {
-					allFrames = append(allFrames, MaxStreamDataFrame{streamId, limit})
+					allFrames = append(allFrames, &MaxStreamDataFrame{streamId, limit})
 					delete(streamsDataLimits, streamId)
 				}
 				if dataBlocked {
-					allFrames = append(allFrames, DataBlockedFrame{a.RemoteFC.MaxData})
+					allFrames = append(allFrames, &DataBlockedFrame{a.RemoteFC.MaxData})
 				}
 				if bidiStreamsBlocked {
-					allFrames = append(allFrames, StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi})
+					allFrames = append(allFrames, &StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi})
 				}
 				if uniStreamsBlocked {
-					allFrames = append(allFrames, StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni})
+					allFrames = append(allFrames, &StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni})
 				}
 				for streamId, _ := range blockedStreams {
-					allFrames = append(allFrames, StreamDataBlockedFrame{streamId, conn.Streams.Get(streamId).WriteLimit})
+					allFrames = append(allFrames, &StreamDataBlockedFrame{streamId, conn.Streams.Get(streamId).WriteLimit})
 				}
 
 				var frames []Frame

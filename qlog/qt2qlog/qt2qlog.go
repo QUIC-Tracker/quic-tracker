@@ -66,6 +66,8 @@ func convertFrames(frames []Frame) []interface{} {
 			qf = &qlog.PingFrame{"ping"}
 		case *AckFrame:
 			qf = ackFrameToQLog(ft)
+		case *AckECNFrame:
+			qf = ackECNFrameToQLog(ft)
 		case *StreamFrame:
 			qf = &qlog.StreamFrame{
 				FrameType: "stream",
@@ -177,6 +179,14 @@ func ackFrameToQLog(a *AckFrame) *qlog.AckFrame {
 		largest -= ar.Gap + 1 + ar.AckRange
 	}
 	return &q
+}
+
+func ackECNFrameToQLog(a *AckECNFrame) *qlog.AckFrame {
+	q := ackFrameToQLog(&a.AckFrame)
+	q.ECT0 = a.ECT0Count
+	q.ECT1 = a.ECT1Count
+	q.CE = a.ECTCECount
+	return q
 }
 
 func maxStreamsToQLog(m *MaxStreamsFrame) *qlog.MaxStreamsFrame {

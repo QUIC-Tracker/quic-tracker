@@ -63,8 +63,8 @@ forLoop:
 			if readOffset == uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal) && !shouldResume {
 				conn.TLSTPHandler.MaxData *= 2
 				conn.TLSTPHandler.MaxStreamDataBidiLocal *= 2
-				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, qt.EncryptionLevel1RTT})
-				conn.FrameQueue.Submit(qt.QueuedFrame{qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{&qt.MaxDataFrame{uint64(conn.TLSTPHandler.MaxData)}, qt.EncryptionLevel1RTT})
+				conn.FrameQueue.Submit(qt.QueuedFrame{&qt.MaxStreamDataFrame{0, uint64(conn.TLSTPHandler.MaxStreamDataBidiLocal)}, qt.EncryptionLevel1RTT})
 				shouldResume = true
 			}
 		case <-conn.ConnectionClosed:

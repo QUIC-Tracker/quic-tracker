@@ -1,6 +1,10 @@
 package agents
 
-import . "github.com/QUIC-Tracker/quic-tracker"
+import (
+	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/qlog"
+	qt2qlog "github.com/QUIC-Tracker/quic-tracker/qlog/qt2qlog"
+)
 
 // The BufferAgent is in charge of waiting for a given decryption level to become available before putting
 // ciphertexts that require this level back into the decryption queue.
@@ -25,6 +29,8 @@ func (a *BufferAgent) Run(conn *Connection) {
 			case i := <-uPChan:
 				u := i.(UnprocessedPayload)
 				if !encryptionLevelsAvailable[u.EncryptionLevel] {
+					u.EncryptionLevel.String()
+					conn.QLogEvents <- conn.QLogTrace.NewEvent(qlog.Categories.Transport.Category, qlog.Categories.Transport.PacketBuffered, qt2qlog.ConvertPacketBuffered(EncryptionLevelToPacketType[u.EncryptionLevel], "keys_unavailable"))
 					unprocessedPayloads[u.EncryptionLevel] = append(unprocessedPayloads[u.EncryptionLevel], u.IncomingPayload)
 				} else {
 					conn.IncomingPayloads.Submit(u.IncomingPayload)
@@ -38,6 +44,7 @@ func (a *BufferAgent) Run(conn *Connection) {
 						a.Logger.Printf("Encryption level %s is available, putting back %d unprocessed payloads into the buffer", eL.String(), len(unprocessedPayloads[eL]))
 					}
 					for _, uP := range unprocessedPayloads[eL] {
+						uP.WasBuffered = true
 						conn.IncomingPayloads.Submit(uP)
 					}
 					unprocessedPayloads[eL] = nil

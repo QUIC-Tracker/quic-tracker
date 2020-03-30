@@ -53,6 +53,13 @@ var EncryptionLevelToPNSpace = map[EncryptionLevel]PNSpace {
 	EncryptionLevelBestAppData: PNSpaceAppData,
 }
 
+var EncryptionLevelToPacketType = map[EncryptionLevel]PacketType{
+	EncryptionLevelInitial: Initial,
+	EncryptionLevelHandshake: Handshake,
+	EncryptionLevel0RTT: ZeroRTTProtected,
+	EncryptionLevel1RTT: ShortHeaderPacket,
+}
+
 var packetTypeToEncryptionLevel = map[PacketType]EncryptionLevel{
 	Initial: EncryptionLevelInitial,
 	Retry: EncryptionLevelNone,

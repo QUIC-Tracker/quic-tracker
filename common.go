@@ -33,6 +33,7 @@ package quictracker
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	. "github.com/QUIC-Tracker/quic-tracker/lib"
 	_ "github.com/mpiraux/ls-qpack-go"
 	"github.com/mpiraux/pigotls"
@@ -160,6 +161,12 @@ var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
 	PNSpaceAppData: pigotls.Epoch1RTT,
 }
 
+var PNSpaceToPacketType = map[PNSpace]PacketType{
+	PNSpaceInitial: Initial,
+	PNSpaceHandshake: Handshake,
+	PNSpaceAppData: ShortHeaderPacket, // TODO: Deal with O-RTT packets
+}
+
 var EpochToPNSpace = map[pigotls.Epoch]PNSpace {
 	pigotls.EpochInitial: PNSpaceInitial,
 	pigotls.EpochHandshake: PNSpaceHandshake,
@@ -212,6 +219,10 @@ func (c ConnectionID) WriteTo(buffer *bytes.Buffer) {
 	buffer.Write(c)
 }
 
+func (c ConnectionID) String() string {
+	return hex.EncodeToString(c)
+}
+
 func min(a, b uint64) uint64 {
 	if a < b {
 		return a
@@ -235,14 +246,17 @@ const (
 	ECNStatusCE               = 3
 )
 
-type ReceiveContext struct {
+type PacketContext struct {
 	Timestamp  time.Time
 	RemoteAddr net.Addr
 	ECNStatus
+	DatagramSize uint16
+	PacketSize uint16
+	WasBuffered bool
 }
 
 type IncomingPayload struct {
-	ReceiveContext
+	PacketContext
 	Payload []byte
 }
 

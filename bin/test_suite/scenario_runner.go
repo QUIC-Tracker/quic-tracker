@@ -17,6 +17,7 @@ func main() {
 	alpn := flag.String("alpn", "hq", "The ALPN prefix to use when connecting ot the endpoint.")
 	scenarioName := flag.String("scenario", "", "The particular scenario to run.")
 	outputFile := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
+	qlog := flag.String("qlog", "", "The file to write the qlog output to.")
 	debug := flag.Bool("debug", false, "Enables debugging information to be printed.")
 	nopcap := flag.Bool("nopcap", false, "Disables the pcap capture.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcap.")
@@ -39,6 +40,8 @@ func main() {
 	conn, err := qt.NewDefaultConnection(*host, strings.Split(*host, ":")[0], nil, scenario.IPv6(), *alpn, scenario.HTTP3()) // Raw IPv6 are not handled correctly
 
 	if err == nil {
+		conn.QLog.Title = "QUIC-Tracker scenario " + *scenarioName
+
 		var pcap *exec.Cmd
 		if !*nopcap {
 			pcap, err = qt.StartPcapCapture(conn, *netInterface)
@@ -65,6 +68,19 @@ func main() {
 		if err != nil {
 			trace.Results["pcap_completed_error"] = err.Error()
 		}
+
+		conn.QLogTrace.Sort()
+		trace.QLog = conn.QLog
+		if *qlog != "" {
+			outFile, err := os.OpenFile(*qlog, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+			if err == nil {
+				content, err := json.Marshal(conn.QLog)
+				if err == nil {
+					outFile.Write(content)
+					outFile.Close()
+				}
+			}
+		}
 	} else {
 		trace.ErrorCode = 255
 		trace.Results["udp_error"] = err.Error()
@@ -74,14 +90,14 @@ func main() {
 	if *outputFile != "" {
 		os.Remove(*outputFile)
 		outFile, err := os.OpenFile(*outputFile, os.O_CREATE|os.O_WRONLY, 0755)
-		defer outFile.Close()
 		if err == nil {
 			outFile.Write(out)
-			return
+			outFile.Close()
 		} else {
 			println(err.Error())
 		}
+	} else {
+		println(string(out))
 	}
 
-	println(string(out))
 }

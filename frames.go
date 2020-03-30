@@ -673,31 +673,31 @@ func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 
 type ApplicationCloseFrame struct {
 	// TODO: Merge it with 0x1c
-	errorCode          uint64
-	reasonPhraseLength uint64
-	reasonPhrase       string
+	ErrorCode          uint64
+	ReasonPhraseLength uint64
+	ReasonPhrase       string
 }
 
 func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
 func (frame ApplicationCloseFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
-	WriteVarInt(buffer, frame.errorCode)
-	WriteVarInt(buffer, frame.reasonPhraseLength)
-	if frame.reasonPhraseLength > 0 {
-		buffer.Write([]byte(frame.reasonPhrase))
+	WriteVarInt(buffer, frame.ErrorCode)
+	WriteVarInt(buffer, frame.ReasonPhraseLength)
+	if frame.ReasonPhraseLength > 0 {
+		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
 func (frame ApplicationCloseFrame) shouldBeRetransmitted() bool { return false }
-func (frame ApplicationCloseFrame) FrameLength() uint16         { return 1 + 2 + uint16(VarIntLen(frame.reasonPhraseLength)) + uint16(frame.reasonPhraseLength) }
+func (frame ApplicationCloseFrame) FrameLength() uint16         { return 1 + 2 + uint16(VarIntLen(frame.ReasonPhraseLength)) + uint16(frame.ReasonPhraseLength) }
 func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 	frame := new(ApplicationCloseFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
-	frame.errorCode, _, _ = ReadVarIntValue(buffer)
-	frame.reasonPhraseLength, _, _ = ReadVarIntValue(buffer)
-	if frame.reasonPhraseLength > 0 {
-		reasonBytes := make([]byte, frame.reasonPhraseLength, frame.reasonPhraseLength)
+	frame.ErrorCode, _, _ = ReadVarIntValue(buffer)
+	frame.ReasonPhraseLength, _, _ = ReadVarIntValue(buffer)
+	if frame.ReasonPhraseLength > 0 {
+		reasonBytes := make([]byte, frame.ReasonPhraseLength, frame.ReasonPhraseLength)
 		binary.Read(buffer, binary.BigEndian, &reasonBytes)
-		frame.reasonPhrase = string(reasonBytes)
+		frame.ReasonPhrase = string(reasonBytes)
 	}
 	return frame
 }

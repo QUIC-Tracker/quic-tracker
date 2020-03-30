@@ -2,6 +2,7 @@ package agents
 
 import (
 	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/qlog"
 	"time"
 	"math"
 )
@@ -112,6 +113,14 @@ func (a *RTTAgent) UpdateRTT(ackDelay uint64, ackOnly bool) { // TODO: https://t
 	a.conn.MinRTT = a.MinRTT
 	a.conn.SmoothedRTT = a.SmoothedRTT
 	a.conn.RTTVar = a.RTTVar
+
+	a.conn.QLogEvents <- a.conn.QLogTrace.NewEvent(qlog.Categories.Recovery.Category, qlog.Categories.Recovery.MetricsUpdated, qlog.MetricUpdate{
+		LatestRTT: a.LatestRTT / 1000,
+		MaxAckDelay: a.MaxAckDelay / 1000,
+		SmoothedRTT: a.conn.SmoothedRTT / 1000,
+		RTTVariance: a.conn.RTTVar / 1000,
+		MinRTT: a.conn.MinRTT / 1000,
+	})
 
 	a.Logger.Printf("LatestRTT = %d, MinRTT = %d, SmoothedRTT = %d, RTTVar = %d", a.LatestRTT, a.MinRTT, a.SmoothedRTT, a.RTTVar)
 }

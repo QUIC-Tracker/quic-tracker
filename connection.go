@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/QUIC-Tracker/quic-tracker/qlog"
 	"github.com/mpiraux/pigotls"
 	"log"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -73,6 +75,9 @@ type Connection struct {
 
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	Logger               *log.Logger
+	QLog 				 qlog.QLog
+	QLogTrace			 *qlog.Trace
+	QLogEvents			 chan *qlog.Event
 }
 func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
@@ -126,7 +131,9 @@ func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
 		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
 
-		c.UdpConnection.Write(c.EncodeAndEncrypt(packet, level))
+		packetBytes := c.EncodeAndEncrypt(packet, level)
+		c.UdpConnection.Write(packetBytes)
+		packet.SetSendContext(PacketContext{Timestamp: time.Now(), RemoteAddr: c.UdpConnection.RemoteAddr(), DatagramSize: uint16(len(packetBytes)), PacketSize: uint16(len(packetBytes))})
 
 		c.PacketWasSent(packet)
 	default:
@@ -355,6 +362,33 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.SendPacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
 	c.PacketAcknowledged = NewBroadcaster(1000)
+
+	c.QLog.Version = "draft-01"
+	c.QLog.Description = "QUIC-Tracker"
+	if len(GitCommit()) > 0 {
+		c.QLog.Description += " commit " + GitCommit()
+	}
+	c.QLogTrace = &qlog.Trace{}
+	c.QLog.Traces = append(c.QLog.Traces, c.QLogTrace)
+
+	c.QLogTrace.VantagePoint.Name = "QUIC-Tracker"
+	c.QLogTrace.VantagePoint.Type = "client"
+	c.QLogTrace.Description = fmt.Sprintf("Connection to %s (%s), using version %08x and alpn %s", serverName, udpConn.RemoteAddr().String(), version, ALPN)
+	c.QLogTrace.ReferenceTime = time.Now()
+	c.QLogTrace.Configuration.TimeUnits = qlog.TimeUnitsString
+
+	c.QLogTrace.CommonFields = make(map[string]interface{})
+	c.QLogTrace.CommonFields["ODCID"] = hex.EncodeToString(c.OriginalDestinationCID)
+	c.QLogTrace.CommonFields["group_id"] = c.QLogTrace.CommonFields["ODCID"]
+	c.QLogTrace.CommonFields["reference_time"] = c.QLogTrace.ReferenceTime.UnixNano() / int64(qlog.TimeUnits)
+	c.QLogTrace.EventFields = qlog.DefaultEventFields()
+	c.QLogEvents = make(chan *qlog.Event, 1000)
+
+	go func() {
+		for e := range c.QLogEvents {
+			c.QLogTrace.Add(e)
+		}
+	}()
 
 	c.Logger = log.New(os.Stderr, fmt.Sprintf("[CID %s] ", hex.EncodeToString(c.OriginalDestinationCID)), log.Lshortfile)
 

@@ -13,7 +13,8 @@ const (
 	Handshake        PacketType = 0x2
 	Retry            PacketType = 0x3
 
-	ShortHeaderPacket PacketType = 0xff  // TODO: Find a way around this
+	VersionNegotiation PacketType = 0xfe // TODO: Find a way around this
+	ShortHeaderPacket  PacketType = 0xff // TODO: Find a way around this
 )
 
 var packetTypeToString = map[PacketType]string{

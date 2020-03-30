@@ -21,6 +21,7 @@ type Trace struct {
 	ErrorCode           uint8                  `json:"error_code"` // A scenario-specific error code that reports its verdict
 	Stream              []TracePacket          `json:"stream"`     // A clear-text copy of the packets that were sent and received
 	Pcap                []byte                 `json:"pcap"`       // The packet capture file associated with the trace
+	QLog                interface{}            `json:"qlog"`       // The QLog trace captured during the test run
 	ClientRandom        []byte                 `json:"client_random"`
 	Secrets				map[pigotls.Epoch]Secrets `json:"secrets"`
 }

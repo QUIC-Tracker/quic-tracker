@@ -2,6 +2,8 @@ package agents
 
 import (
 	. "github.com/QUIC-Tracker/quic-tracker"
+	"github.com/QUIC-Tracker/quic-tracker/qlog"
+	"github.com/QUIC-Tracker/quic-tracker/qlog/qt2qlog"
 	"time"
 )
 
@@ -42,11 +44,12 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 			select {
 			case <-retransmissionTicker.C:
 				var batch RetransmitBatch
-				for _, buffer := range a.retransmissionBuffer {
-					for k, v := range buffer {
+				for pnSpace, buffer := range a.retransmissionBuffer {
+					for pn, v := range buffer {
 						if time.Now().Sub(v.Timestamp) > a.TimerValue {
+							a.conn.QLogEvents <- a.conn.QLogTrace.NewEvent(qlog.Categories.Recovery.Category, qlog.Categories.Recovery.PacketLost, qt2qlog.ConvertPacketLost(PNSpaceToPacketType[pnSpace], pn, v.Frames, "Linear timer"))
 							batch = append(batch, v)
-							delete(buffer, k)
+							delete(buffer, pn)
 						}
 					}
 				}

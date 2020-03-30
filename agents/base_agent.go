@@ -208,6 +208,7 @@ func (c *ConnectionAgents) AddHTTPAgent() HTTPAgent {
 func GetDefaultAgents() []Agent {
 	fc := &FlowControlAgent{}
 	return []Agent{
+		&QLogAgent{},
 		&SocketAgent{},
 		&ParsingAgent{},
 		&BufferAgent{},

@@ -1,4 +1,4 @@
-quic.rocks:4433	/index.html	4433	hq
+quic.rocks:4433	/index.html	4433	h3
 nghttp2.org:4433	/index.html	4433	h3
 quant.eggert.org:4433	/index.html	4433	hq
 h2o.examp1e.net:443	/notfound	443	h3

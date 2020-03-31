@@ -31,7 +31,7 @@ func (s *MultiPacketClientHello) Run(conn *qt.Connection, trace *qt.Trace, prefe
 	originalLen := len(originalPacket.Encode(originalPacket.EncodePayload()))
 	f := originalPacket.GetFirst(qt.CryptoType).(*qt.CryptoFrame)
 	secondPacket := qt.NewInitialPacket(conn)
-	secondPacket.AddFrame(qt.CryptoFrame{Offset: f.Length / 2, Length: f.Length - (f.Length / 2), CryptoData:f.CryptoData[f.Length/2:]})
+	secondPacket.AddFrame(&qt.CryptoFrame{Offset: f.Length / 2, Length: f.Length - (f.Length / 2), CryptoData:f.CryptoData[f.Length/2:]})
 	secondPacket.PadTo(originalLen)
 	f.CryptoData = f.CryptoData[:f.Length/2]
 	f.Length /= 2

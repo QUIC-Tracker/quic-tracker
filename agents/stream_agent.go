@@ -96,7 +96,7 @@ func (a *StreamAgent) reset(streamId uint64, appErrorCode uint64) error {
 		}
 		s.WriteCloseOffset = s.WriteOffset
 		s.WriteClosed = true
-		a.conn.FrameQueue.Submit(QueuedFrame{ResetStream{streamId, appErrorCode, s.WriteOffset}, EncryptionLevelBestAppData})
+		a.conn.FrameQueue.Submit(QueuedFrame{&ResetStream{streamId, appErrorCode, s.WriteOffset}, EncryptionLevelBestAppData})
 		return nil
 	}
 	return errors.New("cannot reset server uni stream")
@@ -107,7 +107,7 @@ func (a *StreamAgent) stopSending(streamId uint64, appErrorCode uint64) error {
 		if _, present := a.conn.Streams.Has(streamId); !present && IsServer(streamId) {
 			return errors.New("cannot ask to stop sending on non-ready server stream")
 		}
-		a.conn.FrameQueue.Submit(QueuedFrame{StopSendingFrame{streamId, appErrorCode}, EncryptionLevelBestAppData})
+		a.conn.FrameQueue.Submit(QueuedFrame{&StopSendingFrame{streamId, appErrorCode}, EncryptionLevelBestAppData})
 		return nil
 	}
 	return errors.New("cannot ask to stop sending on a client uni stream")

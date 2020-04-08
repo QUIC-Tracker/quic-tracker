@@ -109,12 +109,12 @@ const (
 
 type PaddingFrame byte
 
-func (frame PaddingFrame) FrameType() FrameType { return PaddingFrameType }
-func (frame PaddingFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *PaddingFrame) FrameType() FrameType { return PaddingFrameType }
+func (frame *PaddingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
-func (frame PaddingFrame) shouldBeRetransmitted() bool { return false }
-func (frame PaddingFrame) FrameLength() uint16         { return 1 }
+func (frame *PaddingFrame) shouldBeRetransmitted() bool { return false }
+func (frame *PaddingFrame) FrameLength() uint16         { return 1 }
 func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 	_, _ = ReadVarInt(buffer) // Discard frame type
 	return new(PaddingFrame)
@@ -122,12 +122,12 @@ func NewPaddingFrame(buffer *bytes.Reader) *PaddingFrame {
 
 type PingFrame byte
 
-func (frame PingFrame) FrameType() FrameType { return PingType }
-func (frame PingFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *PingFrame) FrameType() FrameType { return PingType }
+func (frame *PingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
-func (frame PingFrame) shouldBeRetransmitted() bool { return false }
-func (frame PingFrame) FrameLength() uint16         { return 1 }
+func (frame *PingFrame) shouldBeRetransmitted() bool { return false }
+func (frame *PingFrame) FrameLength() uint16         { return 1 }
 func NewPingFrame(buffer *bytes.Reader) *PingFrame {
 	frame := new(PingFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -145,9 +145,9 @@ type AckRange struct {
 	AckRange uint64
 }
 
-func (frame AckFrame) FrameType() FrameType        { return AckType }
-func (frame AckFrame) shouldBeRetransmitted() bool { return false }
-func (frame AckFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *AckFrame) FrameType() FrameType        { return AckType }
+func (frame *AckFrame) shouldBeRetransmitted() bool { return false }
+func (frame *AckFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(frame.LargestAcknowledged))
 	WriteVarInt(buffer, frame.AckDelay)
@@ -159,7 +159,7 @@ func (frame AckFrame) WriteTo(buffer *bytes.Buffer) {
 		WriteVarInt(buffer, ack.AckRange)
 	}
 }
-func (frame AckFrame) FrameLength() uint16 {
+func (frame *AckFrame) FrameLength() uint16 {
 	var length uint16
 	length += 1 + uint16(VarIntLen(uint64(frame.LargestAcknowledged))+VarIntLen(frame.AckDelay)+VarIntLen(frame.AckRangeCount))
 
@@ -171,7 +171,7 @@ func (frame AckFrame) FrameLength() uint16 {
 	}
 	return length
 }
-func (frame AckFrame) GetAckedPackets() []PacketNumber { // TODO: This is prone to livelock
+func (frame *AckFrame) GetAckedPackets() []PacketNumber { // TODO: This is prone to livelock
 	var packets []PacketNumber
 
 	currentPacketNumber := frame.LargestAcknowledged
@@ -221,15 +221,15 @@ type AckECNFrame struct {
 	ECTCECount uint64
 }
 
-func (frame AckECNFrame) FrameType() FrameType { return AckECNType }
-func (frame AckECNFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *AckECNFrame) FrameType() FrameType { return AckECNType }
+func (frame *AckECNFrame) WriteTo(buffer *bytes.Buffer) {
 	frame.AckFrame.WriteTo(buffer)
 	WriteVarInt(buffer, frame.ECT0Count)
 	WriteVarInt(buffer, frame.ECT1Count)
 	WriteVarInt(buffer, frame.ECTCECount)
 }
-func (frame AckECNFrame) shouldBeRetransmitted() bool { return false }
-func (frame AckECNFrame) FrameLength() uint16         { return frame.AckFrame.FrameLength() + uint16(VarIntLen(frame.ECT0Count)+VarIntLen(frame.ECT1Count)+VarIntLen(frame.ECTCECount)) }
+func (frame *AckECNFrame) shouldBeRetransmitted() bool { return false }
+func (frame *AckECNFrame) FrameLength() uint16         { return frame.AckFrame.FrameLength() + uint16(VarIntLen(frame.ECT0Count)+VarIntLen(frame.ECT1Count)+VarIntLen(frame.ECTCECount)) }
 func ReadAckECNFrame(buffer *bytes.Reader, conn *Connection) *AckECNFrame {
 	frame := &AckECNFrame{*ReadAckFrame(buffer), 0, 0, 0}
 
@@ -245,15 +245,15 @@ type ResetStream struct {
 	FinalSize            uint64
 }
 
-func (frame ResetStream) FrameType() FrameType { return ResetStreamType }
-func (frame ResetStream) WriteTo(buffer *bytes.Buffer) {
+func (frame *ResetStream) FrameType() FrameType { return ResetStreamType }
+func (frame *ResetStream) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.ApplicationErrorCode)
 	WriteVarInt(buffer, frame.FinalSize)
 }
-func (frame ResetStream) shouldBeRetransmitted() bool { return true }
-func (frame ResetStream) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.ApplicationErrorCode)+VarIntLen(frame.FinalSize)) }
+func (frame *ResetStream) shouldBeRetransmitted() bool { return true }
+func (frame *ResetStream) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.ApplicationErrorCode)+VarIntLen(frame.FinalSize)) }
 func NewResetStream(buffer *bytes.Reader) *ResetStream {
 	frame := new(ResetStream)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -268,14 +268,14 @@ type StopSendingFrame struct {
 	ApplicationErrorCode uint64
 }
 
-func (frame StopSendingFrame) FrameType() FrameType { return StopSendingType }
-func (frame StopSendingFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *StopSendingFrame) FrameType() FrameType { return StopSendingType }
+func (frame *StopSendingFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.ApplicationErrorCode)
 }
-func (frame StopSendingFrame) shouldBeRetransmitted() bool { return true }
-func (frame StopSendingFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId) + VarIntLen(frame.ApplicationErrorCode)) }
+func (frame *StopSendingFrame) shouldBeRetransmitted() bool { return true }
+func (frame *StopSendingFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId) + VarIntLen(frame.ApplicationErrorCode)) }
 func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -290,15 +290,15 @@ type CryptoFrame struct {
 	CryptoData []byte
 }
 
-func (frame CryptoFrame) FrameType() FrameType { return CryptoType }
-func (frame CryptoFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *CryptoFrame) FrameType() FrameType { return CryptoType }
+func (frame *CryptoFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.Offset)
 	WriteVarInt(buffer, frame.Length)
 	buffer.Write(frame.CryptoData)
 }
-func (frame CryptoFrame) shouldBeRetransmitted() bool { return true }
-func (frame CryptoFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.Offset)+VarIntLen(frame.Length)) + uint16(len(frame.CryptoData)) }
+func (frame *CryptoFrame) shouldBeRetransmitted() bool { return true }
+func (frame *CryptoFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.Offset)+VarIntLen(frame.Length)) + uint16(len(frame.CryptoData)) }
 func ReadCryptoFrame(buffer *bytes.Reader, conn *Connection) *CryptoFrame {
 	frame := new(CryptoFrame)
 	ReadVarIntValue(buffer) // Discards frame type
@@ -320,14 +320,14 @@ type NewTokenFrame struct {
 	Token []byte
 }
 
-func (frame NewTokenFrame) FrameType() FrameType { return NewTokenType }
-func (frame NewTokenFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *NewTokenFrame) FrameType() FrameType { return NewTokenType }
+func (frame *NewTokenFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, uint64(len(frame.Token)))
 	buffer.Write(frame.Token)
 }
-func (frame NewTokenFrame) shouldBeRetransmitted() bool { return true }
-func (frame NewTokenFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(uint64(len(frame.Token)))) + uint16(len(frame.Token)) }
+func (frame *NewTokenFrame) shouldBeRetransmitted() bool { return true }
+func (frame *NewTokenFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(uint64(len(frame.Token)))) + uint16(len(frame.Token)) }
 func ReadNewTokenFrame(buffer *bytes.Reader, conn *Connection) *NewTokenFrame {
 	frame := new(NewTokenFrame)
 	ReadVarIntValue(buffer) // Discard frame type
@@ -348,8 +348,8 @@ type StreamFrame struct {
 	StreamData []byte
 }
 
-func (frame StreamFrame) FrameType() FrameType { return StreamType }
-func (frame StreamFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *StreamFrame) FrameType() FrameType { return StreamType }
+func (frame *StreamFrame) WriteTo(buffer *bytes.Buffer) {
 	typeByte := uint64(frame.FrameType())
 	if frame.FinBit {
 		typeByte |= 0x01
@@ -370,8 +370,8 @@ func (frame StreamFrame) WriteTo(buffer *bytes.Buffer) {
 	}
 	buffer.Write(frame.StreamData)
 }
-func (frame StreamFrame) shouldBeRetransmitted() bool { return true }
-func (frame StreamFrame) FrameLength() uint16 {
+func (frame *StreamFrame) shouldBeRetransmitted() bool { return true }
+func (frame *StreamFrame) FrameLength() uint16 {
 	length := 1 + uint16(VarIntLen(frame.StreamId))
 	if frame.OffBit {
 		length += uint16(VarIntLen(frame.Offset))
@@ -420,13 +420,13 @@ type MaxDataFrame struct {
 	MaximumData uint64
 }
 
-func (frame MaxDataFrame) FrameType() FrameType { return MaxDataType }
-func (frame MaxDataFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *MaxDataFrame) FrameType() FrameType { return MaxDataType }
+func (frame *MaxDataFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.MaximumData)
 }
-func (frame MaxDataFrame) shouldBeRetransmitted() bool { return true }
-func (frame MaxDataFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.MaximumData)) }
+func (frame *MaxDataFrame) shouldBeRetransmitted() bool { return true }
+func (frame *MaxDataFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.MaximumData)) }
 func NewMaxDataFrame(buffer *bytes.Reader) *MaxDataFrame {
 	frame := new(MaxDataFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -439,14 +439,14 @@ type MaxStreamDataFrame struct {
 	MaximumStreamData uint64
 }
 
-func (frame MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
-func (frame MaxStreamDataFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *MaxStreamDataFrame) FrameType() FrameType { return MaxStreamDataType }
+func (frame *MaxStreamDataFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.MaximumStreamData)
 }
-func (frame MaxStreamDataFrame) shouldBeRetransmitted() bool { return true }
-func (frame MaxStreamDataFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.MaximumStreamData)) }
+func (frame *MaxStreamDataFrame) shouldBeRetransmitted() bool { return true }
+func (frame *MaxStreamDataFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.MaximumStreamData)) }
 func NewMaxStreamDataFrame(buffer *bytes.Reader) *MaxStreamDataFrame {
 	frame := new(MaxStreamDataFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -460,21 +460,21 @@ type MaxStreamsFrame struct {
 	MaximumStreams uint64
 }
 
-func (frame MaxStreamsFrame) FrameType() FrameType {
+func (frame *MaxStreamsFrame) FrameType() FrameType {
 	if frame.StreamsType == BidiStreams {
 		return MaxStreamsType
 	} else {
 		return MaxStreamsType + 1
 	}
 }
-func (frame MaxStreamsFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *MaxStreamsFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.MaximumStreams)
 }
-func (frame MaxStreamsFrame) shouldBeRetransmitted() bool { return true }
-func (frame MaxStreamsFrame) IsUni() bool                 { return frame.StreamsType == UniStreams }
-func (frame MaxStreamsFrame) IsBidi() bool                { return frame.StreamsType == BidiStreams }
-func (frame MaxStreamsFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.MaximumStreams)) }
+func (frame *MaxStreamsFrame) shouldBeRetransmitted() bool { return true }
+func (frame *MaxStreamsFrame) IsUni() bool                 { return frame.StreamsType == UniStreams }
+func (frame *MaxStreamsFrame) IsBidi() bool                { return frame.StreamsType == BidiStreams }
+func (frame *MaxStreamsFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.MaximumStreams)) }
 func NewMaxStreamIdFrame(buffer *bytes.Reader) *MaxStreamsFrame {
 	frame := new(MaxStreamsFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -486,13 +486,13 @@ type DataBlockedFrame struct {
 	DataLimit uint64
 }
 
-func (frame DataBlockedFrame) FrameType() FrameType { return DataBlockedType }
-func (frame DataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *DataBlockedFrame) FrameType() FrameType { return DataBlockedType }
+func (frame *DataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.DataLimit)
 }
-func (frame DataBlockedFrame) shouldBeRetransmitted() bool { return false }
-func (frame DataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.DataLimit)) }
+func (frame *DataBlockedFrame) shouldBeRetransmitted() bool { return false }
+func (frame *DataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.DataLimit)) }
 func NewBlockedFrame(buffer *bytes.Reader) *DataBlockedFrame {
 	frame := new(DataBlockedFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -505,14 +505,14 @@ type StreamDataBlockedFrame struct {
 	StreamDataLimit uint64
 }
 
-func (frame StreamDataBlockedFrame) FrameType() FrameType { return StreamDataBlockedType }
-func (frame StreamDataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *StreamDataBlockedFrame) FrameType() FrameType { return StreamDataBlockedType }
+func (frame *StreamDataBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamId)
 	WriteVarInt(buffer, frame.StreamDataLimit)
 }
-func (frame StreamDataBlockedFrame) shouldBeRetransmitted() bool { return false }
-func (frame StreamDataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.StreamDataLimit)) }
+func (frame *StreamDataBlockedFrame) shouldBeRetransmitted() bool { return false }
+func (frame *StreamDataBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamId)+VarIntLen(frame.StreamDataLimit)) }
 func NewStreamBlockedFrame(buffer *bytes.Reader) *StreamDataBlockedFrame {
 	frame := new(StreamDataBlockedFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -526,21 +526,21 @@ type StreamsBlockedFrame struct {
 	StreamLimit uint64
 }
 
-func (frame StreamsBlockedFrame) FrameType() FrameType {
+func (frame *StreamsBlockedFrame) FrameType() FrameType {
 	if frame.StreamsType == BidiStreams {
 		return StreamsBlockedType
 	} else {
 		return StreamsBlockedType + 1
 	}
 }
-func (frame StreamsBlockedFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *StreamsBlockedFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.StreamLimit)
 }
-func (frame StreamsBlockedFrame) shouldBeRetransmitted() bool { return false }
-func (frame StreamsBlockedFrame) IsUni() bool                 { return frame.StreamsType == UniStreams }
-func (frame StreamsBlockedFrame) IsBidi() bool                { return frame.StreamsType == BidiStreams }
-func (frame StreamsBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamLimit)) }
+func (frame *StreamsBlockedFrame) shouldBeRetransmitted() bool { return false }
+func (frame *StreamsBlockedFrame) IsUni() bool                 { return frame.StreamsType == UniStreams }
+func (frame *StreamsBlockedFrame) IsBidi() bool                { return frame.StreamsType == BidiStreams }
+func (frame *StreamsBlockedFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.StreamLimit)) }
 func NewStreamIdNeededFrame(buffer *bytes.Reader) *StreamsBlockedFrame {
 	frame := new(StreamsBlockedFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -556,8 +556,8 @@ type NewConnectionIdFrame struct {
 	StatelessResetToken [16]byte
 }
 
-func (frame NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
-func (frame NewConnectionIdFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *NewConnectionIdFrame) FrameType() FrameType { return NewConnectionIdType }
+func (frame *NewConnectionIdFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.Sequence)
 	WriteVarInt(buffer, frame.RetirePriorTo)
@@ -565,8 +565,8 @@ func (frame NewConnectionIdFrame) WriteTo(buffer *bytes.Buffer) {
 	buffer.Write(frame.ConnectionId)
 	binary.Write(buffer, binary.BigEndian, frame.StatelessResetToken)
 }
-func (frame NewConnectionIdFrame) shouldBeRetransmitted() bool { return true }
-func (frame NewConnectionIdFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.Sequence) + VarIntLen(frame.RetirePriorTo)) + 1 + uint16(len(frame.ConnectionId)) + 16 }
+func (frame *NewConnectionIdFrame) shouldBeRetransmitted() bool { return true }
+func (frame *NewConnectionIdFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.Sequence) + VarIntLen(frame.RetirePriorTo)) + 1 + uint16(len(frame.ConnectionId)) + 16 }
 func NewNewConnectionIdFrame(buffer *bytes.Reader) *NewConnectionIdFrame {
 	frame := new(NewConnectionIdFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -583,13 +583,13 @@ type RetireConnectionId struct {
 	SequenceNumber uint64
 }
 
-func (frame RetireConnectionId) FrameType() FrameType { return RetireConnectionIdType }
-func (frame RetireConnectionId) WriteTo(buffer *bytes.Buffer) {
+func (frame *RetireConnectionId) FrameType() FrameType { return RetireConnectionIdType }
+func (frame *RetireConnectionId) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.SequenceNumber)
 }
-func (frame RetireConnectionId) shouldBeRetransmitted() bool { return true }
-func (frame RetireConnectionId) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.SequenceNumber)) }
+func (frame *RetireConnectionId) shouldBeRetransmitted() bool { return true }
+func (frame *RetireConnectionId) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.SequenceNumber)) }
 func ReadRetireConnectionId(buffer *bytes.Reader) *RetireConnectionId {
 	frame := new(RetireConnectionId)
 	buffer.ReadByte() // Discard frame byte
@@ -601,13 +601,13 @@ type PathChallenge struct {
 	Data [8]byte
 }
 
-func (frame PathChallenge) FrameType() FrameType { return PathChallengeType }
-func (frame PathChallenge) WriteTo(buffer *bytes.Buffer) {
+func (frame *PathChallenge) FrameType() FrameType { return PathChallengeType }
+func (frame *PathChallenge) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	buffer.Write(frame.Data[:])
 }
-func (frame PathChallenge) shouldBeRetransmitted() bool { return true }
-func (frame PathChallenge) FrameLength() uint16         { return 1 + 8 }
+func (frame *PathChallenge) shouldBeRetransmitted() bool { return true }
+func (frame *PathChallenge) FrameLength() uint16         { return 1 + 8 }
 func ReadPathChallenge(buffer *bytes.Reader) *PathChallenge {
 	frame := new(PathChallenge)
 	buffer.ReadByte() // Discard frame byte
@@ -619,13 +619,13 @@ type PathResponse struct {
 	Data [8]byte
 }
 
-func (frame PathResponse) FrameType() FrameType { return PathResponseType }
-func (frame PathResponse) WriteTo(buffer *bytes.Buffer) {
+func (frame *PathResponse) FrameType() FrameType { return PathResponseType }
+func (frame *PathResponse) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	buffer.Write(frame.Data[:])
 }
-func (frame PathResponse) shouldBeRetransmitted() bool { return false }
-func (frame PathResponse) FrameLength() uint16         { return 1 + 8 }
+func (frame *PathResponse) shouldBeRetransmitted() bool { return false }
+func (frame *PathResponse) FrameLength() uint16         { return 1 + 8 }
 func ReadPathResponse(buffer *bytes.Reader) *PathResponse {
 	frame := new(PathResponse)
 	buffer.ReadByte() // Discard frame byte
@@ -645,8 +645,8 @@ type ConnectionCloseFrame struct {
 	ReasonPhrase       string
 }
 
-func (frame ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
-func (frame ConnectionCloseFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *ConnectionCloseFrame) FrameType() FrameType { return ConnectionCloseType }
+func (frame *ConnectionCloseFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.ErrorCode)
 	WriteVarInt(buffer, frame.ErrorFrameType)
@@ -655,8 +655,8 @@ func (frame ConnectionCloseFrame) WriteTo(buffer *bytes.Buffer) {
 		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
-func (frame ConnectionCloseFrame) shouldBeRetransmitted() bool { return false }
-func (frame ConnectionCloseFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.ErrorCode)+VarIntLen(frame.ErrorFrameType)+VarIntLen(frame.ReasonPhraseLength)) + uint16(frame.ReasonPhraseLength) }
+func (frame *ConnectionCloseFrame) shouldBeRetransmitted() bool { return false }
+func (frame *ConnectionCloseFrame) FrameLength() uint16         { return 1 + uint16(VarIntLen(frame.ErrorCode)+VarIntLen(frame.ErrorFrameType)+VarIntLen(frame.ReasonPhraseLength)) + uint16(frame.ReasonPhraseLength) }
 func NewConnectionCloseFrame(buffer *bytes.Reader) *ConnectionCloseFrame {
 	frame := new(ConnectionCloseFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -678,8 +678,8 @@ type ApplicationCloseFrame struct {
 	ReasonPhrase       string
 }
 
-func (frame ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
-func (frame ApplicationCloseFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *ApplicationCloseFrame) FrameType() FrameType { return ApplicationCloseType }
+func (frame *ApplicationCloseFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 	WriteVarInt(buffer, frame.ErrorCode)
 	WriteVarInt(buffer, frame.ReasonPhraseLength)
@@ -687,8 +687,8 @@ func (frame ApplicationCloseFrame) WriteTo(buffer *bytes.Buffer) {
 		buffer.Write([]byte(frame.ReasonPhrase))
 	}
 }
-func (frame ApplicationCloseFrame) shouldBeRetransmitted() bool { return false }
-func (frame ApplicationCloseFrame) FrameLength() uint16         { return 1 + 2 + uint16(VarIntLen(frame.ReasonPhraseLength)) + uint16(frame.ReasonPhraseLength) }
+func (frame *ApplicationCloseFrame) shouldBeRetransmitted() bool { return false }
+func (frame *ApplicationCloseFrame) FrameLength() uint16         { return 1 + 2 + uint16(VarIntLen(frame.ReasonPhraseLength)) + uint16(frame.ReasonPhraseLength) }
 func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 	frame := new(ApplicationCloseFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
@@ -704,12 +704,12 @@ func NewApplicationCloseFrame(buffer *bytes.Reader) *ApplicationCloseFrame {
 
 type HandshakeDoneFrame byte
 
-func (frame HandshakeDoneFrame) FrameType() FrameType { return HandshakeDoneType }
-func (frame HandshakeDoneFrame) WriteTo(buffer *bytes.Buffer) {
+func (frame *HandshakeDoneFrame) FrameType() FrameType { return HandshakeDoneType }
+func (frame *HandshakeDoneFrame) WriteTo(buffer *bytes.Buffer) {
 	WriteVarInt(buffer, uint64(frame.FrameType()))
 }
-func (frame HandshakeDoneFrame) shouldBeRetransmitted() bool { return true }
-func (frame HandshakeDoneFrame) FrameLength() uint16         { return 1 }
+func (frame *HandshakeDoneFrame) shouldBeRetransmitted() bool { return true }
+func (frame *HandshakeDoneFrame) FrameLength() uint16         { return 1 }
 func NewHandshakeDoneFrame(buffer *bytes.Reader) *HandshakeDoneFrame {
 	frame := new(HandshakeDoneFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type

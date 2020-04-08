@@ -34,7 +34,7 @@ func (s *ServerFlowControlScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 		Length:   uint64(len(data)), StreamData: data,
 	}
 
-	conn.FrameQueue.Submit(qt.QueuedFrame{f, qt.EncryptionLevelBestAppData})
+	conn.FrameQueue.Submit(qt.QueuedFrame{&f, qt.EncryptionLevelBestAppData})
 
 	trace.ErrorCode = SFC_DidNotClose
 	for {

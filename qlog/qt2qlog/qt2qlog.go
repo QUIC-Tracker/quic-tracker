@@ -155,7 +155,7 @@ func convertFrames(frames []Frame) []interface{} {
 			qf = &qlog.HandshakeDoneFrame{
 				FrameType: "handshake_done",
 			}
-		case PaddingFrame, *PaddingFrame:
+		case *PaddingFrame:
 			continue
 		default:
 			qf = unknownFrameToQLog(ft)

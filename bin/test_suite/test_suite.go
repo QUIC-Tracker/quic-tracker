@@ -25,7 +25,7 @@ func main() {
 	outputFilename := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	logsDirectory := flag.String("logs-directory", "/tmp", "Location of the logs.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcaps. Lets tcpdump decide if not set.")
-	parallel := flag.Bool("parallel", false, "Runs each scenario against multiple hosts at the same time.")
+	parallel := flag.Bool("parallel", false, "Runs as many scenarios, against as many hosts, as specified by maxInstances in parallel")
 	maxInstances := flag.Int("max-instances", 10, "Limits the number of parallel scenario runs.")
 	randomise := flag.Bool("randomise", false, "Randomise the execution order of scenarii")
 	timeout := flag.Int("timeout", 10, "The amount of time in seconds spent when completing a test. Defaults to 10. When set to 0, each test ends as soon as possible.")
@@ -75,22 +75,25 @@ func main() {
 		close(resultsAgg)
 	}()
 
+	if !*parallel {
+		*maxInstances = 1
+	}
+
+	semaphore := make(chan bool, *maxInstances)
+	for i := 0; i < *maxInstances; i++ {
+		semaphore <- true
+	}
+	wg := &sync.WaitGroup{}
+
 	for _, id := range scenarioIds {
 		if *scenarioName != "" && *scenarioName != id {
 			continue
 		}
-		scenario := scenariiInstances[id]
 
-		if !*parallel {
-			*maxInstances = 1
-		}
-		semaphore := make(chan bool, *maxInstances)
-		for i := 0; i < *maxInstances; i++ {
-			semaphore <- true
-		}
-		wg := &sync.WaitGroup{}
+		scenarioId := id
+		scenario := scenariiInstances[scenarioId]
 
-		os.MkdirAll(p.Join(*logsDirectory, id), os.ModePerm)
+		os.MkdirAll(p.Join(*logsDirectory, scenarioId), os.ModePerm)
 
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
@@ -126,7 +129,7 @@ func main() {
 				}
 				outputFile.Close()
 
-				logFile, err := os.Create(p.Join(*logsDirectory, id, host))
+				logFile, err := os.Create(p.Join(*logsDirectory, scenarioId, host))
 				if err != nil {
 					println(err.Error())
 					return
@@ -136,7 +139,7 @@ func main() {
 				crashTrace := GetCrashTrace(scenario, host) // Prepare one just in case
 				start := time.Now()
 
-				args := []string{"run", scenarioRunnerFilename, "-host", host, "-path", path, "-alpn", preferredALPN, "-scenario", id, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
+				args := []string{"run", scenarioRunnerFilename, "-host", host, "-path", path, "-alpn", preferredALPN, "-scenario", scenarioId, "-interface", *netInterface, "-output", outputFile.Name(), "-timeout", strconv.Itoa(*timeout)}
 				if *debug {
 					args = append(args, "-debug")
 				}
@@ -169,9 +172,9 @@ func main() {
 			}()
 		}
 
-		wg.Wait()
 		file.Seek(0, 0)
 	}
+	wg.Wait()
 	close(result)
 	<-resultsAgg
 
@@ -198,11 +201,12 @@ func GetCrashTrace(scenario scenarii.Scenario, host string) *qt.Trace {
 }
 
 type Results []qt.Trace
+
 func (a Results) Less(i, j int) bool {
 	if a[i].Scenario == a[j].Scenario {
 		return a[i].Host < a[j].Host
 	}
 	return a[i].Scenario < a[j].Scenario
 }
-func (a Results) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a Results) Len() int           { return len(a) }
+func (a Results) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a Results) Len() int      { return len(a) }

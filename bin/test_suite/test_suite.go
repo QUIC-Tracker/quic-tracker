@@ -25,7 +25,8 @@ func main() {
 	outputFilename := flag.String("output", "", "The file to write the output to. Output to stdout if not set.")
 	logsDirectory := flag.String("logs-directory", "/tmp", "Location of the logs.")
 	netInterface := flag.String("interface", "", "The interface to listen to when capturing pcaps. Lets tcpdump decide if not set.")
-	parallel := flag.Bool("parallel", false, "Runs as many scenarios, against as many hosts, as specified by maxInstances in parallel")
+	parallel := flag.Bool("parallel", false, "Runs each scenario against multiple hosts at the same time.")
+	parallelScenarios := flag.Bool("parallel-scenarios", false, "Run multiple scenarios against multiple hosts in parallel. Enable this only if all the test servers can support multiple connections")
 	maxInstances := flag.Int("max-instances", 10, "Limits the number of parallel scenario runs.")
 	randomise := flag.Bool("randomise", false, "Randomise the execution order of scenarii")
 	timeout := flag.Int("timeout", 10, "The amount of time in seconds spent when completing a test. Defaults to 10. When set to 0, each test ends as soon as possible.")
@@ -75,7 +76,7 @@ func main() {
 		close(resultsAgg)
 	}()
 
-	if !*parallel {
+	if !*parallel && !*parallelScenarios {
 		*maxInstances = 1
 	}
 
@@ -171,9 +172,12 @@ func main() {
 				result <- &trace
 			}()
 		}
-
+		if !*parallelScenarios {
+			wg.Wait()
+		}
 		file.Seek(0, 0)
 	}
+
 	wg.Wait()
 	close(result)
 	<-resultsAgg

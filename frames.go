@@ -280,7 +280,7 @@ func NewStopSendingFrame(buffer *bytes.Reader) *StopSendingFrame {
 	frame := new(StopSendingFrame)
 	_, _ = ReadVarInt(buffer) // Discard frame type
 	frame.StreamId, _, _ = ReadVarIntValue(buffer)
-	binary.Read(buffer, binary.BigEndian, &frame.ApplicationErrorCode)
+	frame.ApplicationErrorCode, _, _ = ReadVarIntValue(buffer)
 	return frame
 }
 

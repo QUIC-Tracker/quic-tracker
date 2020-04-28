@@ -270,7 +270,6 @@ func NewInitialPacket(conn *Connection) *InitialPacket {
 
 type RetryPacket struct {
 	abstractPacket
-	OriginalDestinationCID ConnectionID
 	RetryToken []byte
 	RetryIntegrityTag [16]byte
 }
@@ -278,18 +277,9 @@ func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
 	h := ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
 	p.header = h
-	if conn.Version < 0xff000019 {
-		OCIDL, _ := buffer.ReadByte()
-		p.OriginalDestinationCID = make([]byte, OCIDL)
-		buffer.Read(p.OriginalDestinationCID)
-		p.RetryToken = make([]byte, buffer.Len())
-	} else {
-		p.RetryToken = make([]byte, buffer.Len() - len(p.RetryIntegrityTag))
-	}
+	p.RetryToken = make([]byte, buffer.Len() - len(p.RetryIntegrityTag))
 	buffer.Read(p.RetryToken)
-	if conn.Version >= 0xff000019 {
-		buffer.Read(p.RetryIntegrityTag[:])
-	}
+	buffer.Read(p.RetryIntegrityTag[:])
 	return p
 }
 func (p *RetryPacket) GetRetransmittableFrames() []Frame { return nil }

@@ -67,8 +67,10 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					close(conn.ConnectionRestart)
 				case *RetryPacket:
-					// TODO: Validate this, https://tools.ietf.org/html/draft-ietf-quic-tls-25#section-5.8
-					if !a.IgnoreRetry && bytes.Equal(conn.DestinationCID, p.OriginalDestinationCID) && !a.receivedRetry {  // TODO: Check the original_connection_id TP too
+					// TODO: Validate this, https://tools.ietf.org/html/draft-ietf-quic-tls-27#section-5.8
+					if !a.IgnoreRetry && !a.receivedRetry {
+						spew.Dump(p)
+						a.Logger.Println("A Retry packet was received, restarting the connection")
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
@@ -120,6 +122,11 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 			case i := <-tlsStatus:
 				s := i.(TLSStatus)
 				if s.Error != nil {
+					if s.Completed && a.receivedRetry && !bytes.Equal(conn.TLSTPHandler.ReceivedParameters.OriginalConnectionId, conn.OriginalDestinationCID){
+						a.Logger.Println("The server include an invalid original_connection_id after sending a Retry")
+						s.Completed = false
+						s.Error = errors.New(fmt.Sprint("invalid original_connection_id"))
+					}
 					a.HandshakeStatus.Submit(HandshakeStatus{s.Completed, s.Packet, s.Error})
 				}
 				tlsCompleted = s.Completed

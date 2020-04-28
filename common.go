@@ -1,6 +1,6 @@
 //
 // QUIC-Tracker is a test suite for QUIC, built upon a minimal client implementation in Go.
-// It is currently draft-13 and TLS-1.3-draft-28 compatible.
+// It is currently draft-27 and TLS-1.3 compatible.
 //
 // The main package is a toolbox to parse and create QUIC packets of all types. More high-level client behaviours are
 // implemented in the package agents. Several test scenarii are implemented in the package scenarii.

@@ -30,7 +30,7 @@ func ConvertPacket(p Packet) *qlog.Packet {
 	}
 	// TODO handle PacketSize computation here
 	switch p.(type) {
-	case *VersionNegotiationPacket, *RetryPacket:
+	case *VersionNegotiationPacket, *RetryPacket, *StatelessResetPacket:
 	default:
 		j.Header.PacketNumber = uint64(p.Header().PacketNumber())
 	}

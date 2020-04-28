@@ -375,3 +375,21 @@ func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	return p
 }
 
+type StatelessResetPacket struct {
+	abstractPacket
+	UnpredictableBits []byte
+	StatelessResetToken [16]byte
+}
+func (*StatelessResetPacket) ShouldBeAcknowledged() bool { return false }
+func (*StatelessResetPacket) PNSpace() PNSpace { return PNSpaceNoSpace }
+func (p *StatelessResetPacket) Pointer() unsafe.Pointer { return unsafe.Pointer(p) }
+func (*StatelessResetPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelNone }
+func ( StatelessResetPacket) EncodePayload() []byte { return nil }
+
+func ReadStatelessResetPacket(buffer *bytes.Reader) *StatelessResetPacket {
+	p := new(StatelessResetPacket)
+	p.UnpredictableBits = make([]byte, buffer.Len() - len(p.StatelessResetToken))
+	buffer.Read(p.UnpredictableBits)
+	buffer.Read(p.StatelessResetToken[:])
+	return p
+}

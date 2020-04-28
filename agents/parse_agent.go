@@ -108,10 +108,18 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						payload := cryptoState.Read.Decrypt(ciphertext[hLen:], uint64(header.PacketNumber()), ciphertext[:hLen])
 						if payload == nil {
 							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
-							break packetSelect
+							statelessResetToken := ciphertext[len(ciphertext)-16:]
+							if bytes.Equal(statelessResetToken, conn.TLSTPHandler.ReceivedParameters.StatelessResetToken) {
+								a.Logger.Println("Received a Stateless Reset packet")
+								cleartext = ciphertext
+								packet = ReadStatelessResetPacket(bytes.NewReader(ciphertext))
+							} else {
+								break packetSelect
+							}
+						} else {
+							cleartext = append(append(cleartext, ic.Payload[off:off+hLen]...), payload...)
+							packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
 						}
-						cleartext = append(append(cleartext, ic.Payload[off:off+hLen]...), payload...)
-						packet = ReadProtectedPacket(bytes.NewReader(cleartext), a.conn)
 						consumed = len(ic.Payload)
 					case Retry:
 						cleartext = ciphertext

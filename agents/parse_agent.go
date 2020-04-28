@@ -43,7 +43,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					}
 
 					header := ReadHeader(bytes.NewReader(ciphertext), a.conn)
-					cryptoState := a.conn.CryptoStates[header.EncryptionLevel()]
+					cryptoState := a.conn.CryptoState(header.EncryptionLevel())
 
 					switch header.PacketType() {
 					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN

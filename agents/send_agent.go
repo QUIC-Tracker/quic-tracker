@@ -50,7 +50,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 	initialSent := false
 
 	fillPacket := func(packet Framer, level EncryptionLevel) Framer {
-		spaceLeft := int(a.MTU) - packet.Header().HeaderLength() - conn.CryptoStates[level].Write.Overhead()
+		spaceLeft := int(a.MTU) - packet.Header().HeaderLength() - conn.CryptoState(level).Write.Overhead()
 
 	addFrame:
 		for i, fp := range a.FrameProducer {
@@ -114,7 +114,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 					} else {
 						initialLength = MinimumInitialLength
 					}
-					initialLength -= conn.CryptoStates[EncryptionLevelInitial].Write.Overhead()
+					initialLength -= conn.CryptoState(EncryptionLevelInitial).Write.Overhead()
 					p.PadTo(initialLength)
 					initialSent = true
 					conn.DoSendPacket(p, EncryptionLevelInitial)
@@ -191,7 +191,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 					} else {
 						initialLength = MinimumInitialLength
 					}
-					initialLength -= conn.CryptoStates[EncryptionLevelInitial].Write.Overhead()
+					initialLength -= conn.CryptoState(EncryptionLevelInitial).Write.Overhead()
 					initial.PadTo(initialLength)
 					initialSent = true
 				}

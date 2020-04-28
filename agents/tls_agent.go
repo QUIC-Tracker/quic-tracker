@@ -83,6 +83,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 							a.TLSStatus.Submit(TLSStatus{false, packet, err})
 						}
 
+						conn.CryptoStateLock.Lock()
 						if conn.CryptoStates[EncryptionLevelHandshake] == nil {
 							conn.CryptoStates[EncryptionLevelHandshake] = new(CryptoState)
 						}
@@ -126,6 +127,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 								conn.EncryptionLevels.Submit(*e)
 							}
 						}
+						conn.CryptoStateLock.Unlock()
 
 						if !resumptionTicketSent && len(conn.Tls.ResumptionTicket()) > 0 {
 							a.ResumptionTicket.Submit(conn.Tls.ResumptionTicket())

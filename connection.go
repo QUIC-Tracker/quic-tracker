@@ -31,6 +31,7 @@ type Connection struct {
 	SpinBit   	   SpinBit
 	LastSpinNumber PacketNumber
 
+	CryptoStateLock sync.Locker
 	CryptoStates   map[EncryptionLevel]*CryptoState
 
 	ReceivedPacketHandler func([]byte, unsafe.Pointer)
@@ -90,10 +91,19 @@ func (c *Connection) nextPacketNumber(space PNSpace) PacketNumber {  // TODO: Th
 	c.PacketNumberLock.Unlock()
 	return pn
 }
+func (c *Connection) CryptoState(level EncryptionLevel) *CryptoState {
+	c.CryptoStateLock.Lock()
+	cs, ok := c.CryptoStates[level]
+	c.CryptoStateLock.Unlock()
+	if ok {
+		return cs
+	}
+	return nil
+}
 func (c *Connection) EncodeAndEncrypt(packet Packet, level EncryptionLevel) []byte {
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
-		cryptoState := c.CryptoStates[level]
+		cryptoState := c.CryptoState(level)
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
@@ -161,7 +171,9 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	if len(c.Tls.ZeroRTTSecret()) > 0 {
 		c.Logger.Printf("0-RTT secret is available, installing crypto state")
+		c.CryptoStateLock.Lock()
 		c.CryptoStates[EncryptionLevel0RTT] = NewProtectedCryptoState(c.Tls, nil, c.Tls.ZeroRTTSecret())
+		c.CryptoStateLock.Unlock()
 		c.EncryptionLevels.Submit(DirectionalEncryptionLevel{EncryptionLevel: EncryptionLevel0RTT, Read: false, Available: true})
 	}
 
@@ -174,7 +186,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	initialPacket := NewInitialPacket(c)
 	initialPacket.Frames = append(initialPacket.Frames, cryptoFrame)
-	initialPacket.PadTo(initialLength - c.CryptoStates[EncryptionLevelInitial].Write.Overhead())
+	initialPacket.PadTo(initialLength - c.CryptoState(EncryptionLevelInitial).Write.Overhead())
 
 	return initialPacket
 }
@@ -250,9 +262,12 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 		c.AckQueue[space] = nil
 	}
 
+	c.CryptoStateLock = &sync.Mutex{}
+	c.CryptoStateLock.Lock()
 	c.CryptoStates = make(map[EncryptionLevel]*CryptoState)
 	c.CryptoStreams = make(map[PNSpace]*Stream)
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
+	c.CryptoStateLock.Unlock()
 	c.Streams = Streams{streams: make(map[uint64]*Stream), lock: &sync.Mutex{}, input: &c.StreamInput}
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint64, reasonPhrase string) {

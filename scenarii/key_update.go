@@ -50,12 +50,14 @@ forLoop1:
 	readSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedReadSecret(), "ku", nil, conn.Tls.HashDigestSize(), pigotls.QuicBaseLabel)
 	writeSecret := conn.Tls.HkdfExpandLabel(conn.Tls.ProtectedWriteSecret(), "ku", nil, conn.Tls.HashDigestSize(), pigotls.QuicBaseLabel)
 
+	conn.CryptoStateLock.Lock()
 	oldState := conn.CryptoStates[qt.EncryptionLevel1RTT]
 
 	conn.CryptoStates[qt.EncryptionLevel1RTT] = qt.NewProtectedCryptoState(conn.Tls, readSecret, writeSecret)
 	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderRead = oldState.HeaderRead
 	conn.CryptoStates[qt.EncryptionLevel1RTT].HeaderWrite = oldState.HeaderWrite
 	conn.KeyPhaseIndex++
+	conn.CryptoStateLock.Unlock()
 
 	responseChan := connAgents.AddHTTPAgent().SendRequest(preferredPath, "GET", trace.Host, nil)
 

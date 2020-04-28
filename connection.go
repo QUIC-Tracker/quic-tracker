@@ -65,6 +65,7 @@ type Connection struct {
 	Token            []byte
 	ResumptionTicket []byte
 
+	PacketNumberLock       sync.Locker
 	PacketNumber           map[PNSpace]PacketNumber // Stores the next PN to be sent
 	LargestPNsReceived     map[PNSpace]PacketNumber // Stores the largest PN received
 	LargestPNsAcknowledged map[PNSpace]PacketNumber // Stores the largest PN we have sent that were acknowledged by the peer
@@ -83,8 +84,10 @@ func (c *Connection) ConnectedIp() net.Addr {
 	return c.UdpConnection.RemoteAddr()
 }
 func (c *Connection) nextPacketNumber(space PNSpace) PacketNumber {  // TODO: This should be thread safe
+	c.PacketNumberLock.Lock()
 	pn := c.PacketNumber[space]
 	c.PacketNumber[space]++
+	c.PacketNumberLock.Unlock()
 	return pn
 }
 func (c *Connection) EncodeAndEncrypt(packet Packet, level EncryptionLevel) []byte {
@@ -237,6 +240,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.Version = version
 	c.ALPN = ALPN
 	c.Tls = pigotls.NewConnection(c.ServerName, c.ALPN, c.ResumptionTicket)
+	c.PacketNumberLock = &sync.Mutex{}
 	c.PacketNumber = make(map[PNSpace]PacketNumber)
 	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)

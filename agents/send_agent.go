@@ -79,7 +79,9 @@ func (a *SendingAgent) Run(conn *Connection) {
 
 		if len(packet.GetFrames()) == 0 {
 			a.Logger.Printf("Preparing a packet for encryption level %s resulted in an empty packet, discarding\n", level.String())
+			conn.PacketNumberLock.Lock()
 			conn.PacketNumber[packet.PNSpace()]-- // Avoids PN skipping
+			conn.PacketNumberLock.Unlock()
 			return nil
 		}
 		return packet

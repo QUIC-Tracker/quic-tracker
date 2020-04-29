@@ -9,7 +9,7 @@ cloudflare-quic.com:443	/index.html	443	h3
 f5quic.com:4433	/t1.html	4433	h3
 test.privateoctopus.com:4433	/	4433	hq
 quicker.edm.uhasselt.be:4433	/index.html	4433	hq
-ralith.com:4433	/index.html	4433	hq
+h3.stammw.eu:443	/index.html	443	hq
 http3-test.litespeedtech.com:4433	/index.html	4433	h3
 quic.tech:4433	/index.html	8443	hq
 quic.aiortc.org:443	/	443	hq

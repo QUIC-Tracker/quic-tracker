@@ -119,7 +119,9 @@ func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	addParameter(InitialMaxStreamsBidi, h.QuicTransportParameters.MaxBidiStreams)
 	addParameter(InitialMaxStreamsUni, h.QuicTransportParameters.MaxUniStreams)
 	addParameter(IdleTimeout, h.QuicTransportParameters.IdleTimeout)
-	addParameter(ActiveConnectionIdLimit, h.QuicTransportParameters.ActiveConnectionIdLimit)
+	if h.QuicTransportParameters.ActiveConnectionIdLimit > 1 {
+		addParameter(ActiveConnectionIdLimit, h.QuicTransportParameters.ActiveConnectionIdLimit)
+	}
 	if h.QuicTransportParameters.MaxPacketSize > 0 {
 		addParameter(MaxPacketSize, h.QuicTransportParameters.MaxPacketSize)
 	}

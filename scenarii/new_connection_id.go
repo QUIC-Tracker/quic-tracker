@@ -34,7 +34,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 	}
 	defer connAgents.CloseConnection(false, 0, "")
 
-	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit == 0 {
+	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit < 2 {
 		trace.ErrorCode = NCI_NoCIDAllowed
 		return
 	}

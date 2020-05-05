@@ -23,7 +23,6 @@ func NewConnectionMigrationScenario() *ConnectionMigrationScenario {
 	return &ConnectionMigrationScenario{AbstractScenario{name: "connection_migration", version: 1}}
 }
 func (s *ConnectionMigrationScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
-	conn.TLSTPHandler.ActiveConnectionIdLimit = 1
 	connAgents := s.CompleteHandshake(conn, trace, CM_TLSHandshakeFailed)
 	if connAgents == nil {
 		return

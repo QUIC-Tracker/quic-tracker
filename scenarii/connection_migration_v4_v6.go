@@ -41,7 +41,7 @@ func (s *ConnectionMigrationv4v6Scenario) Run(conn *qt.Connection, trace *qt.Tra
 		return
 	}
 
-	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit == 0 {
+	if conn.TLSTPHandler.ReceivedParameters.ActiveConnectionIdLimit < 0 {
 		trace.ErrorCode = CM46_NoCIDAllowed
 		return
 	}

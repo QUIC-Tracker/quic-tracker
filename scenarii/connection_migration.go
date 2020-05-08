@@ -1,6 +1,7 @@
 package scenarii
 
 import (
+	"bytes"
 	qt "github.com/QUIC-Tracker/quic-tracker"
 	"math/rand"
 
@@ -60,8 +61,6 @@ wait:
 	}
 
 	connAgents.Stop("SocketAgent", "SendingAgent")
-	conn.DestinationCID = ncid
-	conn.SourceCID = scid
 
 	newUdpConn, err := qt.EstablishUDPConnection(conn.Host)
 	if err != nil {
@@ -87,6 +86,10 @@ wait:
 			p := i.(qt.Packet)
 			if trace.ErrorCode == CM_HostDidNotMigrate {
 				trace.ErrorCode = CM_HostDidNotValidateNewPath
+				if bytes.Equal(p.Header().DestinationConnectionID(), scid) && ncid != nil {
+					conn.SourceCID = scid
+					conn.DestinationCID = ncid
+				}
 			}
 
 			if fp, ok := p.(qt.Framer); ok && fp.Contains(qt.PathChallengeType) {

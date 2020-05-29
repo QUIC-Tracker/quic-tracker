@@ -29,7 +29,7 @@ func (a *SocketAgent) Run(conn *Connection) {
 
 	go func() {
 		for {
-			recBuf := make([]byte, MaxUDPPayloadSize)
+			recBuf := make([]byte, MaxTheoreticUDPPayloadSize)
 			oob := make([]byte, 128) // Find a reasonable upper-bound
 			i, oobn, _, addr, err := conn.UdpConnection.ReadMsgUDP(recBuf, oob)
 

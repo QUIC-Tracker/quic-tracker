@@ -32,6 +32,7 @@ type HandshakeAgent struct {
 	DontDropKeys     bool
 	sendInitial		 chan bool
 	receivedRetry    bool
+	retrySource      ConnectionID
 }
 
 func (a *HandshakeAgent) Run(conn *Connection) {
@@ -72,6 +73,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						a.Logger.Println("A Retry packet was received, restarting the connection")
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
+						a.retrySource = p.Header().(*LongHeader).SourceCID
 						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
 						conn.TransitionTo(QuicVersion, alpn)
 						conn.TLSTPHandler = tlsTP
@@ -121,10 +123,24 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 			case i := <-tlsStatus:
 				s := i.(TLSStatus)
 				if s.Error != nil {
-					if s.Completed && a.receivedRetry && !bytes.Equal(conn.TLSTPHandler.ReceivedParameters.OriginalConnectionId, conn.OriginalDestinationCID){
-						a.Logger.Println("The server include an invalid original_connection_id after sending a Retry")
-						s.Completed = false
-						s.Error = errors.New(fmt.Sprint("invalid original_connection_id"))
+					if s.Completed {
+						if !bytes.Equal(conn.TLSTPHandler.ReceivedParameters.OriginalDestinationConnectionId, conn.OriginalDestinationCID) {
+							a.Logger.Println("The server included an invalid original_destination_connection_id")
+							s.Completed = false
+							s.Error = errors.New(fmt.Sprint("invalid original_destination_connection_id"))
+						} else if a.receivedRetry {
+							if !bytes.Equal(conn.TLSTPHandler.ReceivedParameters.RetrySourceConnectionId, a.retrySource) {
+								a.Logger.Println("The server include an invalid retry_source_connection_id after sending a Retry")
+								s.Completed = false
+								s.Error = errors.New(fmt.Sprint("invalid retry_source_connection_id"))
+							}
+						} else {
+							if conn.TLSTPHandler.ReceivedParameters.RetrySourceConnectionId != nil {
+								a.Logger.Println("The server included a retry_source_connection_id but did not send a Retry")
+								s.Completed = false
+								s.Error = errors.New(fmt.Sprint("invalid retry_source_connection_id"))
+							}
+						}
 					}
 					a.HandshakeStatus.Submit(HandshakeStatus{s.Completed, s.Packet, s.Error})
 				}

@@ -17,6 +17,7 @@ func NewZeroLengthCID() *ZeroLengthCID {
 
 func (s *ZeroLengthCID) Run(conn *qt.Connection, trace *qt.Trace, preferredPath string, debug bool) {
 	conn.SourceCID = nil
+	conn.TLSTPHandler.InitialSourceConnectionId = nil
 	connAgents := s.CompleteHandshake(conn, trace, ZLCID_TLSHandshakeFailed)
 	if connAgents == nil {
 		return

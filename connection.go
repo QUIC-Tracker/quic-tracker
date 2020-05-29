@@ -248,7 +248,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	return frame
 }
 func (c *Connection) TransitionTo(version uint32, ALPN string) {
-	c.TLSTPHandler = NewTLSTransportParameterHandler()
+	c.TLSTPHandler = NewTLSTransportParameterHandler(c.SourceCID)
 	c.Version = version
 	c.ALPN = ALPN
 	c.Tls = pigotls.NewConnection(c.ServerName, c.ALPN, c.ResumptionTicket)

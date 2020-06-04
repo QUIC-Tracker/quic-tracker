@@ -31,6 +31,8 @@ func (s *AddressValidationScenario) Run(conn *qt.Connection, trace *qt.Trace, pr
 	socketAgent := connAgents.Get("SocketAgent").(*agents.SocketAgent)
 	tlsAgent := connAgents.Get("TLSAgent").(*agents.TLSAgent)
 	tlsAgent.DisableFrameSending = true
+	fcAgent := connAgents.Get("FlowControlAgent").(*agents.FlowControlAgent)
+	fcAgent.DontSlideCreditWindow = true
 
 	handshakeAgent := &agents.HandshakeAgent{TLSAgent: tlsAgent, SocketAgent: connAgents.Get("SocketAgent").(*agents.SocketAgent)}
 	handshakeAgent.IgnoreRetry = true

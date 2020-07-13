@@ -161,6 +161,12 @@ var PNSpaceToEpoch = map[PNSpace]pigotls.Epoch{
 	PNSpaceAppData: pigotls.Epoch1RTT,
 }
 
+var PacketTypeToPNSpace = map[PacketType]PNSpace {
+	Initial: PNSpaceInitial,
+	Handshake: PNSpaceHandshake,
+	ShortHeaderPacket: PNSpaceAppData, // TODO: Deal with O-RTT packets
+}
+
 var PNSpaceToPacketType = map[PNSpace]PacketType{
 	PNSpaceInitial: Initial,
 	PNSpaceHandshake: Handshake,
@@ -278,4 +284,9 @@ type PacketAcknowledged struct {
 type PacketToSend struct {
 	Packet
 	EncryptionLevel
+}
+
+type PacketRequest struct {
+	Header
+	Frame
 }

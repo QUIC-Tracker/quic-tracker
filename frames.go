@@ -16,20 +16,7 @@ type Frame interface {
 	FrameLength() uint16
 }
 
-func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
-	typeValue, length,  err := ReadVarIntValue(buffer)
-	if err == io.EOF {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	for i := 0; i < length; i++ {
-		err := buffer.UnreadByte()
-		if err != nil {
-			return nil, err
-		}
-	}
-	frameType := FrameType(typeValue)
+func NewFrameFromType(frameType FrameType, buffer *bytes.Reader, conn *Connection) (Frame, error) {
 	switch {
 	case frameType == PaddingFrameType:
 		return Frame(NewPaddingFrame(buffer)), nil
@@ -76,8 +63,25 @@ func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
 	case frameType == HandshakeDoneType:
 		return Frame(NewHandshakeDoneFrame(buffer)), nil
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown frame type %d", typeValue))
+		return nil, errors.New(fmt.Sprintf("Unknown frame type %d", frameType))
 	}
+}
+
+func NewFrame(buffer *bytes.Reader, conn *Connection) (Frame, error) {
+	typeValue, length,  err := ReadVarIntValue(buffer)
+	if err == io.EOF {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	for i := 0; i < length; i++ {
+		err := buffer.UnreadByte()
+		if err != nil {
+			return nil, err
+		}
+	}
+	frameType := FrameType(typeValue)
+	return NewFrameFromType(frameType, buffer, conn)
 }
 
 type FrameType uint64
@@ -106,6 +110,64 @@ const (
 	ApplicationCloseType             = 0x1d
 	HandshakeDoneType				 = 0x1e
 )
+
+var frameTypeToString = map[FrameType]string {
+	PaddingFrameType:          "PADDING",
+	PingType:                  "PING",
+	AckType:                   "ACK",
+	AckECNType:                "ACK_ECN",
+	ResetStreamType:           "RESET_STREAM",
+	StopSendingType:           "STOP_SENDING",
+	CryptoType:                "CRYPTO",
+	NewTokenType:              "NEW_TOKEN",
+	StreamType:                "STREAM",
+	MaxDataType:               "MAX_DATA",
+	MaxStreamDataType:         "MAX_STREAM_DATA",
+	MaxStreamsType:            "MAX_STREAMS",
+	DataBlockedType:           "DATA_BLOCKED",
+	StreamDataBlockedType:     "STREAM_DATA_BLOCKED",
+	StreamsBlockedType:        "STREAMS_BLOCKED",
+	NewConnectionIdType:       "NEW_CONNECTION_ID",
+	RetireConnectionIdType:    "RETIRE_CONNECTION_ID",
+	PathChallengeType:         "PATH_CHALLENGE",
+	PathResponseType:          "PATH_RESPONSE",
+	ConnectionCloseType:       "CONNECTION_CLOSE",
+	ApplicationCloseType:      "APPLICATION_CLOSE",
+	HandshakeDoneType:         "HANDSHAKE_DONE",
+}
+
+func (t FrameType) String() string {
+	return frameTypeToString[t]
+}
+
+var stringToFrameType = map[string]FrameType {
+	"PADDING":                PaddingFrameType,
+	"PING":                   PingType,
+	"ACK":                    AckType,
+	"ACK_ECN":                AckECNType,
+	"RESET_STREAM":           ResetStreamType,
+	"STOP_SENDING":           StopSendingType,
+	"CRYPTO":                 CryptoType,
+	"NEW_TOKEN":              NewTokenType,
+	"STREAM":                 StreamType,
+	"MAX_DATA":               MaxDataType,
+	"MAX_STREAM_DATA":        MaxStreamDataType,
+	"MAX_STREAMS":            MaxStreamsType,
+	"DATA_BLOCKED":           DataBlockedType,
+	"STREAM_DATA_BLOCKED":    StreamDataBlockedType,
+	"STREAMS_BLOCKED":        StreamsBlockedType,
+	"NEW_CONNECTION_ID":      NewConnectionIdType,
+	"RETIRE_CONNECTION_ID":   RetireConnectionIdType,
+	"PATH_CHALLENGE":         PathChallengeType,
+	"PATH_RESPONSE":          PathResponseType,
+	"CONNECTION_CLOSE":       ConnectionCloseType,
+	"APPLICATION_CLOSE":      ApplicationCloseType,
+	"HANDSHAKE_DONE":         HandshakeDoneType,
+}
+
+func FrameTypeFromString(input string) FrameType {
+	return stringToFrameType[input]
+}
 
 type PaddingFrame byte
 

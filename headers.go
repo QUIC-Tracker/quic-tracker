@@ -93,7 +93,7 @@ func (h *LongHeader) PacketType() PacketType { return h.packetType }
 func (h *LongHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *LongHeader) PacketNumber() PacketNumber { return h.packetNumber }
 func (h *LongHeader) TruncatedPN() TruncatedPN { return h.truncatedPN }
-func (h *LongHeader) EncryptionLevel() EncryptionLevel { return packetTypeToEncryptionLevel[h.PacketType()] }
+func (h *LongHeader) EncryptionLevel() EncryptionLevel { return PacketTypeToEncryptionLevel[h.PacketType()] }
 func (h *LongHeader) HeaderLength() int {
 	length := 7 + len(h.DestinationCID) + len(h.SourceCID) + h.Length.Length + h.truncatedPN.Length
 	if h.packetType == Initial {
@@ -177,7 +177,7 @@ func (h *ShortHeader) PacketType() PacketType                { return ShortHeade
 func (h *ShortHeader) DestinationConnectionID() ConnectionID { return h.DestinationCID }
 func (h *ShortHeader) PacketNumber() PacketNumber            { return h.packetNumber }
 func (h *ShortHeader) TruncatedPN() TruncatedPN              { return h.truncatedPN }
-func (h *ShortHeader) EncryptionLevel() EncryptionLevel      { return packetTypeToEncryptionLevel[h.PacketType()] }
+func (h *ShortHeader) EncryptionLevel() EncryptionLevel      { return PacketTypeToEncryptionLevel[h.PacketType()] }
 func (h *ShortHeader) HeaderLength() int                     { return 1 + len(h.DestinationCID) + h.truncatedPN.Length }
 func ReadShortHeader(buffer *bytes.Reader, conn *Connection) *ShortHeader {
 	h := new(ShortHeader)

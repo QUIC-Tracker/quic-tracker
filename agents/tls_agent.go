@@ -16,15 +16,17 @@ type TLSStatus struct {
 // DisableFrameSending. The TLSAgent will broadcast when new encryption or decryption levels are available.
 type TLSAgent struct {
 	BaseAgent
-	TLSStatus  Broadcaster //type: TLSStatus
-	ResumptionTicket Broadcaster //type: []byte
-	DisableFrameSending bool
+	TLSStatus             Broadcaster //type: TLSStatus
+	ResumptionTicket      Broadcaster //type: []byte
+	SendFromQueue		  chan EncryptionLevel
+	DisableFrameSending   bool
 }
 
 func (a *TLSAgent) Run(conn *Connection) {
 	a.Init("TLSAgent", conn.OriginalDestinationCID)
 	a.TLSStatus = NewBroadcaster(10)
 	a.ResumptionTicket = NewBroadcaster(10)
+	a.SendFromQueue = make(chan EncryptionLevel, 100)
 
 	encryptionLevels := []*DirectionalEncryptionLevel{
 		{EncryptionLevel: EncryptionLevelHandshake},
@@ -105,6 +107,13 @@ func (a *TLSAgent) Run(conn *Connection) {
 							}
 						}
 
+						if len(tlsOutput) > 0 && a.DisableFrameSending {
+							for _, m := range tlsOutput {
+								encLevel := EpochToEncryptionLevel[m.Epoch]
+								conn.TlsQueue[encLevel] = append(conn.TlsQueue[encLevel], QueuedFrame{NewCryptoFrame(conn.CryptoStreams.Get(EpochToPNSpace[m.Epoch]), m.Data), encLevel})
+							}
+						}
+
 						if !notCompleted && conn.CryptoStates[EncryptionLevel1RTT] == nil {
 							a.Logger.Printf("Handshake has completed, installing protected crypto {read=%s, write=%s}\n", hex.EncodeToString(conn.Tls.ProtectedReadSecret()), hex.EncodeToString(conn.Tls.ProtectedWriteSecret()))
 							conn.CryptoStates[EncryptionLevel1RTT] = NewProtectedCryptoState(conn.Tls, conn.Tls.ProtectedReadSecret(), conn.Tls.ProtectedWriteSecret())
@@ -136,6 +145,19 @@ func (a *TLSAgent) Run(conn *Connection) {
 				default:
 					// The packet does not impact the TLS agent
 				}
+			case encLevel := <-a.SendFromQueue:
+				if len(conn.TlsQueue[encLevel]) > 0 {
+					queuedFrame := conn.TlsQueue[encLevel][0]
+					conn.FrameQueue.Submit(queuedFrame)
+					conn.TlsQueue[encLevel] = conn.TlsQueue[encLevel][1:]
+				} else {
+					a.Logger.Printf("INFO: TLS Queue empty, sending new CHELLO at %v enc level", encLevel.String())
+					conn.FrameQueue.Submit(QueuedFrame{
+						Frame:           conn.GetInitialCryptoFrame(),
+						EncryptionLevel: encLevel,
+					})
+				}
+
 			case <-a.close:
 				return
 			}

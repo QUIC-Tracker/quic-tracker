@@ -25,14 +25,15 @@ func (s HandshakeStatus) String() string {
 // should only be published once, reporting a failure or a success.
 type HandshakeAgent struct {
 	BaseAgent
-	TLSAgent         *TLSAgent
-	SocketAgent      *SocketAgent
-	HandshakeStatus  Broadcaster //type: HandshakeStatus
-	IgnoreRetry 	 bool
-	DontDropKeys     bool
-	sendInitial		 chan bool
-	receivedRetry    bool
-	retrySource      ConnectionID
+	TLSAgent              *TLSAgent
+	SocketAgent           *SocketAgent
+	HandshakeStatus       Broadcaster //type: HandshakeStatus
+	IgnoreRetry 	      bool
+	DontDropKeys          bool
+	sendInitial		      chan bool
+	receivedRetry         bool
+	retrySource           ConnectionID
+	DisableFrameSending   bool
 }
 
 func (a *HandshakeAgent) Run(conn *Connection) {
@@ -114,6 +115,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						cf := f.(*CryptoFrame)
 						if cf.CryptoData[0] == 0x14 { // TLS Finished
 							a.HandshakeStatus.Submit(HandshakeStatus{true, tlsPacket, nil})
+							// TODO: Should we still unregister after the handshake is complete
+							// since we may provoke it again?
 							conn.IncomingPackets.Unregister(incPackets)
 							conn.OutgoingPackets.Unregister(outPackets)
 							return
@@ -152,7 +155,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					return
 				}
 			case <-pingTimer.C:
-				if firstInitialReceived {
+				// FIXME: I don't actually understand the purpose of this timer.
+				if firstInitialReceived && !a.DisableFrameSending {
 					conn.PreparePacket.Submit(EncryptionLevelBest)
 				}
 			case <-conn.ConnectionRestarted:
@@ -161,7 +165,14 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				tlsStatus = a.TLSAgent.TLSStatus.RegisterNewChan(10)
 				socketStatus = a.SocketAgent.SocketStatus.RegisterNewChan(10)
 				conn.ConnectionRestarted = make(chan bool, 1)
-				conn.SendPacket.Submit(PacketToSend{Packet: conn.GetInitialPacket(), EncryptionLevel: EncryptionLevelInitial})
+				if a.DisableFrameSending {
+					conn.TlsQueue[EncryptionLevelInitial] = append(conn.TlsQueue[EncryptionLevelInitial], QueuedFrame{
+						Frame:           conn.GetInitialCryptoFrame(),
+						EncryptionLevel: EncryptionLevelInitial,
+					})
+				} else {
+					conn.SendPacket.Submit(PacketToSend{Packet: conn.GetInitialPacket(), EncryptionLevel: EncryptionLevelInitial})
+				}
 			case <-a.close:
 				return
 			}

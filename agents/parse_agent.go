@@ -32,10 +32,15 @@ func (a *ParsingAgent) Run(conn *Connection) {
 				for off < len(ic.Payload) {
 					ciphertext := ic.Payload[off:]
 
+					// Check most significant bit of first byte. If it's set, i.e byte & 0x80 == 0x80, it's a QUIC
+					// long header, otherwise it's a short header.
+					// The 4 following bytes indicate the QUIC Version. If these are 0x00000000, we're dealing
+					// with a Version Negotiation packet.
 					if ciphertext[0] & 0x80 == 0x80 && bytes.Equal(ciphertext[1:5], []byte{0, 0, 0, 0}) {
 						ctx := ic.PacketContext
 						ctx.PacketSize = uint16(len(ciphertext))
 						packet := ReadVersionNegotationPacket(bytes.NewReader(ciphertext))
+						a.Logger.Printf("Received Version Negotiation Packet with versions %v", packet.SupportedVersions)
 						packet.SetReceiveContext(ctx)
 						a.SaveCleartextPacket(ciphertext, packet.Pointer())
 						a.conn.IncomingPackets.Submit(packet)

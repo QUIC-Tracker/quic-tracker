@@ -76,6 +76,7 @@ type Connection struct {
 	RTTVar             uint64
 
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
+	TlsQueue             map[EncryptionLevel][]QueuedFrame // Stores TLS QueuedFrames that are to be sent when requested.
 	Logger               *log.Logger
 	QLog 				 qlog.QLog
 	QLogTrace			 *qlog.Trace
@@ -142,6 +143,11 @@ func (c *Connection) PacketWasSent(packet Packet) {
 func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
+		if c.CryptoState(level) == nil {
+			c.Logger.Printf("Unable to send packet {type=%s, number=%d} with EL %v yet.\n", packet.Header().PacketType().String(), packet.Header().PacketNumber(), level.String())
+			return
+		}
+
 		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
 
 		packetBytes := c.EncodeAndEncrypt(packet, level)
@@ -153,7 +159,8 @@ func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 		// Clients do not send cleartext packets
 	}
 }
-func (c *Connection) GetInitialPacket() *InitialPacket {
+
+func (c *Connection) GetInitialCryptoFrame() *CryptoFrame {
 	extensionData, err := c.TLSTPHandler.GetExtensionData()
 	if err != nil {
 		println(err)
@@ -177,6 +184,15 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 		c.EncryptionLevels.Submit(DirectionalEncryptionLevel{EncryptionLevel: EncryptionLevel0RTT, Read: false, Available: true})
 	}
 
+	return cryptoFrame
+}
+
+func (c *Connection) GetInitialPacket() *InitialPacket {
+	cryptoFrame := c.GetInitialCryptoFrame()
+	if cryptoFrame == nil {
+		return nil
+	}
+
 	var initialLength int
 	if c.UseIPv6 {
 		initialLength = MinimumInitialLengthv6
@@ -190,6 +206,7 @@ func (c *Connection) GetInitialPacket() *InitialPacket {
 
 	return initialPacket
 }
+
 func (c *Connection) ProcessVersionNegotation(vn *VersionNegotiationPacket) error {
 	var version uint32
 	for _, v := range vn.SupportedVersions {
@@ -257,6 +274,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.LargestPNsReceived = make(map[PNSpace]PacketNumber)
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
 	c.AckQueue = make(map[PNSpace][]PacketNumber)
+	c.TlsQueue = make(map[EncryptionLevel][]QueuedFrame)
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0
 		c.AckQueue[space] = nil

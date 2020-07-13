@@ -11,12 +11,14 @@ type AckAgent struct {
 	FrameProducingAgent
 	DisableAcks         map[PNSpace]bool
 	TotalDataAcked      map[PNSpace]uint64
+	SendFromQueue		chan PNSpace
 	DisablePathResponse bool
 }
 
 func (a *AckAgent) Run(conn *Connection) {
 	a.BaseAgent.Init("AckAgent", conn.OriginalDestinationCID)
 	a.FrameProducingAgent.InitFPA(conn)
+	a.SendFromQueue = make(chan PNSpace, 100)
 	if a.DisableAcks == nil {
 		a.DisableAcks = make(map[PNSpace]bool)
 	}
@@ -79,6 +81,16 @@ func (a *AckAgent) Run(conn *Connection) {
 				} else {
 					a.frames <- nil
 				}
+			case pnSpace := <-a.SendFromQueue:
+				ackFrame := conn.GetAckFrame(pnSpace);
+				if ackFrame == nil {
+					a.Logger.Printf("INFO: ACK Queue empty, sending new ACK at %v PN Space", pnSpace.String())
+					ackFrame = new(AckFrame)
+				}
+				conn.FrameQueue.Submit(QueuedFrame{
+					Frame:           ackFrame,
+					EncryptionLevel: PNSpaceToEncryptionLevel[pnSpace],
+				})
 			case <-a.close:
 				return
 			}

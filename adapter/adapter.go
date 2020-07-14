@@ -66,7 +66,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 
 func (a *Adapter) Run() {
 	go a.server.Listen()
-	fmt.Print("Server now listening.")
+	fmt.Println("Server now listening.")
 	incomingSymbolChannel := a.incomingLearnerSymbols.RegisterNewChan(1000)
 	outgoingSulPacketChannel := a.connection.IncomingPackets.RegisterNewChan(1000)
 

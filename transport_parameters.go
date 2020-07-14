@@ -82,7 +82,7 @@ type TLSTransportParameterHandler struct {
 }
 
 func NewTLSTransportParameterHandler(scid ConnectionID) *TLSTransportParameterHandler {
-	return &TLSTransportParameterHandler{QuicTransportParameters: QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 3, IdleTimeout: 100000, AckDelayExponent: 3, ActiveConnectionIdLimit: 4, InitialSourceConnectionId: scid}}
+	return &TLSTransportParameterHandler{QuicTransportParameters: QuicTransportParameters{MaxStreamDataBidiLocal: 16 * 1024, MaxStreamDataUni: 16 * 1024, MaxData: 32 * 1024, MaxBidiStreams: 1, MaxUniStreams: 3, IdleTimeout: 600, AckDelayExponent: 3, ActiveConnectionIdLimit: 4, InitialSourceConnectionId: scid}}
 }
 func (h *TLSTransportParameterHandler) GetExtensionData() ([]byte, error) {
 	var parameters []TransportParameter

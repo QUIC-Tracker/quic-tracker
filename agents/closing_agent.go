@@ -9,10 +9,12 @@ import (
 // It can queue an (CONNECTION|APPLICATION)_CLOSE frame and wait for it to be sent out.
 type ClosingAgent struct {
 	BaseAgent
-	closing      bool
-	conn         *Connection
-	IdleDuration time.Duration
-	IdleTimeout  *time.Timer
+	closing             bool
+	conn                *Connection
+	IdleDuration        time.Duration
+	IdleTimeout         *time.Timer
+	WaitForFirstPacket  bool
+	receivedFirstPacket bool
 }
 
 func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and AC
@@ -31,6 +33,7 @@ func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and
 		for {
 			select {
 			case <-incomingPackets:
+				a.receivedFirstPacket = true
 				a.IdleTimeout.Reset(a.IdleDuration)
 			case i := <-outgoingPackets:
 				switch p := i.(type) {
@@ -44,10 +47,12 @@ func (a *ClosingAgent) Run(conn *Connection) {  // TODO: Observe incoming CC and
 					a.IdleTimeout.Reset(a.IdleDuration)
 				}
 			case <-a.IdleTimeout.C:
-				a.closing = true
-				a.Logger.Printf("Idle timeout of %v reached, closing\n", a.IdleDuration.String())
-				close(a.conn.ConnectionClosed)
-				return
+				if !a.WaitForFirstPacket || a.receivedFirstPacket {
+					a.closing = true
+					a.Logger.Printf("Idle timeout of %v reached, closing\n", a.IdleDuration.String())
+					close(a.conn.ConnectionClosed)
+					return
+				}
 			case shouldRestart := <-a.close:
 				if !shouldRestart {
 					close(a.conn.ConnectionClosed)

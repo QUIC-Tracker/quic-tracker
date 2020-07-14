@@ -3,8 +3,8 @@ package adapter
 import (
 	"encoding/json"
 	"fmt"
-	qt "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/agents"
+	qt "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/agents"
 	tcp "github.com/tiferrei/tcp_server"
 	"os"
 	"strings"
@@ -42,6 +42,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 	adapter.trace.Ip = ip[:strings.LastIndex(ip, ":")]
 
 	adapter.agents = agents.AttachAgentsToConnection(adapter.connection, agents.GetDefaultAgents()...)
+	adapter.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
 	adapter.agents.Stop("RecoveryAgent")
 	adapter.agents.Add(&agents.HandshakeAgent{
 		TLSAgent: adapter.agents.Get("TLSAgent").(*agents.TLSAgent),
@@ -68,6 +69,7 @@ func (a *Adapter) Run() {
 	fmt.Print("Server now listening.")
 	incomingSymbolChannel := a.incomingLearnerSymbols.RegisterNewChan(1000)
 	outgoingSulPacketChannel := a.connection.IncomingPackets.RegisterNewChan(1000)
+
 	for {
 		select {
 		case i := <-incomingSymbolChannel:
@@ -118,6 +120,8 @@ func (a *Adapter) Run() {
 				frameTypes))
 		case <-a.stop:
 			return
+		default:
+			// Got nothing this time...
 		}
 	}
 }

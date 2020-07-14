@@ -2,7 +2,7 @@ package agents
 
 import (
 	"bytes"
-	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/tiferrei/quic-tracker"
 	"unsafe"
 )
 

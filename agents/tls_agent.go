@@ -2,7 +2,7 @@ package agents
 
 import (
 	"encoding/hex"
-	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/tiferrei/quic-tracker"
 )
 
 type TLSStatus struct {

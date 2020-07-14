@@ -1,8 +1,8 @@
 A test suite for QUIC
 =====================
 
-.. image:: https://godoc.org/github.com/QUIC-Tracker/quic-tracker?status.svg
-    :target: https://godoc.org/github.com/QUIC-Tracker/quic-tracker
+.. image:: https://godoc.org/github.com/tiferrei/quic-tracker?status.svg
+    :target: https://godoc.org/github.com/tiferrei/quic-tracker
     :alt: Documentation status
 
 
@@ -15,12 +15,12 @@ exchanged, as well as a pcap file and exporter secrets.
 Installation
 ------------
 
-You should have Go 1.9, tcpdump, libpcap libraries and headers as well as 
+You should have Go 1.9, tcpdump, libpcap libraries and headers as well as
 openssl headers installed before starting.
 
 ::
 
-    go get -u github.com/QUIC-Tracker/quic-tracker  # This will fail because of the missing dependencies that should be build using the 4 lines below
+    go get -u github.com/tiferrei/quic-tracker  # This will fail because of the missing dependencies that should be build using the 4 lines below
     cd $GOPATH/src/github.com/mpiraux/pigotls
     make
     cd $GOPATH/src/github.com/mpiraux/ls-qpack-go

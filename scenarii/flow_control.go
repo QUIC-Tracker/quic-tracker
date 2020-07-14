@@ -1,8 +1,8 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/agents"
+	qt "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/agents"
 	"strings"
 )
 

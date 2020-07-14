@@ -1,9 +1,9 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/agents"
-	"github.com/QUIC-Tracker/quic-tracker/http3"
+	qt "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/agents"
+	"github.com/tiferrei/quic-tracker/http3"
 	"github.com/mpiraux/ls-qpack-go"
 	"time"
 )

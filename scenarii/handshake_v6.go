@@ -1,7 +1,7 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
+	qt "github.com/tiferrei/quic-tracker"
 )
 
 type Handshakev6Scenario struct {

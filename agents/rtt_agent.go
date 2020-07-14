@@ -1,8 +1,8 @@
 package agents
 
 import (
-	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/qlog"
+	. "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/qlog"
 	"time"
 	"math"
 )

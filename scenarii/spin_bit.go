@@ -1,7 +1,7 @@
 package scenarii
 
 import (
-	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/tiferrei/quic-tracker"
 )
 
 const (

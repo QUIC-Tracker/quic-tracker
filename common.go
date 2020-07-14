@@ -34,7 +34,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	. "github.com/QUIC-Tracker/quic-tracker/lib"
+	. "github.com/tiferrei/quic-tracker/lib"
 	_ "github.com/mpiraux/ls-qpack-go"
 	"github.com/mpiraux/pigotls"
 	"io"

@@ -2,8 +2,8 @@ package agents
 
 import (
 	"errors"
-	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/compat"
+	. "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/compat"
 	"syscall"
 	"time"
 	"unsafe"

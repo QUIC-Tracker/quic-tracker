@@ -2,7 +2,7 @@ package scenarii
 
 import (
 	"fmt"
-	qt "github.com/QUIC-Tracker/quic-tracker"
+	qt "github.com/tiferrei/quic-tracker"
 	_ "github.com/davecgh/go-spew/spew"
 )
 

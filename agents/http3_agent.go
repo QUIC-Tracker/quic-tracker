@@ -2,8 +2,8 @@ package agents
 
 import (
 	"bytes"
-	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/http3"
+	. "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/http3"
 	"math"
 )
 

@@ -2,7 +2,7 @@ package agents
 
 import (
 	"container/heap"
-	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/tiferrei/quic-tracker"
 )
 
 var FramePriority = map[FrameType]int{

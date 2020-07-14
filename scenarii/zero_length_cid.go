@@ -1,6 +1,6 @@
 package scenarii
 
-import qt "github.com/QUIC-Tracker/quic-tracker"
+import qt "github.com/tiferrei/quic-tracker"
 
 const (
 	ZLCID_TLSHandshakeFailed = 1

@@ -3,8 +3,8 @@ package http3
 import (
 	"bytes"
 	"fmt"
-	. "github.com/QUIC-Tracker/quic-tracker"
-	"github.com/QUIC-Tracker/quic-tracker/lib"
+	. "github.com/tiferrei/quic-tracker"
+	"github.com/tiferrei/quic-tracker/lib"
 	"io"
 )
 

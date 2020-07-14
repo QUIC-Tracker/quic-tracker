@@ -10,7 +10,7 @@ package agents
 import (
 	"encoding/hex"
 	"fmt"
-	. "github.com/QUIC-Tracker/quic-tracker"
+	. "github.com/tiferrei/quic-tracker"
 	"log"
 	"os"
 	"strings"

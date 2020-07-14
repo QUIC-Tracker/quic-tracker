@@ -2,7 +2,7 @@ package scenarii
 
 import (
 	"encoding/binary"
-	qt "github.com/QUIC-Tracker/quic-tracker"
+	qt "github.com/tiferrei/quic-tracker"
 	"time"
 )
 

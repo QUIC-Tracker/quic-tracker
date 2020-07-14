@@ -2,7 +2,7 @@ package adapter
 
 import (
 	"fmt"
-	qt "github.com/QUIC-Tracker/quic-tracker"
+	qt "github.com/tiferrei/quic-tracker"
 	"regexp"
 	"strconv"
 	"strings"

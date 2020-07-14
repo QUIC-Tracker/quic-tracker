@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	qt "github.com/QUIC-Tracker/quic-tracker"
-	s "github.com/QUIC-Tracker/quic-tracker/scenarii"
+	qt "github.com/tiferrei/quic-tracker"
+	s "github.com/tiferrei/quic-tracker/scenarii"
 	"os"
 	"os/exec"
 	"strings"

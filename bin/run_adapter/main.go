@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/QUIC-Tracker/quic-tracker/adapter"
+	"github.com/tiferrei/quic-tracker/adapter"
 )
 
 

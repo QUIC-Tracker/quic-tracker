@@ -12,9 +12,9 @@
 package scenarii
 
 import (
-	qt "github.com/QUIC-Tracker/quic-tracker"
+	qt "github.com/tiferrei/quic-tracker"
 
-	"github.com/QUIC-Tracker/quic-tracker/agents"
+	"github.com/tiferrei/quic-tracker/agents"
 	"time"
 )
 

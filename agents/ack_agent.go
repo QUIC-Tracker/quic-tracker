@@ -86,6 +86,7 @@ func (a *AckAgent) Run(conn *Connection) {
 				if ackFrame == nil {
 					a.Logger.Printf("INFO: ACK Queue empty, sending new ACK at %v PN Space", pnSpace.String())
 					ackFrame = new(AckFrame)
+					ackFrame.AckRanges = append(ackFrame.AckRanges, AckRange{})
 				}
 				conn.FrameQueue.Submit(QueuedFrame{
 					Frame:           ackFrame,

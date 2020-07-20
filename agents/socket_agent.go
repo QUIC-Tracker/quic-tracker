@@ -26,7 +26,6 @@ func (a *SocketAgent) Run(conn *Connection) {
 	a.conn = conn
 	a.SocketStatus = NewBroadcaster(10)
 	recChan := make(chan IncomingPayload)
-
 	go func() {
 		for {
 			recBuf := make([]byte, MaxTheoreticUDPPayloadSize)
@@ -83,7 +82,6 @@ func (a *SocketAgent) Run(conn *Connection) {
 				if !open {
 					return
 				}
-
 				conn.IncomingPayloads.Submit(p)
 			case <-a.close:
 				conn.UdpConnection.Close()

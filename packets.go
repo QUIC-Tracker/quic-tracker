@@ -129,6 +129,7 @@ type Framer interface {
 	Packet
 	GetFrames() []Frame
 	AddFrame(frame Frame)
+	RemoveAtIndex(index int)
 	GetRetransmittableFrames() []Frame
 	Contains(frameType FrameType) bool
 	OnlyContains(frameType FrameType) bool
@@ -146,6 +147,11 @@ func (p *FramePacket) GetFrames() []Frame {
 func (p *FramePacket) AddFrame(frame Frame) {
 	p.Frames = append(p.Frames, frame)
 }
+
+func (p *FramePacket) RemoveAtIndex(index int) {
+	p.Frames = append(p.Frames[:index], p.Frames[index+1:]...)
+}
+
 func (p *FramePacket) GetRetransmittableFrames() []Frame {
 	var frames []Frame
 	for _, frame := range p.Frames {

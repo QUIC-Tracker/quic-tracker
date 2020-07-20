@@ -6,6 +6,7 @@ import (
 	qt "github.com/tiferrei/quic-tracker"
 	"github.com/tiferrei/quic-tracker/agents"
 	tcp "github.com/tiferrei/tcp_server"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -17,23 +18,23 @@ type Adapter struct {
 	agents                    *agents.ConnectionAgents
 	server                    *tcp.Server
 	stop                      chan bool
+	Logger                    *log.Logger
 
 	incomingLearnerSymbols    qt.Broadcaster // Type: AbstractSymbol
-	outgoingAdapterSymbols    qt.Broadcaster // Type: AbstractSymbol
+	incomingSulPackets        chan interface{}
+	outgoingResponse          Response
 }
 
 func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adapter, error) {
 	adapter := new(Adapter)
+
 	adapter.incomingLearnerSymbols = qt.NewBroadcaster(1000)
-	adapter.outgoingAdapterSymbols = qt.NewBroadcaster(1000)
 	adapter.stop = make(chan bool, 1)
+	adapter.Logger = log.New(os.Stderr, "[ADAPTER] ", log.Lshortfile)
 	adapter.server = tcp.New(adapterAddress)
 
-	var err error
-	adapter.connection, err = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "hq", false)
-	if err != nil {
-		return nil, err
-	}
+	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "hq", false)
+	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
 
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
 	adapter.trace.AttachTo(adapter.connection)
@@ -41,9 +42,8 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 	ip := strings.Replace(adapter.connection.ConnectedIp().String(), "[", "", -1)
 	adapter.trace.Ip = ip[:strings.LastIndex(ip, ":")]
 
-	adapter.agents = agents.AttachAgentsToConnection(adapter.connection, agents.GetDefaultAgents()...)
+	adapter.agents = agents.AttachAgentsToConnection(adapter.connection, agents.GetBasicAgents()...)
 	adapter.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
-	adapter.agents.Stop("RecoveryAgent")
 	adapter.agents.Add(&agents.HandshakeAgent{
 		TLSAgent: adapter.agents.Get("TLSAgent").(*agents.TLSAgent),
 		SocketAgent: adapter.agents.Get("SocketAgent").(*agents.SocketAgent),
@@ -57,18 +57,17 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		qt.PNSpaceHandshake: true,
 		qt.PNSpaceAppData: true,
 	}
-	adapter.agents.Stop("RecoveryAgent")
 
 	adapter.server.OnNewMessage(adapter.handleNewServerInput)
+
 
 	return adapter, nil
 }
 
 func (a *Adapter) Run() {
 	go a.server.Listen()
-	fmt.Println("Server now listening.")
+	a.Logger.Printf("Server now listening.")
 	incomingSymbolChannel := a.incomingLearnerSymbols.RegisterNewChan(1000)
-	outgoingSulPacketChannel := a.connection.IncomingPackets.RegisterNewChan(1000)
 
 	for {
 		select {
@@ -87,12 +86,15 @@ func (a *Adapter) Run() {
 					a.agents.Get("TLSAgent").(*agents.TLSAgent).SendFromQueue <- encLevel
 				case qt.PaddingFrameType:
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
+				case qt.StreamType:
+					a.connection.StreamInput.Submit(qt.StreamInput{StreamId: 0, Data: []byte(fmt.Sprintf("GET %s\r\n", "/index.html"))})
 				default:
 					panic(fmt.Sprintf("Error: Frame Type '%v' not implemented!", frameType))
 				}
 			}
+			a.Logger.Printf("Submitting request: %v", as.String())
 			a.connection.PreparePacket.Submit(encLevel)
-		case o := <-outgoingSulPacketChannel:
+		case o := <-a.incomingSulPackets:
 			var packetType qt.PacketType
 			version := &a.connection.Version
 			frameTypes := []qt.FrameType{}
@@ -110,14 +112,21 @@ func (a *Adapter) Run() {
 				for _, frame := range packet.GetFrames() {
 					frameTypes = append(frameTypes, frame.FrameType())
 				}
+				// A framer with no frames is a result of removing retransmitted ones.
+				// FIXME: This could be more elegant.
+				if len(frameTypes) == 0 {
+					continue
+				}
 			default:
 				panic(fmt.Sprintf("Error: Packet '%T' not implemented!", packet))
 			}
 
-			a.outgoingAdapterSymbols.Submit(NewAbstractSymbol(
+			abstractSymbol := NewAbstractSymbol(
 				packetType,
 				HeaderOptions{QUICVersion: version},
-				frameTypes))
+				frameTypes)
+			a.Logger.Printf("Got response: %v", abstractSymbol.String())
+			a.outgoingResponse = append(a.outgoingResponse, abstractSymbol)
 		case <-a.stop:
 			return
 		default:
@@ -130,44 +139,70 @@ func (a *Adapter) Stop() {
 	a.trace.Complete(a.connection)
 	a.agents.StopAll()
 	a.SaveTrace("trace.json")
-	a.connection.Close()
+	a.agents.CloseConnection(false, 0, "")
 	a.stop <- true
 }
 
 func (a *Adapter) Reset() {
-	a.stop = make(chan bool, 1)
-	a.connection.TransitionTo(qt.QuicVersion, qt.QuicALPNToken)
+	a.Logger.Print("Received RESET command.")
+	a.agents.CloseConnection(false, 0, "")
+	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", false)
+	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
+	a.trace.AttachTo(a.connection)
+	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
+	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
+	a.agents.Add(&agents.HandshakeAgent{
+		TLSAgent: a.agents.Get("TLSAgent").(*agents.TLSAgent),
+		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
+		DisableFrameSending: true,
+	})
+	a.agents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = a.agents.GetFrameProducingAgents()
+	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
+	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
+		qt.PNSpaceNoSpace: true,
+		qt.PNSpaceInitial: true,
+		qt.PNSpaceHandshake: true,
+		qt.PNSpaceAppData: true,
+	}
+
 }
 
 func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
-	message = strings.TrimSuffix(message, "\r\n")
-	switch message {
-	case "START":
-		go a.Run()
-	case "RESET":
-		a.Reset()
-	case "STOP":
-		a.Stop()
-		_ = client.Close()
-	default:
-		go a.handleNewAbstractInput(client, message)
+	message = strings.TrimSuffix(message, "\n")
+	message = strings.TrimSuffix(message, "\r")
+	query := strings.Split(message, " ")
+	a.Logger.Printf("Server input: %v", query)
+	if len(query) == 1 {
+		switch query[0] {
+		case "START":
+			go a.Run()
+		case "RESET":
+			a.Reset()
+		case "STOP":
+			a.Stop()
+			_ = client.Close()
+		default:
+			a.handleNewAbstractQuery(client, query)
+		}
+	} else {
+		a.handleNewAbstractQuery(client, query)
 	}
 }
 
-func (a *Adapter) handleNewAbstractInput(client *tcp.Client, message string) {
-	abstractSymbol := NewAbstractSymbolFromString(message)
-	a.incomingLearnerSymbols.Submit(abstractSymbol)
-	outgoingSymbols := a.outgoingAdapterSymbols.RegisterNewChan(1000)
-	for {
-		select {
-		case o := <-outgoingSymbols:
-			outgoingSymbol := o.(AbstractSymbol)
-			err := client.Send(outgoingSymbol.String() + "\n")
-			if err != nil {
-				fmt.Printf(err.Error())
-			}
-			break
-		}
+func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
+	queryAnswer := []string{}
+	for _, message := range query {
+		a.outgoingResponse = nil
+		abstractSymbol := NewAbstractSymbolFromString(message)
+		a.incomingLearnerSymbols.Submit(abstractSymbol)
+		time.Sleep(200 * time.Millisecond)
+		queryAnswer = append(queryAnswer, a.outgoingResponse.String())
+		a.outgoingResponse = nil
+	}
+
+	err := client.Send(strings.Join(queryAnswer, " ") + "\n")
+	if err != nil {
+		fmt.Printf(err.Error())
 	}
 }
 

@@ -77,6 +77,7 @@ type Connection struct {
 
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	TlsQueue             map[EncryptionLevel][]QueuedFrame // Stores TLS QueuedFrames that are to be sent when requested.
+	ReceiveFrameBuffer   map[PNSpace]map[FrameType][]Frame // Keeps track of received frames to detect retransmits.
 	Logger               *log.Logger
 	QLog 				 qlog.QLog
 	QLogTrace			 *qlog.Trace
@@ -151,7 +152,13 @@ func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
 
 		packetBytes := c.EncodeAndEncrypt(packet, level)
-		c.UdpConnection.Write(packetBytes)
+		n, err := c.UdpConnection.Write(packetBytes)
+		if err != nil {
+			c.Logger.Printf("Error sending packet bytes: %v", err.Error())
+		} else {
+			c.Logger.Printf("Sent %v bytes to UDP socket", n)
+		}
+
 		packet.SetSendContext(PacketContext{Timestamp: time.Now(), RemoteAddr: c.UdpConnection.RemoteAddr(), DatagramSize: uint16(len(packetBytes)), PacketSize: uint16(len(packetBytes))})
 
 		c.PacketWasSent(packet)
@@ -287,6 +294,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.CryptoStates[EncryptionLevelInitial] = NewInitialPacketProtection(c)
 	c.CryptoStateLock.Unlock()
 	c.Streams = Streams{streams: make(map[uint64]*Stream), lock: &sync.Mutex{}, input: &c.StreamInput}
+	c.Logger.Printf("Transitioned to Version %#x and ALPN %v", Uint32ToBEBytes(version), ALPN)
 }
 func (c *Connection) CloseConnection(quicLayer bool, errCode uint64, reasonPhrase string) {
 	if quicLayer {
@@ -399,6 +407,12 @@ func NewConnection(serverName string, version uint32, ALPN string, SCID []byte, 
 	c.SendPacket = NewBroadcaster(1000)
 	c.StreamInput = NewBroadcaster(1000)
 	c.PacketAcknowledged = NewBroadcaster(1000)
+
+	c.ReceiveFrameBuffer = map[PNSpace]map[FrameType][]Frame{
+		PNSpaceInitial:   make(map[FrameType][]Frame),
+		PNSpaceHandshake: make(map[FrameType][]Frame),
+		PNSpaceAppData:   make(map[FrameType][]Frame),
+	}
 
 	c.QLog.Version = "draft-01"
 	c.QLog.Description = "QUIC-Tracker"

@@ -12,7 +12,6 @@ func main() {
 		fmt.Printf("Failed to create Adapter: %v", err.Error())
 		return
 	}
-	fmt.Println("Successfuly created new Adapter.")
 
 	adapter.Run()
 }

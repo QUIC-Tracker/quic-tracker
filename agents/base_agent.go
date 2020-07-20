@@ -223,3 +223,22 @@ func GetDefaultAgents() []Agent {
 		&ClosingAgent{},
 	}
 }
+
+
+func GetBasicAgents() []Agent {
+	fc := &FlowControlAgent{}
+	return []Agent{
+		&QLogAgent{},
+		&SocketAgent{},
+		&ParsingAgent{},
+		&BufferAgent{},
+		&TLSAgent{},
+		&AckAgent{},
+		&SendingAgent{MTU: 1200},
+		&RTTAgent{},
+		&FrameQueueAgent{},
+		fc,
+		&StreamAgent{FlowControlAgent: fc},
+		&ClosingAgent{},
+	}
+}

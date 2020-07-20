@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-
-
 var packetTypeToString = map[qt.PacketType]string {
 	qt.VersionNegotiation: "VERNEG",
 	qt.Initial: "INITIAL",
@@ -61,6 +59,20 @@ func (as *AbstractSymbol) String() string {
 	return fmt.Sprintf("%v(%v)[%v]", packetType, headerOptions, frameTypes)
 }
 
+type Response []AbstractSymbol
+func (as Response) String() string {
+	stringSlice := make([]string, len(as))
+	for index, abstractSymbol := range as {
+		stringSlice[index] = abstractSymbol.String()
+	}
+
+
+	if len(stringSlice) == 0 {
+		stringSlice = append(stringSlice, "EMPTY")
+	}
+	return strings.Join(stringSlice, "+")
+}
+
 func NewAbstractSymbol(packetType qt.PacketType, headerOptions HeaderOptions, frameTypes []qt.FrameType) AbstractSymbol {
 	return AbstractSymbol{
 		packetType:    packetType,
@@ -75,7 +87,7 @@ func NewAbstractSymbolFromString(message string) AbstractSymbol {
 	// The PacketType is the second group, we can get the type with a map.
 	packetType := stringToPacketType[subgroups[1]]
 
-	// Header options (for now) are optional, SHORT packets for example don't have them.
+	// Header options contain options that might be optional, SHORT packets for example don't have QUICVersion.
 	headerOptions := HeaderOptions{}
 	// The fourth group has the content of header options.
 	if subgroups[3] != "" {

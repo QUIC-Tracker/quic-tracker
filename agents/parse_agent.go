@@ -2,6 +2,7 @@ package agents
 
 import (
 	"bytes"
+	cmp "github.com/google/go-cmp/cmp"
 	. "github.com/tiferrei/quic-tracker"
 	"unsafe"
 )
@@ -11,7 +12,8 @@ import (
 // UnprocessedPayloads queue.
 type ParsingAgent struct {
 	BaseAgent
-	conn *Connection
+	conn            *Connection
+	DropRetransmits bool
 }
 
 func (a *ParsingAgent) Run(conn *Connection) {
@@ -137,11 +139,17 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 					a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), len(cleartext))
 
-					switch packet.(type) {
-					case Framer:
-						if packet.Header().PacketNumber() > conn.LargestPNsReceived[packet.PNSpace()] {
-							conn.LargestPNsReceived[packet.PNSpace()] = packet.Header().PacketNumber()
+
+					if framer, ok := packet.(Framer); ok {
+						framer = a.filterOutRetransmits(framer)
+						for _, frame := range framer.GetFrames() {
+							a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()] = append(a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()], frame)
 						}
+
+						if framer.Header().PacketNumber() > conn.LargestPNsReceived[framer.PNSpace()] {
+							conn.LargestPNsReceived[framer.PNSpace()] = framer.Header().PacketNumber()
+						}
+						packet = framer
 					}
 
 					off += consumed
@@ -158,6 +166,24 @@ func (a *ParsingAgent) Run(conn *Connection) {
 			}
 		}
 	}()
+}
+
+func (a *ParsingAgent) filterOutRetransmits(framer Framer) Framer {
+	deleted := 0
+	for initIndex := range framer.GetFrames() {
+		index := initIndex - deleted
+		frame := framer.GetFrames()[index]
+		for _, loggedFrame := range a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()] {
+			// TODO: My thought process was that for now we don't want to pass PINGs as they're time-dependent.
+			if cmp.Equal(frame, loggedFrame) || frame.FrameType() == PingType {
+				a.Logger.Printf("Detected retransmitted %v frame, removing.", frame.FrameType().String())
+				framer.RemoveAtIndex(index)
+				deleted++
+				break
+			}
+		}
+	}
+	return framer
 }
 
 func (a *ParsingAgent) SaveCleartextPacket(cleartext []byte, unique unsafe.Pointer) {

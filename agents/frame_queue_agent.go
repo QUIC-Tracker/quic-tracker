@@ -119,7 +119,7 @@ func (a *FrameQueueAgent) Run(conn *Connection) {
 			case i := <-incFrames:
 				qf := i.(QueuedFrame)
 				heap.Push(frameBuffer[qf.EncryptionLevel], qf.Frame)
-				a.Logger.Printf("Received a 0x%02x frame for encryption level %s\n", qf.FrameType(), qf.EncryptionLevel)
+				a.Logger.Printf("Received a %v frame for encryption level %s\n", qf.FrameType().String(), qf.EncryptionLevel)
 				conn.PreparePacket.Submit(qf.EncryptionLevel)
 			case args := <-a.requestFrame:
 				var frames []Frame

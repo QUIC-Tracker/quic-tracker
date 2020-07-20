@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	. "github.com/tiferrei/quic-tracker/lib"
 	"io"
 )
@@ -254,6 +255,16 @@ func (frame *AckFrame) GetAckedPackets() []PacketNumber { // TODO: This is prone
 	}
 	return packets
 }
+
+func (frame AckFrame) Equal(otherFrame AckFrame) bool {
+	if cmp.Equal(frame.AckRangeCount, otherFrame.AckRangeCount) &&
+		cmp.Equal(frame.AckRanges, otherFrame.AckRanges) &&
+		cmp.Equal(frame.LargestAcknowledged, otherFrame.LargestAcknowledged){
+		return true
+	}
+	return false
+}
+
 func ReadAckFrame(buffer *bytes.Reader) *AckFrame {
 	frame := new(AckFrame)
 	buffer.ReadByte() // Discard frame byte

@@ -83,6 +83,13 @@ var EpochToEncryptionLevel = map[pigotls.Epoch]EncryptionLevel {
 	pigotls.Epoch1RTT: EncryptionLevel1RTT,
 }
 
+var EncryptionLevelToEpoch = map[EncryptionLevel]pigotls.Epoch {
+	EncryptionLevelInitial: pigotls.EpochInitial,
+	EncryptionLevel0RTT: pigotls.Epoch0RTT,
+	EncryptionLevelHandshake: pigotls.EpochHandshake,
+	EncryptionLevel1RTT: pigotls.Epoch1RTT,
+}
+
 type DirectionalEncryptionLevel struct {
 	EncryptionLevel EncryptionLevel
 	Read bool

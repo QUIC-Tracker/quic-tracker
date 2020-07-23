@@ -167,7 +167,7 @@ func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 	}
 }
 
-func (c *Connection) GetInitialCryptoFrame() *CryptoFrame {
+func (c *Connection) GetCryptoFrame(encLevel EncryptionLevel) *CryptoFrame {
 	extensionData, err := c.TLSTPHandler.GetExtensionData()
 	if err != nil {
 		println(err)
@@ -175,13 +175,13 @@ func (c *Connection) GetInitialCryptoFrame() *CryptoFrame {
 	}
 	c.Tls.SetQUICTransportParameters(extensionData)
 
-	tlsOutput, notComplete, err := c.Tls.HandleMessage(nil, pigotls.EpochInitial)
+	tlsOutput, notComplete, err := c.Tls.HandleMessage(nil, EncryptionLevelToEpoch[encLevel])
 	if err != nil || !notComplete {
 		println(err.Error())
 		return nil
 	}
 	clientHello := tlsOutput[0].Data
-	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(PNSpaceInitial), clientHello)
+	cryptoFrame := NewCryptoFrame(c.CryptoStreams.Get(EncryptionLevelToPNSpace[encLevel]), clientHello)
 
 	if len(c.Tls.ZeroRTTSecret()) > 0 {
 		c.Logger.Printf("0-RTT secret is available, installing crypto state")
@@ -195,7 +195,7 @@ func (c *Connection) GetInitialCryptoFrame() *CryptoFrame {
 }
 
 func (c *Connection) GetInitialPacket() *InitialPacket {
-	cryptoFrame := c.GetInitialCryptoFrame()
+	cryptoFrame := c.GetCryptoFrame(EncryptionLevelInitial)
 	if cryptoFrame == nil {
 		return nil
 	}

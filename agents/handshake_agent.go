@@ -167,7 +167,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 				conn.ConnectionRestarted = make(chan bool, 1)
 				if a.DisableFrameSending {
 					conn.TlsQueue[EncryptionLevelInitial] = append(conn.TlsQueue[EncryptionLevelInitial], QueuedFrame{
-						Frame:           conn.GetInitialCryptoFrame(),
+						Frame:           conn.GetCryptoFrame(EncryptionLevelInitial),
 						EncryptionLevel: EncryptionLevelInitial,
 					})
 				} else {

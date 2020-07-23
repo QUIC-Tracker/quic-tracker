@@ -153,7 +153,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 				} else {
 					a.Logger.Printf("INFO: TLS Queue empty, sending new CHELLO at %v enc level", encLevel.String())
 					conn.FrameQueue.Submit(QueuedFrame{
-						Frame:           conn.GetInitialCryptoFrame(),
+						Frame:           conn.GetCryptoFrame(encLevel),
 						EncryptionLevel: encLevel,
 					})
 				}

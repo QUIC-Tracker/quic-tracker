@@ -8,6 +8,7 @@ import (
 	tcp "github.com/tiferrei/tcp_server"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -196,6 +197,9 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
 		abstractSymbol := NewAbstractSymbolFromString(message)
 		a.incomingLearnerSymbols.Submit(abstractSymbol)
 		time.Sleep(200 * time.Millisecond)
+		sort.Slice(a.outgoingResponse, func(i, j int) bool {
+			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()
+		})
 		queryAnswer = append(queryAnswer, a.outgoingResponse.String())
 		a.outgoingResponse = nil
 	}

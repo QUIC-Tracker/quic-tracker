@@ -35,7 +35,11 @@ type HeaderOptions struct {
 }
 
 func (ho *HeaderOptions) String() string {
-	return fmt.Sprintf("%#x", qt.Uint32ToBEBytes(*ho.QUICVersion))
+	version := ""
+	if ho.QUICVersion != nil {
+		version = fmt.Sprintf("%#x", qt.Uint32ToBEBytes(*ho.QUICVersion))
+	}
+	return version
 }
 // INITIAL(0xff00001d)[ACK,CRYPTO]
 // Is represented as:

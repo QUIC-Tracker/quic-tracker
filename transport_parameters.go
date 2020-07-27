@@ -88,7 +88,7 @@ func NewTLSTransportParameterHandler(scid ConnectionID) *TLSTransportParameterHa
 		MaxData: 32 * 1024,
 		MaxBidiStreams: 1,
 		MaxUniStreams: 3,
-		IdleTimeout: 60000,
+		IdleTimeout: 600000,
 		AckDelayExponent: 3,
 		MaxAckDelay: 10000,
 		ActiveConnectionIdLimit: 4,

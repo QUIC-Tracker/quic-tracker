@@ -12,4 +12,4 @@ WORKDIR /go/src/github.com/mpiraux/ls-qpack-go
 RUN make
 WORKDIR /go/src/github.com/tiferrei/quic-tracker
 RUN go build -o /run_adapter bin/run_adapter/main.go
-ENTRYPOINT ["wait-for-it", "server:4433", "-s", "--", "/run_adapter"]
+ENTRYPOINT ["wait-for-it", "implementation:4433", "-s", "--", "/run_adapter"]

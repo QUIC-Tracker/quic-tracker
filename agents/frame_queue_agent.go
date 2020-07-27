@@ -3,6 +3,7 @@ package agents
 import (
 	"container/heap"
 	. "github.com/tiferrei/quic-tracker"
+	"reflect"
 )
 
 var FramePriority = map[FrameType]int{
@@ -94,6 +95,15 @@ type FrameQueueAgent struct {
 	FrameProducingAgent
 }
 
+func interfaceIsNil(i interface{}) bool {
+	if i == nil {
+		return true
+	} else if reflect.ValueOf(i).Kind() == reflect.Ptr && reflect.ValueOf(i).IsNil() {
+		return true
+	}
+	return false
+}
+
 // The FrameQueueAgent collects all the frames that should be packed into packets and order them by frame type priority.
 // Each type of frame is given a level of priority as expressed in FramePriority.
 func (a *FrameQueueAgent) Run(conn *Connection) {
@@ -125,15 +135,15 @@ func (a *FrameQueueAgent) Run(conn *Connection) {
 				var frames []Frame
 				buffer := frameBuffer[args.level]
 				var i interface{}
-				for i = heap.Pop(buffer); i != nil && args.availableSpace >= int(i.(Frame).FrameLength()); i = heap.Pop(buffer) {
+				for i = heap.Pop(buffer); !interfaceIsNil(i) && args.availableSpace >= int(i.(Frame).FrameLength()); i = heap.Pop(buffer) {
 					frames = append(frames, i.(Frame))
 					args.availableSpace -= int(i.(Frame).FrameLength())
 				}
-				if i != nil {
+				if !interfaceIsNil(i) {
 					heap.Push(buffer, i)
 				}
 
-				if i != nil && args.availableSpace < int(i.(Frame).FrameLength()) {
+				if !interfaceIsNil(i) && args.availableSpace < int(i.(Frame).FrameLength()) {
 					a.Logger.Printf("Unable to put %d-byte frame into %d-byte buffer\n", i.(Frame).FrameLength(), args.availableSpace)
 					a.conn.PreparePacket.Submit(args.level)
 				}

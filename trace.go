@@ -5,7 +5,7 @@ import (
 	"time"
 	"strings"
 	"unsafe"
-	"github.com/mpiraux/pigotls"
+	"github.com/tiferrei/pigotls"
 )
 
 // Contains the result of a test run against a given host.

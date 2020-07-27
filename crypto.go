@@ -3,7 +3,7 @@ package quictracker
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/mpiraux/pigotls"
+	"github.com/tiferrei/pigotls"
 )
 
 var quicVersionSalt = []byte{  // See https://tools.ietf.org/html/draft-ietf-quic-tls-29#section-5.2

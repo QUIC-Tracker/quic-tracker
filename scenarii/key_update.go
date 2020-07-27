@@ -2,7 +2,7 @@ package scenarii
 
 import (
 	qt "github.com/tiferrei/quic-tracker"
-	"github.com/mpiraux/pigotls"
+	"github.com/tiferrei/pigotls"
 )
 
 const (

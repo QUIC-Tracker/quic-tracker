@@ -36,7 +36,7 @@ import (
 	"encoding/hex"
 	. "github.com/tiferrei/quic-tracker/lib"
 	_ "github.com/mpiraux/ls-qpack-go"
-	"github.com/mpiraux/pigotls"
+	"github.com/tiferrei/pigotls"
 	"io"
 	"math"
 	"net"

@@ -6,7 +6,7 @@ ADD . /go/src/github.com/tiferrei/quic-tracker
 WORKDIR /go/src/github.com/tiferrei/quic-tracker
 ENV GOPATH /go
 RUN go get -v ./... || true
-WORKDIR /go/src/github.com/mpiraux/pigotls
+WORKDIR /go/src/github.com/tiferrei/pigotls
 RUN make
 WORKDIR /go/src/github.com/mpiraux/ls-qpack-go
 RUN make

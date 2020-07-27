@@ -165,7 +165,7 @@ func (a *Adapter) Reset() {
 		qt.PNSpaceHandshake: true,
 		qt.PNSpaceAppData: true,
 	}
-
+	time.Sleep(200 * time.Millisecond)
 }
 
 func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {

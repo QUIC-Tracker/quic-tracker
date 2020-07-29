@@ -173,9 +173,8 @@ func (a *ParsingAgent) filterOutRetransmits(framer Framer) Framer {
 	for initIndex := range framer.GetFrames() {
 		index := initIndex - deleted
 		frame := framer.GetFrames()[index]
-		if frame.FrameType() == PingType || frame.FrameType() == PaddingFrameType {
+		if frame.FrameType() == PingType {
 			// TODO: My thought process was that for now we don't want to pass PINGs as they're time-dependent.
-			// TODO: We also don't want to pass PADDINGs because some implementations inject hundreds of them per packet.
 			framer.RemoveAtIndex(index)
 			deleted++
 			continue

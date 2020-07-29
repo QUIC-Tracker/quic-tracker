@@ -111,7 +111,10 @@ func (a *Adapter) Run() {
 				packetType = packet.Header().PacketType()
 				// TODO: GetFrames() might not return a deterministic order. Idk yet.
 				for _, frame := range packet.GetFrames() {
-					frameTypes = append(frameTypes, frame.FrameType())
+					// Paddings need to be ACKed, but lets abstract them away from the learner.
+					if frame.FrameType() != qt.PaddingFrameType {
+						frameTypes = append(frameTypes, frame.FrameType())
+					}
 				}
 				// A framer with no frames is a result of removing retransmitted ones.
 				// FIXME: This could be more elegant.

@@ -151,6 +151,7 @@ func (a *Adapter) Reset() {
 	a.Logger.Print("Received RESET command.")
 	a.connection.ConnectionRestart <- true
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
+	time.Sleep(300 * time.Millisecond)
 }
 
 func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {

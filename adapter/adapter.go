@@ -170,7 +170,7 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 		case "START":
 			go a.Run()
 		case "RESET":
-			a.Reset()
+			a.Reset(client)
 		case "STOP":
 			a.Stop()
 			_ = client.Close()

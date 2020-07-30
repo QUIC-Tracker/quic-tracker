@@ -203,18 +203,19 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
 		a.outgoingResponse = nil
 		abstractSymbol := NewAbstractSymbolFromString(message)
 		a.incomingLearnerSymbols.Submit(abstractSymbol)
+
+		// Wait for 200s for response.
 		time.Sleep(200 * time.Millisecond)
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {
 			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()
 		})
 		queryAnswer = append(queryAnswer, a.outgoingResponse.String())
-		a.outgoingResponse = nil
-	}
 
-	select {
-	case <-a.connection.ConnectionRestart:
-		time.Sleep(200 * time.Millisecond)
-	default:
+		// If we received a Retry, give the connection time to restart.
+		if strings.Contains(a.outgoingResponse.String(), "RETRY") {
+			time.Sleep(300 * time.Millisecond)
+		}
+		a.outgoingResponse = nil
 	}
 
 	err := client.Send(strings.Join(queryAnswer, " ") + "\n")

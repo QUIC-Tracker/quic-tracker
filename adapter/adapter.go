@@ -211,12 +211,10 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
 		a.outgoingResponse = nil
 	}
 
-	for {
-		select {
-		case <-a.connection.ConnectionRestart:
-			time.Sleep(200 * time.Millisecond)
-		}
-		break
+	select {
+	case <-a.connection.ConnectionRestart:
+		time.Sleep(200 * time.Millisecond)
+	default:
 	}
 
 	err := client.Send(strings.Join(queryAnswer, " ") + "\n")

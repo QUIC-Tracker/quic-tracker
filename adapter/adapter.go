@@ -147,12 +147,17 @@ func (a *Adapter) Stop() {
 	a.stop <- true
 }
 
-func (a *Adapter) Reset() {
+func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
-	a.connection.ConnectionRestart <- true
-	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
+	a.connection.TransitionTo(qt.QuicVersion, qt.QuicALPNToken)
+	close(a.connection.ConnectionRestart)
 	time.Sleep(300 * time.Millisecond)
+	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.Logger.Print("Finished RESET mechanism")
+	err := client.Send("DONE")
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
 }
 
 func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {

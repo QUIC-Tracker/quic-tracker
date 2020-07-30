@@ -149,25 +149,8 @@ func (a *Adapter) Stop() {
 
 func (a *Adapter) Reset() {
 	a.Logger.Print("Received RESET command.")
-	a.agents.CloseConnection(false, 0, "")
-	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", false)
+	a.connection.ConnectionRestart <- true
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
-	a.trace.AttachTo(a.connection)
-	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
-	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
-	a.agents.Add(&agents.HandshakeAgent{
-		TLSAgent: a.agents.Get("TLSAgent").(*agents.TLSAgent),
-		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
-		DisableFrameSending: true,
-	})
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = a.agents.GetFrameProducingAgents()
-	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
-	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
-		qt.PNSpaceNoSpace: true,
-		qt.PNSpaceInitial: true,
-		qt.PNSpaceHandshake: true,
-		qt.PNSpaceAppData: true,
-	}
 }
 
 func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {

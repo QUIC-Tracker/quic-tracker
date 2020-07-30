@@ -272,6 +272,7 @@ func (c *Connection) GetAckFrame(space PNSpace) *AckFrame { // Returns an ack fr
 	return frame
 }
 func (c *Connection) TransitionTo(version uint32, ALPN string) {
+	time.Sleep(200 * time.Millisecond)
 	c.TLSTPHandler = NewTLSTransportParameterHandler(c.SourceCID)
 	c.Version = version
 	c.ALPN = ALPN

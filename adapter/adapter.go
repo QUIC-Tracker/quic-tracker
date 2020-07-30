@@ -154,7 +154,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	time.Sleep(300 * time.Millisecond)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.Logger.Print("Finished RESET mechanism")
-	err := client.Send("DONE")
+	err := client.Send("DONE\n")
 	if err != nil {
 		fmt.Printf(err.Error())
 	}

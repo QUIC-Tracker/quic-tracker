@@ -148,7 +148,6 @@ func (a *Adapter) Stop() {
 }
 
 func (a *Adapter) Reset() {
-	time.Sleep(200 * time.Millisecond)
 	a.Logger.Print("Received RESET command.")
 	a.agents.CloseConnection(false, 0, "")
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", false)

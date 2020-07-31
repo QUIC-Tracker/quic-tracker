@@ -42,8 +42,10 @@ Docker builds exist on `Docker Hub`_.
 
 ::
 
-    docker run --network="host" quictracker/quictracker /http_get -h
-    docker run --network="host" quictracker/quictracker /scenario_runner -h
-    docker run --network="host" quictracker/quictracker /test_suite -h
+    docker run --network="host" mpiraux/quictracker /http_get -h
+    docker run --network="host" mpiraux/quictracker /scenario_runner -h
+    docker run --network="host" mpiraux/quictracker /test_suite -h
+    # Running the web app and mounting traces files from the current directory
+    docker run -v "$PWD:/traces" -p 5000:5000 mpiraux/quictracker flask run -h 0.0.0.0
 
 .. _Docker Hub: https://hub.docker.com/r/quictracker/quictracker/

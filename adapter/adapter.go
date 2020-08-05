@@ -50,7 +50,10 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		SocketAgent: adapter.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
-	adapter.agents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = adapter.agents.GetFrameProducingAgents()
+	adapter.agents.Add(&agents.SendingAgent{
+		MTU: 1200,
+		FrameProducer: adapter.agents.GetFrameProducingAgents(),
+	})
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	adapter.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
 		qt.PNSpaceNoSpace: true,

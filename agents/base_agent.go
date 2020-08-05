@@ -234,7 +234,6 @@ func GetBasicAgents() []Agent {
 		&BufferAgent{},
 		&TLSAgent{},
 		&AckAgent{},
-		&SendingAgent{MTU: 1200},
 		&RTTAgent{},
 		&FrameQueueAgent{},
 		fc,

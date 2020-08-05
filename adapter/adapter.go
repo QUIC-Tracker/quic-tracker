@@ -160,7 +160,10 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).FrameProducer = a.agents.GetFrameProducingAgents()
+	a.agents.Add(&agents.SendingAgent{
+		MTU: 1200,
+		FrameProducer: a.agents.GetFrameProducingAgents(),
+	})
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
 		qt.PNSpaceNoSpace: true,

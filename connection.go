@@ -311,8 +311,8 @@ func (c *Connection) Close() {
 	c.Tls.Close()
 	c.UdpConnection.Close()
 }
-func EstablishUDPConnection(addr *net.UDPAddr) (*net.UDPConn, error) {
-	udpConn, err := net.DialUDP(addr.Network(), nil, addr)
+func EstablishUDPConnection(addr *net.UDPAddr, localAddress *net.UDPAddr) (*net.UDPConn, error) {
+	udpConn, err := net.DialUDP(addr.Network(), localAddress, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func NewDefaultConnection(address string, serverName string, resumptionTicket []
 	if err != nil {
 		return nil, err
 	}
-	udpConn, err := EstablishUDPConnection(udpAddr)
+	udpConn, err := EstablishUDPConnection(udpAddr, nil)
 	if err != nil {
 		return nil, err
 	}

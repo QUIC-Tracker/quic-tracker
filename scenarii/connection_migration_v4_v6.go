@@ -82,7 +82,7 @@ firstFlight:
 		trace.Results["ResolveUDPAddr"] = err.Error()
 		return
 	}
-	udpConn, err := qt.EstablishUDPConnection(v6Addr)
+	udpConn, err := qt.EstablishUDPConnection(v6Addr, nil)
 	if err != nil {
 		trace.ErrorCode = CM46_UDPConnectionFailed
 		trace.Results["EstablishUDPConnection"] = err.Error()

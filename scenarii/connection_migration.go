@@ -62,7 +62,7 @@ wait:
 
 	connAgents.Stop("SocketAgent", "SendingAgent")
 
-	newUdpConn, err := qt.EstablishUDPConnection(conn.Host)
+	newUdpConn, err := qt.EstablishUDPConnection(conn.Host, nil)
 	if err != nil {
 		trace.ErrorCode = CM_UDPConnectionFailed
 		return

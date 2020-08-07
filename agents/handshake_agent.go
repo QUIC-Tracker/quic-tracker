@@ -76,9 +76,16 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						a.retrySource = p.Header().(*LongHeader).SourceCID
 						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
+						// Section 17.2.5.3, A client MUST NOT reset the packet number
+						// for any packet number space after processing a Retry packet
+						PNs, largestPNsReceived := conn.PacketNumber, conn.LargestPNsReceived
 						conn.TransitionTo(QuicVersion, alpn)
 						conn.TLSTPHandler = tlsTP
 						conn.Token = p.RetryToken
+						conn.PacketNumberLock.Lock()
+						conn.PacketNumber = PNs
+						conn.LargestPNsReceived = largestPNsReceived
+						conn.PacketNumberLock.Unlock()
 						close(conn.ConnectionRestart)
 					}
 				case Framer:

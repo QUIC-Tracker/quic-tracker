@@ -125,8 +125,11 @@ func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgen
 					a.Join()
 				}
 				conn.ConnectionRestart = make(chan bool, 1)
-				conn.UdpConnection.Close()
-				conn.UdpConnection, _ = EstablishUDPConnection(conn.Host)
+				// TODO: I don't think we want to restart this connection,
+				//   because we need to keep the same address (IP:PORT) for
+				//   RETRY validation.
+				//conn.UdpConnection.Close()
+				//conn.UdpConnection, _ = EstablishUDPConnection(conn.Host)
 				for _, a := range agents {
 					a.Run(conn)
 				}

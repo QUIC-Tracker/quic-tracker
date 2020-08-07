@@ -210,7 +210,7 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
 		abstractSymbol := NewAbstractSymbolFromString(message)
 		a.incomingLearnerSymbols.Submit(abstractSymbol)
 
-		// Wait for 200s for response.
+		// Wait for 300ms for response.
 		time.Sleep(300 * time.Millisecond)
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {
 			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()

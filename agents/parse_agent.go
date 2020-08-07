@@ -182,7 +182,10 @@ func (a *ParsingAgent) filterOutRetransmits(framer Framer) Framer {
 
 		for _, loggedFrame := range a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()] {
 			if cmp.Equal(frame, loggedFrame) {
-				a.Logger.Printf("Detected retransmitted %v frame, removing.", frame.FrameType().String())
+				// Some implementations send *a lot* of PADDINGs. Don't flood the logs.
+				if frame.FrameType() != PaddingFrameType {
+					a.Logger.Printf("Detected retransmitted %v frame, removing.", frame.FrameType().String())
+				}
 				framer.RemoveAtIndex(index)
 				deleted++
 				break

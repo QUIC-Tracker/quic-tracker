@@ -54,6 +54,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		MTU: 1200,
 		FrameProducer: adapter.agents.GetFrameProducingAgents(),
 	})
+	adapter.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	adapter.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
 		qt.PNSpaceNoSpace: true,
@@ -170,6 +171,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		MTU: 1200,
 		FrameProducer: a.agents.GetFrameProducingAgents(),
 	})
+	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
 		qt.PNSpaceNoSpace: true,

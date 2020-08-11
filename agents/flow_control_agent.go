@@ -278,6 +278,8 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 					for _, frame := range frames {
 						a.SubmitFrame(QueuedFrame{frame, args.level})
 					}
+					a.frames <- nil
+					break
 				} else {
 					a.frames <- frames
 				}

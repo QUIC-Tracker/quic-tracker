@@ -57,7 +57,7 @@ var PNSpaceToEncryptionLevel = map[PNSpace]EncryptionLevel {
 	PNSpaceNoSpace: EncryptionLevelNone,
 	PNSpaceInitial: EncryptionLevelInitial,
 	PNSpaceHandshake: EncryptionLevelHandshake,
-	PNSpaceAppData: EncryptionLevel0RTT,
+	PNSpaceAppData: EncryptionLevel1RTT,
 }
 
 var EncryptionLevelToPacketType = map[EncryptionLevel]PacketType{

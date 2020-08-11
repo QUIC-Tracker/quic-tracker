@@ -274,7 +274,14 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 						totalSize += fLen
 					}
 				}
-				a.frames <- frames
+				if a.DisableFrameSending {
+					for _, frame := range frames {
+						a.SubmitFrame(QueuedFrame{frame, args.level})
+					}
+				} else {
+					a.frames <- frames
+				}
+
 			case fr := <-a.SendFromQueue:
 				if len(conn.FlowControlQueue[fr]) > 0 {
 					queuedFrame := conn.FlowControlQueue[fr][0]

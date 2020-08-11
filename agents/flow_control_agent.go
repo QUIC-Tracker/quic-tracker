@@ -47,6 +47,8 @@ type FlowControlAgent struct {
 	FrameProducingAgent
 	LocalFC               FlowControlLimits
 	RemoteFC              FlowControlLimits
+	DisableFrameSending   bool
+	SendFromQueue		  chan FrameRequest
 	DontSlideCreditWindow bool
 	reserveCredit         chan reserveCreditArgs
 	creditsReserved       chan uint64
@@ -80,6 +82,7 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 	a.FrameProducingAgent.InitFPA(conn)
 	a.reserveCredit = make(chan reserveCreditArgs)
 	a.creditsReserved = make(chan uint64)
+	a.SendFromQueue = make(chan FrameRequest, 100)
 
 	incomingPackets := conn.IncomingPackets.RegisterNewChan(1000)
 	tpReceived := conn.TransportParameters.RegisterNewChan(1)
@@ -196,12 +199,12 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 				// First check that the stream can be opened
 				if IsBidiClient(args.StreamId) && !bidiStreamsBlocked && (a.RemoteFC.StreamsBidi == 0 || GetMaxBidiClient(a.RemoteFC.StreamsBidi) < args.StreamId) {
 					bidiStreamsBlocked = true
-					conn.FrameQueue.Submit(QueuedFrame{&StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi}, EncryptionLevelBestAppData})
+					a.SubmitFrame(QueuedFrame{&StreamsBlockedFrame{BidiStreams, a.RemoteFC.StreamsBidi}, EncryptionLevelBestAppData})
 					a.creditsReserved <- 0
 					break
 				} else if IsUniClient(args.StreamId) && !uniStreamsBlocked && (a.RemoteFC.StreamsUni == 0 || GetMaxUniClient(a.RemoteFC.StreamsUni) < args.StreamId) {
 					uniStreamsBlocked = false
-					conn.FrameQueue.Submit(QueuedFrame{&StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni}, EncryptionLevelBestAppData})
+					a.SubmitFrame(QueuedFrame{&StreamsBlockedFrame{UniStreams, a.RemoteFC.StreamsUni}, EncryptionLevelBestAppData})
 					a.creditsReserved <- 0
 					break
 				}
@@ -226,12 +229,12 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 
 				if !blockedStreams[args.StreamId] && (stream.WriteReserved >= stream.WriteLimit || (creditReserved < args.Credit)) {
 					blockedStreams[args.StreamId] = true
-					conn.FrameQueue.Submit(QueuedFrame{&StreamDataBlockedFrame{args.StreamId, stream.WriteLimit}, EncryptionLevelBestAppData})
+					a.SubmitFrame(QueuedFrame{&StreamDataBlockedFrame{args.StreamId, stream.WriteLimit}, EncryptionLevelBestAppData})
 				}
 
 				if !dataBlocked && dataReserved >= a.LocalFC.MaxData {
 					dataBlocked = true
-					conn.FrameQueue.Submit(QueuedFrame{&DataBlockedFrame{stream.WriteLimit}, EncryptionLevelBestAppData})
+					a.SubmitFrame(QueuedFrame{&DataBlockedFrame{stream.WriteLimit}, EncryptionLevelBestAppData})
 				}
 
 				a.creditsReserved <- creditReserved
@@ -272,11 +275,35 @@ func (a *FlowControlAgent) Run(conn *Connection) { // TODO: Report violation of 
 					}
 				}
 				a.frames <- frames
+			case fr := <-a.SendFromQueue:
+				if len(conn.FlowControlQueue[fr]) > 0 {
+					queuedFrame := conn.FlowControlQueue[fr][0]
+					conn.FrameQueue.Submit(queuedFrame)
+					conn.FlowControlQueue[fr] = conn.FlowControlQueue[fr][1:]
+				} else {
+					a.Logger.Printf("INFO: Flow Control Queue empty, sending new %v frame at %v enc level", fr.FrameType.String(), fr.EncryptionLevel.String())
+					switch fr.FrameType {
+					case MaxDataType:
+						conn.FrameQueue.Submit(MaxDataFrame{a.LocalFC.MaxData})
+					case MaxStreamDataType:
+						conn.FrameQueue.Submit(MaxStreamDataFrame{0, a.LocalFC.MaxStreamDataBidiLocal})
+					}
+				}
 			case <-a.close:
 				return
 			}
 		}
 	}()
+}
+
+// TODO: This is a common pattern in FrameProducingAgents. Should probably move this method to that type.
+func (a *FlowControlAgent) SubmitFrame(frame QueuedFrame) {
+	if a.DisableFrameSending {
+		fr := FrameRequest{FrameType: frame.FrameType(), EncryptionLevel: frame.EncryptionLevel}
+		a.conn.FlowControlQueue[fr] = append(a.conn.FlowControlQueue[fr], frame)
+	} else {
+		a.conn.FrameQueue.Submit(frame)
+	}
 }
 
 func (a *FlowControlAgent) ReserveCredit(streamId uint64, amount uint64) uint64 {

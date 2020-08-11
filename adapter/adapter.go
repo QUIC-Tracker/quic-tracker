@@ -92,6 +92,9 @@ func (a *Adapter) Run() {
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
 				case qt.StreamType:
 					a.connection.StreamInput.Submit(qt.StreamInput{StreamId: 0, Data: []byte(fmt.Sprintf("GET %s\r\n", "/index.html")), Close: true})
+				case qt.MaxDataType:
+				case qt.MaxStreamDataType:
+					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
 				default:
 					panic(fmt.Sprintf("Error: Frame Type '%v' not implemented!", frameType))
 				}

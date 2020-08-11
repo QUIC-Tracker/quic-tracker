@@ -77,6 +77,7 @@ type Connection struct {
 
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	TlsQueue             map[EncryptionLevel][]QueuedFrame // Stores TLS QueuedFrames that are to be sent when requested.
+	FlowControlQueue     map[FrameRequest][]QueuedFrame // Stores Flow Control QueuedFrames that are to be sent when requested.
 	ReceiveFrameBuffer   map[PNSpace]map[FrameType][]Frame // Keeps track of received frames to detect retransmits.
 	Logger               *log.Logger
 	QLog 				 qlog.QLog
@@ -283,6 +284,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
 	c.AckQueue = make(map[PNSpace][]PacketNumber)
 	c.TlsQueue = make(map[EncryptionLevel][]QueuedFrame)
+	c.FlowControlQueue = make(map[FrameRequest][]QueuedFrame)
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0
 		c.AckQueue[space] = nil

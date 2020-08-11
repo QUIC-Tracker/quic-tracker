@@ -286,7 +286,7 @@ type PacketToSend struct {
 	EncryptionLevel
 }
 
-type PacketRequest struct {
-	Header
-	Frame
+type FrameRequest struct {
+	FrameType
+	EncryptionLevel
 }

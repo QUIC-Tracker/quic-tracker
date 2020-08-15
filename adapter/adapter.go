@@ -219,14 +219,13 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 	for _, message := range query {
 		a.outgoingResponse = nil
 		abstractSymbol := NewAbstractSymbolFromString(message)
-		// We can't send packets at encLevels that we haven't reached yet, so return immediately to save time.
-		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) == nil {
-			return
-		}
-		a.incomingLearnerSymbols.Submit(abstractSymbol)
 
-		// Wait for 300ms for response.
-		time.Sleep(waitTime)
+		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) != nil {
+			a.incomingLearnerSymbols.Submit(abstractSymbol)
+			// Wait for 300ms for response.
+			time.Sleep(waitTime)
+		}
+
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {
 			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()
 		})

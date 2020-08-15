@@ -54,6 +54,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		MTU: 1200,
 		FrameProducer: adapter.agents.GetFrameProducingAgents(),
 	})
+	adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	adapter.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	adapter.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -171,6 +172,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		MTU: 1200,
 		FrameProducer: a.agents.GetFrameProducingAgents(),
 	})
+	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -191,6 +193,10 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 	message = strings.TrimSuffix(message, "\r")
 	query := strings.Split(message, " ")
 	a.Logger.Printf("Server input: %v", query)
+	waitTime := 300 * time.Millisecond
+	if len(query) >= 10 {
+		waitTime = 400 * time.Millisecond
+	}
 	if len(query) == 1 {
 		switch query[0] {
 		case "START":
@@ -201,22 +207,26 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 			a.Stop()
 			_ = client.Close()
 		default:
-			a.handleNewAbstractQuery(client, query)
+			a.handleNewAbstractQuery(client, query, waitTime)
 		}
 	} else {
-		a.handleNewAbstractQuery(client, query)
+		a.handleNewAbstractQuery(client, query, waitTime)
 	}
 }
 
-func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string) {
+func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, waitTime time.Duration) {
 	queryAnswer := []string{}
 	for _, message := range query {
 		a.outgoingResponse = nil
 		abstractSymbol := NewAbstractSymbolFromString(message)
+		// We can't send packets at encLevels that we haven't reached yet, so return immediately to save time.
+		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) == nil {
+			return
+		}
 		a.incomingLearnerSymbols.Submit(abstractSymbol)
 
 		// Wait for 300ms for response.
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(waitTime)
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {
 			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()
 		})

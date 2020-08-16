@@ -220,11 +220,9 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		a.outgoingResponse = nil
 		abstractSymbol := NewAbstractSymbolFromString(message)
 
-		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) != nil {
-			a.incomingLearnerSymbols.Submit(abstractSymbol)
-			// Wait for 300ms for response.
-			time.Sleep(waitTime)
-		}
+		a.incomingLearnerSymbols.Submit(abstractSymbol)
+		// Wait for 300ms for response.
+		time.Sleep(waitTime)
 
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {
 			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()

@@ -88,6 +88,8 @@ func (a *Adapter) Run() {
 				switch frameType {
 				case qt.AckType:
 					a.agents.Get("AckAgent").(*agents.AckAgent).SendFromQueue <- pnSpace
+				case qt.PingType:
+					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PingFrame), EncryptionLevel: encLevel})
 				case qt.CryptoType:
 					a.agents.Get("TLSAgent").(*agents.TLSAgent).SendFromQueue <- encLevel
 				case qt.PaddingFrameType:

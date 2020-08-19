@@ -195,7 +195,7 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 	message = strings.TrimSuffix(message, "\r")
 	query := strings.Split(message, " ")
 	a.Logger.Printf("Server input: %v", query)
-	waitTime := 600 * time.Millisecond
+	waitTime := 300 * time.Millisecond
 	if len(query) == 1 {
 		switch query[0] {
 		case "START":

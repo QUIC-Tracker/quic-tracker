@@ -170,7 +170,6 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -183,6 +182,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		MTU: 1200,
 		FrameProducer: a.agents.GetFrameProducingAgents(),
 	})
+	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.Logger.Print("Finished RESET mechanism")
 	err := client.Send("DONE\n")
 	if err != nil {

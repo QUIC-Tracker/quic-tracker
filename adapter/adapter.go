@@ -151,15 +151,15 @@ func (a *Adapter) Run() {
 
 func (a *Adapter) Stop() {
 	a.trace.Complete(a.connection)
-	a.agents.StopAll()
 	a.SaveTrace("trace.json")
-	a.agents.CloseConnection(false, 0, "")
+	a.agents.StopAll()
 	a.stop <- true
 }
 
 func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
-	a.agents.CloseConnection(false, 0, "")
+	a.agents.StopAll()
+	a.connection.Close()
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", false)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.trace.AttachTo(a.connection)
@@ -170,10 +170,6 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
-	a.agents.Add(&agents.SendingAgent{
-		MTU: 1200,
-		FrameProducer: a.agents.GetFrameProducingAgents(),
-	})
 	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
@@ -183,6 +179,10 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		qt.PNSpaceHandshake: true,
 		qt.PNSpaceAppData: true,
 	}
+	a.agents.Add(&agents.SendingAgent{
+		MTU: 1200,
+		FrameProducer: a.agents.GetFrameProducingAgents(),
+	})
 	a.Logger.Print("Finished RESET mechanism")
 	err := client.Send("DONE\n")
 	if err != nil {

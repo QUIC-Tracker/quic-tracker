@@ -183,14 +183,25 @@ func (c *ConnectionAgents) StopAll() {
 // This function sends an (CONNECTION|APPLICATION)_CLOSE frame and wait for it to be sent out. Then it stops all the
 // agents attached to this connection.
 func (c *ConnectionAgents) CloseConnection(quicLayer bool, errorCode uint64, reasonPhrase string) {
-	var a Agent
+	var closingAgent Agent
 	var present bool
-	if a, present = c.Has("ClosingAgent"); !present {
-		a = &ClosingAgent{}
-		c.Add(a)
+	if closingAgent, present = c.Has("ClosingAgent"); !present {
+		closingAgent = &ClosingAgent{}
+		c.Add(closingAgent)
 	}
-	a.(*ClosingAgent).Close(quicLayer, errorCode, reasonPhrase)
-	a.Join()
+	closingAgent.Join()
+
+	var sendingAgent Agent
+	if sendingAgent, present = c.Has("SendingAgent"); !present {
+		sendingAgent = &SendingAgent{
+			MTU: 1200,
+			FrameProducer: c.GetFrameProducingAgents(),
+		}
+		c.Add(sendingAgent)
+	}
+	sendingAgent.Join()
+
+	closingAgent.(*ClosingAgent).Close(quicLayer, errorCode, reasonPhrase)
 	c.StopAll()
 }
 

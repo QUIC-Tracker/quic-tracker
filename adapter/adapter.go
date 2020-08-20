@@ -223,7 +223,8 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) != nil {
 			a.incomingLearnerSymbols.Submit(abstractSymbol)
 			time.Sleep(waitTime)
-
+		} else {
+			a.Logger.Printf("Unable to send packet at " + qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType].String() + " EL.")
 		}
 
 		sort.Slice(a.outgoingResponse, func(i, j int) bool {

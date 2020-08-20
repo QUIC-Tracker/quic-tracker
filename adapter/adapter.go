@@ -95,15 +95,7 @@ func (a *Adapter) Run() {
 				case qt.PaddingFrameType:
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
 				case qt.StreamType:
-					// Get next available even Stream ID
-					streamID := uint64(0)
-					_, streamExists := a.connection.Streams.Has(streamID)
-					for streamExists {
-						streamID += 2
-						_, streamExists = a.connection.Streams.Has(streamID)
-					}
-
-					a.connection.StreamInput.Submit(qt.StreamInput{StreamId: streamID, Data: []byte(fmt.Sprintf("GET %s\r\n", "/index.html")), Close: true})
+					a.connection.StreamInput.Submit(qt.StreamInput{StreamId: a.getNextStreamID(), Data: []byte(fmt.Sprintf("GET %s\r\n", "/index.html")), Close: true})
 				case qt.MaxDataType:
 				case qt.MaxStreamDataType:
 					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
@@ -261,4 +253,17 @@ func (a *Adapter) SaveTrace(filename string) {
 			outFile.Close()
 		}
 	}
+}
+
+// Get next available client-initiated, bidirectional Stream ID.
+func (a *Adapter) getNextStreamID() uint64 {
+	streamID := uint64(0)
+	for {
+		stream := a.connection.Streams.Get(streamID)
+		if !stream.WriteClosed {
+			break
+		}
+		streamID += 4
+	}
+	return streamID
 }

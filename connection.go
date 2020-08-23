@@ -285,6 +285,7 @@ func (c *Connection) TransitionTo(version uint32, ALPN string) {
 	c.LargestPNsAcknowledged = make(map[PNSpace]PacketNumber)
 	c.AckQueue = make(map[PNSpace][]PacketNumber)
 	c.TlsQueue = make(map[EncryptionLevel][]QueuedFrame)
+	c.StreamQueue = make(map[FrameRequest][]QueuedFrame)
 	c.FlowControlQueue = make(map[FrameRequest][]QueuedFrame)
 	for _, space := range []PNSpace{PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData} {
 		c.PacketNumber[space] = 0

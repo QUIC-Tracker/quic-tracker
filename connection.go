@@ -78,6 +78,7 @@ type Connection struct {
 	AckQueue             map[PNSpace][]PacketNumber // Stores the packet numbers to be acked TODO: This should be a channel actually
 	TlsQueue             map[EncryptionLevel][]QueuedFrame // Stores TLS QueuedFrames that are to be sent when requested.
 	FlowControlQueue     map[FrameRequest][]QueuedFrame // Stores Flow Control QueuedFrames that are to be sent when requested.
+	StreamQueue          map[FrameRequest][]QueuedFrame // Stores Stream QueuedFrames that are to be sent when requested.
 	ReceiveFrameBuffer   map[PNSpace]map[FrameType][]Frame // Keeps track of received frames to detect retransmits.
 	Logger               *log.Logger
 	QLog 				 qlog.QLog

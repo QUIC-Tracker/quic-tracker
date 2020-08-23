@@ -54,7 +54,9 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		MTU: 1200,
 		FrameProducer: adapter.agents.GetFrameProducingAgents(),
 	})
-	adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
+	adapter.agents.Add(&agents.HTTP3Agent{})
+	//adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
+	adapter.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
 	adapter.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	adapter.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -95,7 +97,11 @@ func (a *Adapter) Run() {
 				case qt.PaddingFrameType:
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
 				case qt.StreamType:
-					a.connection.StreamInput.Submit(qt.StreamInput{StreamId: a.getNextStreamID(), Data: []byte(fmt.Sprintf("GET %s\r\n", "/index.html")), Close: true})
+					if len(a.connection.StreamQueue) > 0 {
+						a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
+					} else {
+						a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
+					}
 				case qt.MaxDataType:
 				case qt.MaxStreamDataType:
 					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
@@ -170,6 +176,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
+	a.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -182,7 +189,8 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		MTU: 1200,
 		FrameProducer: a.agents.GetFrameProducingAgents(),
 	})
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
+	a.agents.Add(&agents.HTTP3Agent{})
+	//a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.Logger.Print("Finished RESET mechanism")
 	err := client.Send("DONE\n")
 	if err != nil {

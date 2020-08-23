@@ -7,11 +7,13 @@ import (
 
 type StreamAgent struct {
 	FrameProducingAgent
-	conn             *Connection
-	FlowControlAgent *FlowControlAgent
-	input            chan interface{}
-	streamBuffers    map[uint64][]byte
-	streamClosing    map[uint64]bool
+	conn                 *Connection
+	FlowControlAgent     *FlowControlAgent
+	input                chan interface{}
+	streamBuffers        map[uint64][]byte
+	streamClosing        map[uint64]bool
+	SendFromQueue		 chan FrameRequest
+	DisableFrameSending  bool
 }
 
 func (a *StreamAgent) Run(conn *Connection) {
@@ -41,7 +43,7 @@ func (a *StreamAgent) Run(conn *Connection) {
 					a.close(si.StreamId)
 				}
 			case args := <-a.requestFrame:
-				if args.level != EncryptionLevel0RTT && args.level != EncryptionLevel1RTT && args.level != EncryptionLevelBestAppData {
+				if (args.level != EncryptionLevel0RTT && args.level != EncryptionLevel1RTT && args.level != EncryptionLevelBestAppData) || a.DisableFrameSending {
 					a.frames <- nil
 					break
 				}
@@ -68,6 +70,14 @@ func (a *StreamAgent) Run(conn *Connection) {
 					}
 				}
 				a.frames <- frames
+			case fr := <-a.SendFromQueue:
+				if len(conn.StreamQueue[fr]) > 0 {
+					queuedFrame := conn.StreamQueue[fr][0]
+					conn.FrameQueue.Submit(queuedFrame)
+					conn.StreamQueue[fr] = conn.StreamQueue[fr][1:]
+				} else {
+					a.Logger.Printf("INFO: Stream Queue empty.")
+				}
 			case <-a.BaseAgent.close:
 				return
 			}
@@ -82,7 +92,7 @@ func (a *StreamAgent) close(streamId uint64) error {
 			return errors.New("cannot close already closed stream")
 		}
 		s.WriteCloseOffset = s.WriteOffset
-		a.conn.FrameQueue.Submit(QueuedFrame{NewStreamFrame(streamId, s.WriteOffset, nil, true), EncryptionLevelBestAppData})
+		a.SubmitFrame(QueuedFrame{NewStreamFrame(streamId, s.WriteOffset, nil, true), EncryptionLevelBestAppData})
 		return nil
 	}
 	return errors.New("cannot close server uni stream")
@@ -96,7 +106,7 @@ func (a *StreamAgent) reset(streamId uint64, appErrorCode uint64) error {
 		}
 		s.WriteCloseOffset = s.WriteOffset
 		s.WriteClosed = true
-		a.conn.FrameQueue.Submit(QueuedFrame{&ResetStream{streamId, appErrorCode, s.WriteOffset}, EncryptionLevelBestAppData})
+		a.SubmitFrame(QueuedFrame{&ResetStream{streamId, appErrorCode, s.WriteOffset}, EncryptionLevelBestAppData})
 		return nil
 	}
 	return errors.New("cannot reset server uni stream")
@@ -107,7 +117,7 @@ func (a *StreamAgent) stopSending(streamId uint64, appErrorCode uint64) error {
 		if _, present := a.conn.Streams.Has(streamId); !present && IsServer(streamId) {
 			return errors.New("cannot ask to stop sending on non-ready server stream")
 		}
-		a.conn.FrameQueue.Submit(QueuedFrame{&StopSendingFrame{streamId, appErrorCode}, EncryptionLevelBestAppData})
+		a.SubmitFrame(QueuedFrame{&StopSendingFrame{streamId, appErrorCode}, EncryptionLevelBestAppData})
 		return nil
 	}
 	return errors.New("cannot ask to stop sending on a client uni stream")
@@ -124,10 +134,29 @@ func (a *StreamAgent) send(streamId uint64, data []byte, close bool) error {
 	if s.WriteClosed {
 		s.WriteCloseOffset = s.WriteOffset
 	}
-	a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
+
 	if close {
 		a.streamClosing[streamId] = true
 	}
-	a.conn.PreparePacket.Submit(EncryptionLevelBestAppData)
+	if a.DisableFrameSending {
+		fr := FrameRequest{FrameType: StreamType, EncryptionLevel: EncryptionLevel1RTT}
+		streamFrame := NewStreamFrame(streamId, s.WriteOffset - uint64(len(data)), data, close)
+		qf := QueuedFrame{Frame: streamFrame, EncryptionLevel: fr.EncryptionLevel}
+		a.SubmitFrame(qf)
+	} else {
+		a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
+		a.conn.PreparePacket.Submit(EncryptionLevelBestAppData)
+	}
+
 	return nil
+}
+
+// TODO: This is a common pattern in FrameProducingAgents. Should probably move this method to that type.
+func (a *StreamAgent) SubmitFrame(frame QueuedFrame) {
+	if a.DisableFrameSending {
+		fr := FrameRequest{FrameType: frame.FrameType(), EncryptionLevel: frame.EncryptionLevel}
+		a.conn.StreamQueue[fr] = append(a.conn.StreamQueue[fr], frame)
+	} else {
+		a.conn.FrameQueue.Submit(frame)
+	}
 }

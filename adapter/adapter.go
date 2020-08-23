@@ -99,6 +99,8 @@ func (a *Adapter) Run() {
 				case qt.StreamType:
 					if len(a.connection.StreamQueue[qt.FrameRequest{FrameType: qt.StreamType, EncryptionLevel: qt.EncryptionLevel1RTT}]) == 0 {
 						a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
+                        // FIXME: This ensures the request gets queued before packets are sent. I'm not proud of it but it works. 
+                        time.Sleep(1 * time.Millisecond)
 					}
 					a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
 				case qt.MaxDataType:

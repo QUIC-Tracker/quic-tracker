@@ -72,13 +72,10 @@ func (a *StreamAgent) Run(conn *Connection) {
 				}
 				a.frames <- frames
 			case fr := <-a.SendFromQueue:
-				if len(conn.StreamQueue[fr]) > 0 {
-					queuedFrame := conn.StreamQueue[fr][0]
-					conn.FrameQueue.Submit(queuedFrame)
-					conn.StreamQueue[fr] = conn.StreamQueue[fr][1:]
-				} else {
-					a.Logger.Printf("INFO: Stream Queue empty.")
+                for _, qf := range conn.StreamQueue[fr] {
+					conn.FrameQueue.Submit(qf)
 				}
+				conn.StreamQueue[fr] = nil
 			case <-a.BaseAgent.close:
 				return
 			}

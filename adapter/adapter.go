@@ -34,7 +34,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 	adapter.Logger = log.New(os.Stderr, "[ADAPTER] ", log.Lshortfile)
 	adapter.server = tcp.New(adapterAddress)
 
-	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "h3", false)
+	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "h3", true)
 	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
 
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
@@ -97,11 +97,10 @@ func (a *Adapter) Run() {
 				case qt.PaddingFrameType:
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
 				case qt.StreamType:
-					if len(a.connection.StreamQueue) > 0 {
-						a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
-					} else {
+					if len(a.connection.StreamQueue[qt.FrameRequest{FrameType: qt.StreamType, EncryptionLevel: qt.EncryptionLevel1RTT}]) == 0 {
 						a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
 					}
+					a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
 				case qt.MaxDataType:
 				case qt.MaxStreamDataType:
 					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
@@ -166,7 +165,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
 	a.agents.StopAll()
 	a.connection.Close()
-	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", false)
+	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", true)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)

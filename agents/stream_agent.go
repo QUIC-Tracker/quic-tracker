@@ -23,6 +23,7 @@ func (a *StreamAgent) Run(conn *Connection) {
 	a.conn = conn
 	a.streamBuffers = make(map[uint64][]byte)
 	a.streamClosing = make(map[uint64]bool)
+	a.SendFromQueue = make(chan FrameRequest, 100)
 
 	go func() {
 		defer a.Logger.Println("Agent terminated")

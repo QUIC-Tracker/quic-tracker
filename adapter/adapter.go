@@ -99,7 +99,7 @@ func (a *Adapter) Run() {
 				case qt.StreamType:
 					if len(a.connection.StreamQueue[qt.FrameRequest{FrameType: qt.StreamType, EncryptionLevel: qt.EncryptionLevel1RTT}]) == 0 {
 						a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
-                        // FIXME: This ensures the request gets queued before packets are sent. I'm not proud of it but it works. 
+                        // FIXME: This ensures the request gets queued before packets are sent. I'm not proud of it but it works.
                         time.Sleep(1 * time.Millisecond)
 					}
 					a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
@@ -160,6 +160,7 @@ func (a *Adapter) Stop() {
 	a.trace.Complete(a.connection)
 	a.SaveTrace("trace.json")
 	a.agents.Get("SendingAgent").(*agents.SendingAgent).Stop()
+	time.Sleep(50 * time.Millisecond)
 	a.agents.StopAll()
 	a.stop <- true
 }
@@ -167,6 +168,7 @@ func (a *Adapter) Stop() {
 func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
 	a.agents.Get("SendingAgent").(*agents.SendingAgent).Stop()
+	time.Sleep(50 * time.Millisecond)
 	a.agents.StopAll()
 	a.connection.Close()
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", true)

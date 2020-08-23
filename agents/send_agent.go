@@ -66,7 +66,6 @@ func (a *SendingAgent) Run(conn *Connection) {
 				}
 				frames, more := fp.RequestFrames(spaceLeft, l, packet.Header().PacketNumber())
 				if !more {
-					// FIXME: Very rarely this will trigger an IOR Error. Need to investigate.
 					a.FrameProducer[i] = nil
 					a.FrameProducer = append(a.FrameProducer[:i], a.FrameProducer[i+1:]...)
 					break

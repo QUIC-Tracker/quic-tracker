@@ -34,7 +34,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 	adapter.Logger = log.New(os.Stderr, "[ADAPTER] ", log.Lshortfile)
 	adapter.server = tcp.New(adapterAddress)
 
-	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "hq", false)
+	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "h3", false)
 	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
 
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
@@ -54,9 +54,9 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		MTU: 1200,
 		FrameProducer: adapter.agents.GetFrameProducingAgents(),
 	})
-	adapter.agents.Add(&agents.HTTP3Agent{})
-	//adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	adapter.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
+	adapter.agents.Add(&agents.HTTP3Agent{})
+	adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	adapter.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	adapter.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -166,7 +166,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
 	a.agents.StopAll()
 	a.connection.Close()
-	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", false)
+	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", false)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
@@ -176,7 +176,13 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		SocketAgent: a.agents.Get("SocketAgent").(*agents.SocketAgent),
 		DisableFrameSending: true,
 	})
+	a.agents.Add(&agents.SendingAgent{
+		MTU: 1200,
+		FrameProducer: a.agents.GetFrameProducingAgents(),
+	})
 	a.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
+	a.agents.Add(&agents.HTTP3Agent{})
+	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
 	a.agents.Get("AckAgent").(*agents.AckAgent).DisableAcks = map[qt.PNSpace]bool {
@@ -185,11 +191,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		qt.PNSpaceHandshake: true,
 		qt.PNSpaceAppData: true,
 	}
-	a.agents.Add(&agents.SendingAgent{
-		MTU: 1200,
-		FrameProducer: a.agents.GetFrameProducingAgents(),
-	})
-	a.agents.Add(&agents.HTTP3Agent{})
+
 	//a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.Logger.Print("Finished RESET mechanism")
 	err := client.Send("DONE\n")

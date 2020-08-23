@@ -138,13 +138,25 @@ func (a *StreamAgent) send(streamId uint64, data []byte, close bool) error {
 	if close {
 		a.streamClosing[streamId] = true
 	}
+
+	a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
+
 	if a.DisableFrameSending {
 		fr := FrameRequest{FrameType: StreamType, EncryptionLevel: EncryptionLevel1RTT}
-		streamFrame := NewStreamFrame(streamId, s.WriteOffset - uint64(len(data)), data, close)
+		streamFrame := NewStreamFrame(streamId, s.WriteOffset - uint64(len(data)), nil, close)
+		streamFrame.StreamData = data
+		streamFrame.LenBit = true
+		streamFrame.Length = uint64(len(streamFrame.StreamData))
+		delete(a.streamBuffers, streamId)
+		if a.streamClosing[streamId] {
+			delete(a.streamClosing, streamId)
+			streamFrame.FinBit = true
+		}
+
 		qf := QueuedFrame{Frame: streamFrame, EncryptionLevel: fr.EncryptionLevel}
 		a.SubmitFrame(qf)
 	} else {
-		a.streamBuffers[streamId] = append(a.streamBuffers[streamId], data...)
+
 		a.conn.PreparePacket.Submit(EncryptionLevelBestAppData)
 	}
 

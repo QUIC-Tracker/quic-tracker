@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -107,30 +108,38 @@ func (a *FrameProducingAgent) Run(conn *Connection) {}
 type ConnectionAgents struct {
 	conn   *Connection
 	agents map[string]Agent
+	lock   sync.Mutex
 }
 
 func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgents {
-	c := ConnectionAgents{conn, make(map[string]Agent)}
+	c := ConnectionAgents{conn, make(map[string]Agent), sync.Mutex{}}
 
+	c.lock.Lock()
 	for _, a := range agents {
 		c.Add(a)
 	}
+	c.lock.Unlock()
 
 	go func() {
 		for {
 			select {
 			case <-conn.ConnectionRestart:
 				conn.Logger.Printf("Restarting all agents\n")
+				c.lock.Lock()
 				for _, a := range agents {
 					a.Restart()
 					a.Join()
 				}
+				c.lock.Unlock()
 				conn.ConnectionRestart = make(chan bool, 1)
 				conn.UdpConnection.Close()
 				conn.UdpConnection, _ = EstablishUDPConnection(conn.Host, conn.UdpConnection.LocalAddr().(*net.UDPAddr))
+				conn.Logger.Printf("[DEBUG] New Local Address: %v", conn.UdpConnection.LocalAddr().String())
+				c.lock.Lock()
 				for _, a := range agents {
 					a.Run(conn)
 				}
+				c.lock.Unlock()
 				close(conn.ConnectionRestarted)
 				conn.Logger.Printf("Restarting all agents: done\n")
 			case <-conn.ConnectionClosed:
@@ -144,7 +153,9 @@ func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgen
 
 func (c *ConnectionAgents) Add(agent Agent) {
 	agent.Run(c.conn)
+	c.lock.Lock()
 	c.agents[agent.Name()] = agent
+	c.lock.Unlock()
 }
 
 func (c *ConnectionAgents) Get(name string) Agent {
@@ -167,17 +178,21 @@ func (c *ConnectionAgents) GetFrameProducingAgents() []FrameProducer {
 }
 
 func (c *ConnectionAgents) Stop(names ...string) {
+	c.lock.Lock()
 	for _, n := range names {
 		c.Get(n).Stop()
 		c.Get(n).Join()
 	}
+	c.lock.Unlock()
 }
 
 func (c *ConnectionAgents) StopAll() {
+	c.lock.Lock()
 	for _, a := range c.agents {
 		a.Stop()
 		a.Join()
 	}
+	c.lock.Unlock()
 }
 
 // This function sends an (CONNECTION|APPLICATION)_CLOSE frame and wait for it to be sent out. Then it stops all the

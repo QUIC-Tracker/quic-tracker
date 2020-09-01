@@ -159,16 +159,14 @@ func (a *Adapter) Run() {
 func (a *Adapter) Stop() {
 	a.trace.Complete(a.connection)
 	a.SaveTrace("trace.json")
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).Stop()
-	time.Sleep(50 * time.Millisecond)
+	a.agents.Stop("SendingAgent")
 	a.agents.StopAll()
 	a.stop <- true
 }
 
 func (a *Adapter) Reset(client *tcp.Client) {
 	a.Logger.Print("Received RESET command")
-	a.agents.Get("SendingAgent").(*agents.SendingAgent).Stop()
-	time.Sleep(50 * time.Millisecond)
+	a.agents.Stop("SendingAgent")
 	a.agents.StopAll()
 	a.connection.Close()
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", true)

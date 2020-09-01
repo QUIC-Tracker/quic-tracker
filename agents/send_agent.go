@@ -2,6 +2,7 @@ package agents
 
 import (
 	. "github.com/tiferrei/quic-tracker"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type SendingAgent struct {
 	BaseAgent
 	MTU                         uint16
 	FrameProducer               []FrameProducer
+	FrameProducerLock           sync.Mutex
 	DontCoalesceZeroRTT         bool
 	KeepDroppedEncryptionLevels bool
 }
@@ -52,7 +54,8 @@ func (a *SendingAgent) Run(conn *Connection) {
 	fillPacket := func(packet Framer, level EncryptionLevel) Framer {
 		spaceLeft := int(a.MTU) - packet.Header().HeaderLength() - conn.CryptoState(level).Write.Overhead()
 
-	addFrame:
+		a.FrameProducerLock.Lock()
+		addFrame:
 		for i, fp := range a.FrameProducer {
 			levels := []EncryptionLevel{level}
 			for eL, bEL := range bestEncryptionLevels {
@@ -76,6 +79,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 				}
 			}
 		}
+		a.FrameProducerLock.Unlock()
 
 		if len(packet.GetFrames()) == 0 {
 			a.Logger.Printf("Preparing a packet for encryption level %s resulted in an empty packet, discarding\n", level.String())

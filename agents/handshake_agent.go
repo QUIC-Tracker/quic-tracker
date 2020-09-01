@@ -72,6 +72,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					// TODO: Validate this, https://tools.ietf.org/html/draft-ietf-quic-tls-27#section-5.8
 					if !a.IgnoreRetry && !a.receivedRetry {
 						a.Logger.Println("A Retry packet was received, restarting the connection")
+						a.Logger.Printf("[DEBUG] Current Local Address: %v", conn.UdpConnection.LocalAddr().String())
 						a.receivedRetry = true
 						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
 						a.retrySource = p.Header().(*LongHeader).SourceCID

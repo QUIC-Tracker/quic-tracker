@@ -15,6 +15,7 @@ import (
 
 type Adapter struct {
 	connection                *qt.Connection
+	http3                     bool
 	trace                     *qt.Trace
 	agents                    *agents.ConnectionAgents
 	server                    *tcp.Server
@@ -26,15 +27,16 @@ type Adapter struct {
 	outgoingResponse          Response
 }
 
-func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adapter, error) {
+func NewAdapter(adapterAddress string, sulAddress string, sulName string, http3 bool) (*Adapter, error) {
 	adapter := new(Adapter)
 
 	adapter.incomingLearnerSymbols = qt.NewBroadcaster(1000)
+	adapter.http3 = http3
 	adapter.stop = make(chan bool, 1)
 	adapter.Logger = log.New(os.Stderr, "[ADAPTER] ", log.Lshortfile)
 	adapter.server = tcp.New(adapterAddress)
 
-	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "h3", true)
+	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "hq", adapter.http3)
 	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
 
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
@@ -55,7 +57,11 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string) (*Adap
 		FrameProducer: adapter.agents.GetFrameProducingAgents(),
 	})
 	adapter.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
-	adapter.agents.Add(&agents.HTTP3Agent{})
+	if adapter.http3 {
+		adapter.agents.Add(&agents.HTTP3Agent{})
+	} else {
+		adapter.agents.Add(&agents.HTTP09Agent{})
+	}
 	adapter.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	adapter.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	adapter.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
@@ -98,7 +104,11 @@ func (a *Adapter) Run() {
 					a.connection.FrameQueue.Submit(qt.QueuedFrame{Frame: new(qt.PaddingFrame), EncryptionLevel: encLevel})
 				case qt.StreamType:
 					if len(a.connection.StreamQueue[qt.FrameRequest{FrameType: qt.StreamType, EncryptionLevel: qt.EncryptionLevel1RTT}]) == 0 {
-						a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
+						if a.http3 {
+							a.agents.Get("HTTP3Agent").(*agents.HTTP3Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
+						} else {
+							a.agents.Get("HTTP09Agent").(*agents.HTTP09Agent).SendRequest("/index.html", "GET", a.connection.Host.String(), nil)
+						}
                         // FIXME: This ensures the request gets queued before packets are sent. I'm not proud of it but it works.
                         time.Sleep(1 * time.Millisecond)
 					}
@@ -169,7 +179,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.agents.Stop("SendingAgent")
 	a.agents.StopAll()
 	a.connection.Close()
-	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "h3", true)
+	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", a.http3)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
@@ -184,7 +194,11 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		FrameProducer: a.agents.GetFrameProducingAgents(),
 	})
 	a.agents.Get("StreamAgent").(*agents.StreamAgent).DisableFrameSending = true
-	a.agents.Add(&agents.HTTP3Agent{})
+	if a.http3 {
+		a.agents.Add(&agents.HTTP3Agent{})
+	} else {
+		a.agents.Add(&agents.HTTP09Agent{})
+	}
 	a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).DisableFrameSending = true
 	a.agents.Get("TLSAgent").(*agents.TLSAgent).DisableFrameSending = true
@@ -270,17 +284,4 @@ func (a *Adapter) SaveTrace(filename string) {
 			outFile.Close()
 		}
 	}
-}
-
-// Get next available client-initiated, bidirectional Stream ID.
-func (a *Adapter) getNextStreamID() uint64 {
-	streamID := uint64(0)
-	for {
-		stream := a.connection.Streams.Get(streamID)
-		if !stream.WriteClosed {
-			break
-		}
-		streamID += 4
-	}
-	return streamID
 }

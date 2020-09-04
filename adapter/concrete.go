@@ -28,20 +28,28 @@ func (cs ConcreteSymbol) String() string {
 }
 
 type ConcreteSet struct {
-	mapset.Set
+	internalSet mapset.Set // type: ConcreteSymbol
 }
 
 func NewConcreteSet() *ConcreteSet {
-	cs := mapset.NewSet().(ConcreteSet)
+	cs := ConcreteSet{internalSet: mapset.NewSet()}
 	return &cs
 }
 
+func (as *ConcreteSet) Add(concreteSymbol ConcreteSymbol) {
+	as.internalSet.Add(concreteSymbol)
+}
+
+func (as *ConcreteSet) Clear() {
+	as.internalSet.Clear()
+}
+
 func (cs ConcreteSet) String() string {
-	if cs.Cardinality() == 0 {
+	if cs.internalSet.Cardinality() == 0 {
 		return "[]"
 	}
 
-	setSlice := cs.ToSlice()
+	setSlice := cs.internalSet.ToSlice()
 	stringSlice := []string{}
 	for index, setElement := range setSlice {
 		stringSlice[index] = setElement.(ConcreteSymbol).String()

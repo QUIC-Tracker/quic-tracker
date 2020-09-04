@@ -105,20 +105,28 @@ func NewAbstractSymbolFromString(message string) AbstractSymbol {
 }
 
 type AbstractSet struct {
-	mapset.Set // type: AbstractSymbol
+	internalSet mapset.Set // type: AbstractSymbol
 }
 
 func NewAbstractSet() *AbstractSet {
-	as := mapset.NewSet().(AbstractSet)
+	as := AbstractSet{internalSet: mapset.NewSet()}
 	return &as
 }
 
+func (as *AbstractSet) Add(abstractSymbol AbstractSymbol) {
+	as.internalSet.Add(abstractSymbol)
+}
+
+func (as *AbstractSet) Clear() {
+	as.internalSet.Clear()
+}
+
 func (as AbstractSet) String() string {
-	if as.Cardinality() == 0 {
+	if as.internalSet.Cardinality() == 0 {
 		return "[]"
 	}
 
-	setSlice := as.ToSlice()
+	setSlice := as.internalSet.ToSlice()
 	stringSlice := []string{}
 	for index, setElement := range setSlice {
 		stringSlice[index] = setElement.(AbstractSymbol).String()

@@ -20,7 +20,7 @@ func ConvertPacket(p Packet) *qlog.Packet {
 	j := &qlog.Packet{}
 	switch p.(type) {
 	case *InitialPacket, *HandshakePacket, *ZeroRTTProtectedPacket, *ProtectedPacket:
-		j.PacketType = qlogPacketType[p.Header().GetPacketType()]
+		j.PacketType = qlogPacketType[p.GetHeader().GetPacketType()]
 	case *RetryPacket:
 		j.PacketType = qlogPacketType[Retry]
 	case *VersionNegotiationPacket:
@@ -32,10 +32,10 @@ func ConvertPacket(p Packet) *qlog.Packet {
 	switch p.(type) {
 	case *VersionNegotiationPacket, *RetryPacket, *StatelessResetPacket:
 	default:
-		j.Header.PacketNumber = uint64(p.Header().GetPacketNumber())
+		j.Header.PacketNumber = uint64(p.GetHeader().GetPacketNumber())
 	}
 
-	switch h := p.Header().(type) {
+	switch h := p.GetHeader().(type) {
 		case *ShortHeader:
 			j.Header.DCIL = strconv.Itoa(int(h.DestinationCID.CIDL()))
 			j.Header.DCID = h.DestinationCID.String()

@@ -97,7 +97,7 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 					}
 					if _, ok := p.(*InitialPacket); ok && !firstInitialReceived {
 						firstInitialReceived = true
-						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
+						conn.DestinationCID = p.GetHeader().(*LongHeader).SourceCID
 						a.Logger.Printf("Received first Initial packet from server, switching DCID to %s\n", hex.EncodeToString(conn.DestinationCID))
 					}
 					if p.Contains(HandshakeDoneType) {

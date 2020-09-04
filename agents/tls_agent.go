@@ -73,7 +73,7 @@ func (a *TLSAgent) Run(conn *Connection) {
 					}
 				}
 
-				a.Logger.Printf("Received %s packet in PN space %s and %d bytes from the corresponding crypto stream\n", packet.Header().GetPacketType().String(), packet.PNSpace().String(), len(handshakeData))
+				a.Logger.Printf("Received %s packet in PN space %s and %d bytes from the corresponding crypto stream\n", packet.GetHeader().GetPacketType().String(), packet.PNSpace().String(), len(handshakeData))
 
 				switch packet.(type) {
 				case Framer:

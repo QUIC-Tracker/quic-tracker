@@ -11,7 +11,7 @@ import (
 )
 
 type Packet interface {
-	Header() Header
+	GetHeader() Header
 	ShouldBeAcknowledged() bool // Indicates whether or not the packet type should be acknowledged by the mean of sending an ack
 	EncodeHeader() []byte
 	EncodePayload() []byte

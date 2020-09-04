@@ -113,7 +113,7 @@ firstFlight:
 				trace.ErrorCode = CM46_NoNewCIDUsed
 			}
 
-			if bytes.Equal(p.Header().DestinationConnectionID(), scid) && trace.ErrorCode == CM46_NoNewCIDUsed {
+			if bytes.Equal(p.GetHeader().DestinationConnectionID(), scid) && trace.ErrorCode == CM46_NoNewCIDUsed {
 				trace.ErrorCode = 0
 			}
 

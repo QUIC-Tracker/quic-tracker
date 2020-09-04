@@ -38,7 +38,7 @@ func (a *AckAgent) Run(conn *Connection) {
 			case i := <-incomingPackets:
 				p := i.(Packet)
 				if p.PNSpace() != PNSpaceNoSpace {
-					pn := p.Header().GetPacketNumber()
+					pn := p.GetHeader().GetPacketNumber()
 					for _, number := range conn.AckQueue[p.PNSpace()] {
 						if number == pn {
 							a.Logger.Printf("Received duplicate packet number %d in PN space %s\n", pn, p.PNSpace().String())
@@ -47,7 +47,7 @@ func (a *AckAgent) Run(conn *Connection) {
 					}
 
 					conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], pn)
-					recvdTimestamps[p.PNSpace()][p.Header().GetPacketNumber()] = p.ReceiveContext().Timestamp
+					recvdTimestamps[p.PNSpace()][p.GetHeader().GetPacketNumber()] = p.ReceiveContext().Timestamp
 
 					if framePacket, ok := p.(Framer); ok {
 						if pathChallenge := framePacket.GetFirst(PathChallengeType); !a.DisablePathResponse && pathChallenge != nil {

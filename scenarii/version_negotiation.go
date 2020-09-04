@@ -58,7 +58,7 @@ func (s *VersionNegotiationScenario) Run(conn *qt.Connection, trace *qt.Trace, p
 				}
 			case qt.Packet:
 				trace.MarkError(VN_NotAnsweringToVN, "", p)
-				trace.Results["received_packet_type"] = p.Header().GetPacketType()
+				trace.Results["received_packet_type"] = p.GetHeader().GetPacketType()
 			}
 		case <-conn.ConnectionClosed:
 			return

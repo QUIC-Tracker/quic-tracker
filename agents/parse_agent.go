@@ -146,8 +146,8 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()] = append(a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()], frame)
 						}
 
-						if framer.Header().GetPacketNumber() > conn.LargestPNsReceived[framer.PNSpace()] {
-							conn.LargestPNsReceived[framer.PNSpace()] = framer.Header().GetPacketNumber()
+						if framer.GetHeader().GetPacketNumber() > conn.LargestPNsReceived[framer.PNSpace()] {
+							conn.LargestPNsReceived[framer.PNSpace()] = framer.GetHeader().GetPacketNumber()
 						}
 						packet = framer
 					}

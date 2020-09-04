@@ -45,7 +45,7 @@ wait:
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
-			if fp, ok := p.(qt.Framer); ok && fp.Header().GetPacketType() == qt.ShortHeaderPacket && fp.Contains(qt.NewConnectionIdType) {
+			if fp, ok := p.(qt.Framer); ok && fp.GetHeader().GetPacketType() == qt.ShortHeaderPacket && fp.Contains(qt.NewConnectionIdType) {
 				ncids := fp.GetAll(qt.NewConnectionIdType)
 				if len(ncids) > int(conn.TLSTPHandler.ActiveConnectionIdLimit) {
 					trace.MarkError(CM_TooManyCIDs, "", p)
@@ -86,7 +86,7 @@ wait:
 			p := i.(qt.Packet)
 			if trace.ErrorCode == CM_HostDidNotMigrate {
 				trace.ErrorCode = CM_HostDidNotValidateNewPath
-				if bytes.Equal(p.Header().DestinationConnectionID(), scid) && ncid != nil {
+				if bytes.Equal(p.GetHeader().DestinationConnectionID(), scid) && ncid != nil {
 					conn.SourceCID = scid
 					conn.DestinationCID = ncid
 				}

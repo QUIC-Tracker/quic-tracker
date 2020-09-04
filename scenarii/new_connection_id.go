@@ -55,7 +55,7 @@ func (s *NewConnectionIDScenario) Run(conn *qt.Connection, trace *qt.Trace, pref
 		case i := <-incPackets:
 			p := i.(qt.Packet)
 			if expectingResponse {
-				if !bytes.Equal(p.Header().DestinationConnectionID(), conn.SourceCID) {
+				if !bytes.Equal(p.GetHeader().DestinationConnectionID(), conn.SourceCID) {
 					trace.MarkError(NCI_HostDidNotAdaptCID, "", p)
 				} else if conn.Streams.Get(0).ReadClosed {
 					trace.ErrorCode = 0

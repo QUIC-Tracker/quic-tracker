@@ -3,12 +3,12 @@ package adapter
 import (
 	"encoding/json"
 	"fmt"
+	mapset "github.com/deckarep/golang-set"
 	qt "github.com/tiferrei/quic-tracker"
 	"github.com/tiferrei/quic-tracker/agents"
 	tcp "github.com/tiferrei/tcp_server"
 	"log"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -22,9 +22,13 @@ type Adapter struct {
 	stop                      chan bool
 	Logger                    *log.Logger
 
-	incomingLearnerSymbols    qt.Broadcaster // Type: AbstractSymbol
-	incomingSulPackets        chan interface{}
-	outgoingResponse          Response
+	incomingLearnerSymbols qt.Broadcaster // Type: AbstractSymbol
+	incomingSulPackets     chan interface{}
+	outgoingSulPackets     chan interface{}
+	outgoingPacket         *ConcreteSymbol
+	incomingPacketSet      ConcreteSet
+	outgoingResponse       AbstractSet
+	oracleTable            AbstractConcreteMap
 }
 
 func NewAdapter(adapterAddress string, sulAddress string, sulName string, http3 bool) (*Adapter, error) {
@@ -38,6 +42,7 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string, http3 
 
 	adapter.connection, _ = qt.NewDefaultConnection(sulAddress, sulName, nil, false, "hq", adapter.http3)
 	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
+	adapter.outgoingSulPackets = adapter.connection.OutgoingPackets.RegisterNewChan(1000)
 
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
 	adapter.trace.AttachTo(adapter.connection)
@@ -92,7 +97,7 @@ func (a *Adapter) Run() {
 			if as.headerOptions.QUICVersion != nil {
 				a.connection.Version = *as.headerOptions.QUICVersion
 			}
-			for _, frameType := range as.frameTypes {
+			for _, frameType := range as.frameTypes.ToSlice() {
 				switch frameType {
 				case qt.AckType:
 					a.agents.Get("AckAgent").(*agents.AckAgent).SendFromQueue <- pnSpace
@@ -112,10 +117,10 @@ func (a *Adapter) Run() {
                         // FIXME: This ensures the request gets queued before packets are sent. I'm not proud of it but it works.
                         time.Sleep(1 * time.Millisecond)
 					}
-					a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
+					a.agents.Get("StreamAgent").(*agents.StreamAgent).SendFromQueue <- qt.FrameRequest{qt.StreamType, encLevel}
 				case qt.MaxDataType:
 				case qt.MaxStreamDataType:
-					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{frameType, encLevel}
+					a.agents.Get("FlowControlAgent").(*agents.FlowControlAgent).SendFromQueue <- qt.FrameRequest{qt.MaxStreamDataType, encLevel}
 				default:
 					panic(fmt.Sprintf("Error: Frame Type '%v' not implemented!", frameType))
 				}
@@ -123,9 +128,10 @@ func (a *Adapter) Run() {
 			a.Logger.Printf("Submitting request: %v", as.String())
 			a.connection.PreparePacket.Submit(encLevel)
 		case o := <-a.incomingSulPackets:
+			a.incomingPacketSet.Add(NewConcreteSymbol(o))
 			var packetType qt.PacketType
 			version := &a.connection.Version
-			frameTypes := []qt.FrameType{}
+			frameTypes := mapset.NewSet()
 
 			switch packet := o.(type) {
 			case *qt.VersionNegotiationPacket:
@@ -140,12 +146,12 @@ func (a *Adapter) Run() {
 				for _, frame := range packet.GetFrames() {
 					if frame.FrameType() != qt.PaddingFrameType {
 						// We don't want to pass PADDINGs to the learner.
-						frameTypes = append(frameTypes, frame.FrameType())
+						frameTypes.Add(frame.FrameType())
 					}
 				}
 				// A framer with no frames is a result of removing retransmitted ones.
 				// FIXME: This could be more elegant.
-				if len(frameTypes) == 0 {
+				if frameTypes.Cardinality() == 0 {
 					continue
 				}
 			default:
@@ -157,7 +163,10 @@ func (a *Adapter) Run() {
 				HeaderOptions{QUICVersion: version},
 				frameTypes)
 			a.Logger.Printf("Got response: %v", abstractSymbol.String())
-			a.outgoingResponse = append(a.outgoingResponse, abstractSymbol)
+			a.outgoingResponse.Add(abstractSymbol)
+		case o := <- a.outgoingSulPackets:
+			cs := NewConcreteSymbol(o)
+			a.outgoingPacket = &cs
 		case <-a.stop:
 			return
 		default:
@@ -181,6 +190,7 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.connection.Close()
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", a.http3)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
+	a.outgoingSulPackets = a.connection.OutgoingPackets.RegisterNewChan(1000)
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
 	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
@@ -209,7 +219,6 @@ func (a *Adapter) Reset(client *tcp.Client) {
 		qt.PNSpaceAppData: true,
 	}
 
-	//a.agents.Get("SendingAgent").(*agents.SendingAgent).KeepDroppedEncryptionLevels = true
 	a.Logger.Print("Finished RESET mechanism")
 	err := client.Send("DONE\n")
 	if err != nil {
@@ -241,10 +250,16 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 }
 
 func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, waitTime time.Duration) {
-	queryAnswer := []string{}
+	abstractInputs := []AbstractSymbol{}
+	abstractOutputs := []AbstractSet{}
+	concreteInputs := []*ConcreteSymbol{}
+	concreteOutputs := []ConcreteSet{}
 	for _, message := range query {
-		a.outgoingResponse = nil
+		a.outgoingResponse.Clear()
+		a.incomingPacketSet.Clear()
+		a.outgoingPacket = nil
 		abstractSymbol := NewAbstractSymbolFromString(message)
+		abstractInputs = append(abstractInputs, abstractSymbol)
 
 		// If there we don't have the requested encryption level, skip and return EMPTY.
 		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) != nil {
@@ -254,22 +269,30 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 			a.Logger.Printf("Unable to send packet at " + qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType].String() + " EL.")
 		}
 
-		sort.Slice(a.outgoingResponse, func(i, j int) bool {
-			return a.outgoingResponse[i].String() > a.outgoingResponse[j].String()
-		})
-		queryAnswer = append(queryAnswer, a.outgoingResponse.String())
+		abstractOutputs = append(abstractOutputs, a.outgoingResponse)
+		concreteInputs = append(concreteInputs, a.outgoingPacket)
+		concreteOutputs = append(concreteOutputs, a.incomingPacketSet)
 
 		// If we received a Retry, give the connection time to restart.
 		if strings.Contains(a.outgoingResponse.String(), "RETRY") {
 			time.Sleep(300 * time.Millisecond)
 		}
-		a.outgoingResponse = nil
 	}
 
-	err := client.Send(strings.Join(queryAnswer, " ") + "\n")
+	a.oracleTable.AddIOs(abstractInputs, abstractOutputs, concreteInputs, concreteOutputs)
+
+	aoStringSlice := []string{}
+	for _, value := range abstractOutputs {
+		aoStringSlice = append(aoStringSlice, value.String())
+	}
+
+	err := client.Send(strings.Join(aoStringSlice, " ") + "\n")
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
+
+	out := a.oracleTable.String()
+	a.Logger.Printf(out)
 }
 
 func (a *Adapter) SaveTrace(filename string) {

@@ -2,8 +2,10 @@ package adapter
 
 import (
 	"fmt"
+	mapset "github.com/deckarep/golang-set"
 	qt "github.com/tiferrei/quic-tracker"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -49,35 +51,22 @@ func (ho *HeaderOptions) String() string {
 type AbstractSymbol struct {
 	packetType qt.PacketType
 	headerOptions HeaderOptions
-	frameTypes []qt.FrameType
+	frameTypes mapset.Set // type: qt.FrameType
 }
 
-func (as *AbstractSymbol) String() string {
+func (as AbstractSymbol) String() string {
 	packetType := packetTypeToString[as.packetType]
 	headerOptions := as.headerOptions.String()
-	var frameStrings []string
-	for _, frameType := range as.frameTypes {
-		frameStrings= append(frameStrings, frameType.String())
+	frameStrings := []string{}
+	for _, frameType := range as.frameTypes.ToSlice() {
+		frameStrings = append(frameStrings, frameType.(qt.FrameType).String())
 	}
+	sort.Strings(frameStrings)
 	frameTypes := strings.Join(frameStrings, ",")
 	return fmt.Sprintf("%v(%v)[%v]", packetType, headerOptions, frameTypes)
 }
 
-type Response []AbstractSymbol
-func (as Response) String() string {
-	stringSlice := make([]string, len(as))
-	for index, abstractSymbol := range as {
-		stringSlice[index] = abstractSymbol.String()
-	}
-
-
-	if len(stringSlice) == 0 {
-		stringSlice = append(stringSlice, "EMPTY")
-	}
-	return strings.Join(stringSlice, "+")
-}
-
-func NewAbstractSymbol(packetType qt.PacketType, headerOptions HeaderOptions, frameTypes []qt.FrameType) AbstractSymbol {
+func NewAbstractSymbol(packetType qt.PacketType, headerOptions HeaderOptions, frameTypes mapset.Set) AbstractSymbol {
 	return AbstractSymbol{
 		packetType:    packetType,
 		headerOptions: headerOptions,
@@ -106,11 +95,67 @@ func NewAbstractSymbolFromString(message string) AbstractSymbol {
 	}
 
 	// The fifth group will be a CSV of frame types.
-	frameTypes := []qt.FrameType{}
+	frameTypes := mapset.NewSet()
 	frameSplice := strings.Split(subgroups[4], ",")
 	for _, frameString := range frameSplice {
-		frameTypes = append(frameTypes, qt.FrameTypeFromString(frameString))
+		frameTypes.Add(qt.FrameTypeFromString(frameString))
 	}
 
 	return NewAbstractSymbol(packetType, headerOptions, frameTypes)
 }
+
+type AbstractSet struct {
+	mapset.Set // type: AbstractSymbol
+}
+
+func (as AbstractSet) String() string {
+	if as.Cardinality() == 0 {
+		return "[]"
+	}
+
+	setSlice := as.ToSlice()
+	stringSlice := []string{}
+	for index, setElement := range setSlice {
+		stringSlice[index] = setElement.(AbstractSymbol).String()
+	}
+	sort.Strings(stringSlice)
+
+	return fmt.Sprintf("[%v]", strings.Join(stringSlice, ","))
+}
+
+type AbstractOrderedPair struct {
+	abstractInputs  []AbstractSymbol
+	abstractOutputs []AbstractSet
+}
+
+func (ct *AbstractOrderedPair) Input() *[]AbstractSymbol {
+	return &ct.abstractInputs
+}
+
+func (ct *AbstractOrderedPair) Output() *[]AbstractSet {
+	return &ct.abstractOutputs
+}
+
+func (ct *AbstractOrderedPair) SetInput(abstractSymbols []AbstractSymbol) {
+	(*ct).abstractInputs = abstractSymbols
+}
+
+func (ct *AbstractOrderedPair) SetOutput(abstractSets []AbstractSet) {
+	(*ct).abstractOutputs = abstractSets
+}
+
+func (ct AbstractOrderedPair) String() string {
+	aiStringSlice := []string{}
+	for _, value := range ct.abstractInputs {
+		aiStringSlice = append(aiStringSlice, value.String())
+	}
+	aiString := fmt.Sprintf("[%v]", strings.Join(aiStringSlice, ","))
+
+	aoStringSlice := []string{}
+	for _, value := range ct.abstractOutputs {
+		aoStringSlice = append(aoStringSlice, value.String())
+	}
+	aoString := fmt.Sprintf("[%v]", strings.Join(aoStringSlice, ","))
+	return fmt.Sprintf("(%v,%v)", aiString, aoString)
+}
+

@@ -14,7 +14,8 @@ type ConcreteSymbol struct {
 }
 
 func NewConcreteSymbol(packet interface{}) ConcreteSymbol {
-	cs := packet.(ConcreteSymbol)
+	gp := packet.(GenericPacket)
+	cs := ConcreteSymbol{gp}
 	return cs
 }
 

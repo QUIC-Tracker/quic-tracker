@@ -52,10 +52,10 @@ func (a *ParsingAgent) Run(conn *Connection) {
 					header := ReadHeader(bytes.NewReader(ciphertext), a.conn)
 					cryptoState := a.conn.CryptoState(header.EncryptionLevel())
 
-					switch header.PacketType() {
+					switch header.GetPacketType() {
 					case Initial, Handshake, ZeroRTTProtected, ShortHeaderPacket: // Decrypt PN
 						if cryptoState != nil && cryptoState.HeaderRead != nil && cryptoState.Read != nil {
-							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.PacketType().String(), len(ciphertext))
+							a.Logger.Printf("Decrypting packet number of %s packet of length %d bytes", header.GetPacketType().String(), len(ciphertext))
 
 							firstByteMask := byte(0x1F)
 							if ciphertext[0] & 0x80 == 0x80 {
@@ -73,38 +73,38 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							}
 							header = ReadHeader(bytes.NewReader(ciphertext), a.conn) // Update PN
 						} else {
-							a.Logger.Printf("Crypto state for %s packet of length %d bytes is not ready, putting it back in waiting buffer\n", header.PacketType().String(), len(ciphertext))
+							a.Logger.Printf("Crypto state for %s packet of length %d bytes is not ready, putting it back in waiting buffer\n", header.GetPacketType().String(), len(ciphertext))
 							ic.Payload = ciphertext
 							a.conn.UnprocessedPayloads.Submit(UnprocessedPayload{ic, header.EncryptionLevel()})
 							break packetSelect
 						}
 					}
 
-					a.Logger.Printf("Successfully decrypted header {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
+					a.Logger.Printf("Successfully decrypted header {type=%s, number=%d}\n", header.GetPacketType().String(), header.GetPacketNumber())
 
 					hLen := header.HeaderLength()
 					var packet Packet
 					var cleartext []byte
 					var consumed int
-					switch header.PacketType() {
+					switch header.GetPacketType() {
 					case Handshake, Initial:
 						lHeader := header.(*LongHeader)
-						pLen := int(lHeader.Length.Value) - header.TruncatedPN().Length
+						pLen := int(lHeader.Length.Value) - header.GetTruncatedPN().Length
 
 						if hLen+pLen > len(ciphertext) {
 							a.Logger.Printf("Payload length %d is past the %d received bytes, has PN decryption failed ? Aborting", hLen+pLen, len(ciphertext))
 							break packetSelect
 						}
 
-						payload := cryptoState.Read.Decrypt(ciphertext[hLen:hLen+pLen], uint64(header.PacketNumber()), ciphertext[:hLen])
+						payload := cryptoState.Read.Decrypt(ciphertext[hLen:hLen+pLen], uint64(header.GetPacketNumber()), ciphertext[:hLen])
 						if payload == nil {
-							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.GetPacketType().String(), header.GetPacketNumber())
 							break packetSelect
 						}
 
 						cleartext = append(append(cleartext, ciphertext[:hLen]...), payload...)
 
-						if lHeader.PacketType() == Initial {
+						if lHeader.GetPacketType() == Initial {
 							packet = ReadInitialPacket(bytes.NewReader(cleartext), a.conn)
 						} else {
 							packet = ReadHandshakePacket(bytes.NewReader(cleartext), a.conn)
@@ -112,9 +112,9 @@ func (a *ParsingAgent) Run(conn *Connection) {
 
 						consumed = hLen + pLen
 					case ShortHeaderPacket: // Packets with a short header always include a 1-RTT protected payload.
-						payload := cryptoState.Read.Decrypt(ciphertext[hLen:], uint64(header.PacketNumber()), ciphertext[:hLen])
+						payload := cryptoState.Read.Decrypt(ciphertext[hLen:], uint64(header.GetPacketNumber()), ciphertext[:hLen])
 						if payload == nil {
-							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.PacketType().String(), header.PacketNumber())
+							a.Logger.Printf("Could not decrypt packet {type=%s, number=%d}\n", header.GetPacketType().String(), header.GetPacketNumber())
 							statelessResetToken := ciphertext[len(ciphertext)-16:]
 							if bytes.Equal(statelessResetToken, conn.TLSTPHandler.ReceivedParameters.StatelessResetToken) {
 								a.Logger.Println("Received a Stateless Reset packet")
@@ -137,7 +137,7 @@ func (a *ParsingAgent) Run(conn *Connection) {
 						break packetSelect
 					}
 
-					a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.PacketType().String(), header.PacketNumber(), len(cleartext))
+					a.Logger.Printf("Successfully parsed packet {type=%s, number=%d, length=%d}\n", header.GetPacketType().String(), header.GetPacketNumber(), len(cleartext))
 
 
 					if framer, ok := packet.(Framer); ok {
@@ -146,8 +146,8 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()] = append(a.conn.ReceiveFrameBuffer[framer.PNSpace()][frame.FrameType()], frame)
 						}
 
-						if framer.Header().PacketNumber() > conn.LargestPNsReceived[framer.PNSpace()] {
-							conn.LargestPNsReceived[framer.PNSpace()] = framer.Header().PacketNumber()
+						if framer.Header().GetPacketNumber() > conn.LargestPNsReceived[framer.PNSpace()] {
+							conn.LargestPNsReceived[framer.PNSpace()] = framer.Header().GetPacketNumber()
 						}
 						packet = framer
 					}

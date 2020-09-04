@@ -67,7 +67,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 				if spaceLeft < 1 {
 					break addFrame
 				}
-				frames, more := fp.RequestFrames(spaceLeft, l, packet.Header().PacketNumber())
+				frames, more := fp.RequestFrames(spaceLeft, l, packet.Header().GetPacketNumber())
 				if !more {
 					a.FrameProducer[i] = nil
 					a.FrameProducer = append(a.FrameProducer[:i], a.FrameProducer[i+1:]...)
@@ -165,7 +165,7 @@ func (a *SendingAgent) Run(conn *Connection) {
 				}
 			case i := <-sendPacket:
 				p := i.(PacketToSend)
-				if p.EncryptionLevel == EncryptionLevelInitial && p.Packet.Header().PacketType() == Initial {
+				if p.EncryptionLevel == EncryptionLevelInitial && p.Packet.Header().GetPacketType() == Initial {
 					initial := p.Packet.(*InitialPacket)
 					if !a.DontCoalesceZeroRTT && bestEncryptionLevels[EncryptionLevelBestAppData] == EncryptionLevel0RTT {
 						// Try to prepare a 0-RTT packet and squeeze it after the Initial

@@ -156,7 +156,7 @@ func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
 	sampleLength := 16
 	switch h := header.(type) {
 	case *LongHeader:
-		pnOffset = h.HeaderLength() - h.TruncatedPN().Length
+		pnOffset = h.HeaderLength() - h.GetTruncatedPN().Length
 	case *ShortHeader:
 		pnOffset = 1 + len(h.DestinationCID)
 	}

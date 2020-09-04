@@ -44,7 +44,7 @@ forLoop:
 				}
 				sendUnsupportedInitial(conn)
 			case *qt.RetryPacket:
-				conn.DestinationCID = p.Header().(*qt.LongHeader).SourceCID
+				conn.DestinationCID = p.GetHeader().(*qt.LongHeader).SourceCID
 				conn.TransitionTo(qt.QuicVersion, qt.QuicALPNToken)
 				conn.Token = p.RetryToken
 				sendUnsupportedInitial(conn)

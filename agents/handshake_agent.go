@@ -74,8 +74,8 @@ func (a *HandshakeAgent) Run(conn *Connection) {
 						a.Logger.Println("A Retry packet was received, restarting the connection")
 						a.Logger.Printf("[DEBUG] Current Local Address: %v", conn.UdpConnection.LocalAddr().String())
 						a.receivedRetry = true
-						conn.DestinationCID = p.Header().(*LongHeader).SourceCID
-						a.retrySource = p.Header().(*LongHeader).SourceCID
+						conn.DestinationCID = p.GetHeader().(*LongHeader).SourceCID
+						a.retrySource = p.GetHeader().(*LongHeader).SourceCID
 						tlsTP, alpn := conn.TLSTPHandler, conn.ALPN
 						// Section 17.2.5.3, A client MUST NOT reset the packet number
 						// for any packet number space after processing a Retry packet

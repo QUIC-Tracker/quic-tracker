@@ -26,41 +26,41 @@ type Packet interface {
 	SetSendContext(ctx PacketContext)
 }
 
-type abstractPacket struct {
-	header         Header
+type AbstractPacket struct {
+	Header         Header
 	receiveContext PacketContext
 	sendContext    PacketContext
 }
-func (p abstractPacket) Header() Header {
-	return p.header
+func (p AbstractPacket) GetHeader() Header {
+	return p.Header
 }
-func (p abstractPacket) ReceiveContext() PacketContext {
+func (p AbstractPacket) ReceiveContext() PacketContext {
 	return p.receiveContext
 }
-func (p *abstractPacket) SetReceiveContext(ctx PacketContext) {
+func (p *AbstractPacket) SetReceiveContext(ctx PacketContext) {
 	p.receiveContext = ctx
 }
-func (p abstractPacket) SendContext() PacketContext {
+func (p AbstractPacket) SendContext() PacketContext {
 	return p.sendContext
 }
-func (p *abstractPacket) SetSendContext(ctx PacketContext) {
+func (p *AbstractPacket) SetSendContext(ctx PacketContext) {
 	p.sendContext = ctx
 }
-func (p abstractPacket) EncodeHeader() []byte {
-	return p.header.Encode()
+func (p AbstractPacket) EncodeHeader() []byte {
+	return p.Header.Encode()
 }
-func (p abstractPacket) Encode(payload []byte) []byte {
+func (p AbstractPacket) Encode(payload []byte) []byte {
 	buffer := new(bytes.Buffer)
 	buffer.Write(p.EncodeHeader())
 	buffer.Write(payload)
 	return buffer.Bytes()
 }
-func (p abstractPacket) ShortString() string {
-	return fmt.Sprintf("{type=%s, number=%d}", p.header.PacketType().String(), p.header.PacketNumber())
+func (p AbstractPacket) ShortString() string {
+	return fmt.Sprintf("{type=%s, number=%d}", p.Header.GetPacketType().String(), p.Header.GetPacketNumber())
 }
 
 type VersionNegotiationPacket struct {
-	abstractPacket
+	AbstractPacket
 	UnusedField uint8
 	Version        uint32
 	DestinationCID ConnectionID
@@ -138,7 +138,7 @@ type Framer interface {
 	PadTo(length int)
 }
 type FramePacket struct {
-	abstractPacket
+	AbstractPacket
 	Frames []Frame
 }
 func (p *FramePacket) GetFrames() []Frame {
@@ -198,14 +198,14 @@ func (p *FramePacket) GetAll(frameType FrameType) []Frame {
 	return frames
 }
 func (p *FramePacket) PadTo(length int) {
-	switch h := p.Header().(type) {
+	switch h := p.GetHeader().(type) {
 	case *LongHeader:
 		h.Length = NewVarInt(uint64(len(p.EncodePayload())))
 	}
 	currentLen := len(p.Encode(p.EncodePayload()))
 	for currentLen < length {
 		p.AddFrame(new(PaddingFrame))
-		switch h := p.Header().(type) {
+		switch h := p.GetHeader().(type) {
 		case *LongHeader:
 			h.Length = NewVarInt(h.Length.Value + 1)
 		}
@@ -247,7 +247,7 @@ func (p *InitialPacket) PNSpace() PNSpace { return PNSpaceInitial }
 func (p *InitialPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelInitial }
 func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
-	p.header = ReadLongHeader(buffer, conn)
+	p.Header = ReadLongHeader(buffer, conn)
 	for {
 		frame, err := NewFrame(buffer, conn)
 		if err != nil {
@@ -266,23 +266,23 @@ func ReadInitialPacket(buffer *bytes.Reader, conn *Connection) *InitialPacket {
 }
 func NewInitialPacket(conn *Connection) *InitialPacket {
 	p := new(InitialPacket)
-	p.header = NewLongHeader(Initial, conn, PNSpaceInitial)
+	p.Header = NewLongHeader(Initial, conn, PNSpaceInitial)
 	if len(conn.Token) > 0 {
-		p.header.(*LongHeader).Token = conn.Token
-		p.header.(*LongHeader).TokenLength = NewVarInt(uint64(len(conn.Token)))
+		p.Header.(*LongHeader).Token = conn.Token
+		p.Header.(*LongHeader).TokenLength = NewVarInt(uint64(len(conn.Token)))
 	}
 	return p
 }
 
 type RetryPacket struct {
-	abstractPacket
+	AbstractPacket
 	RetryToken []byte
 	RetryIntegrityTag [16]byte
 }
 func ReadRetryPacket(buffer *bytes.Reader, conn *Connection) *RetryPacket {
 	p := new(RetryPacket)
-	h := ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long header. Retry header ?
-	p.header = h
+	h := ReadLongHeader(buffer, conn)  // TODO: This should not be a full-length long Header. Retry Header ?
+	p.Header = h
 	p.RetryToken = make([]byte, buffer.Len() - len(p.RetryIntegrityTag))
 	buffer.Read(p.RetryToken)
 	buffer.Read(p.RetryIntegrityTag[:])
@@ -307,7 +307,7 @@ func (p *HandshakePacket) PNSpace() PNSpace { return PNSpaceHandshake }
 func (p *HandshakePacket) EncryptionLevel() EncryptionLevel { return EncryptionLevelHandshake }
 func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
-	p.header = ReadLongHeader(buffer, conn)
+	p.Header = ReadLongHeader(buffer, conn)
 	for {
 		frame, err := NewFrame(buffer, conn)
 		if err != nil {
@@ -326,7 +326,7 @@ func ReadHandshakePacket(buffer *bytes.Reader, conn *Connection) *HandshakePacke
 }
 func NewHandshakePacket(conn *Connection) *HandshakePacket {
 	p := new(HandshakePacket)
-	p.header = NewLongHeader(Handshake, conn, PNSpaceHandshake)
+	p.Header = NewLongHeader(Handshake, conn, PNSpaceHandshake)
 	return p
 }
 
@@ -337,7 +337,7 @@ func (p *ProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
 func (p *ProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel1RTT }
 func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = ReadHeader(buffer, conn)
+	p.Header = ReadHeader(buffer, conn)
 	for {
 		frame, err := NewFrame(buffer, conn)
 		if err != nil {
@@ -356,7 +356,7 @@ func ReadProtectedPacket(buffer *bytes.Reader, conn *Connection) *ProtectedPacke
 }
 func NewProtectedPacket(conn *Connection) *ProtectedPacket {
 	p := new(ProtectedPacket)
-	p.header = NewShortHeader(conn)
+	p.Header = NewShortHeader(conn)
 	return p
 }
 
@@ -367,12 +367,12 @@ func (p *ZeroRTTProtectedPacket) PNSpace() PNSpace { return PNSpaceAppData }
 func (p *ZeroRTTProtectedPacket) EncryptionLevel() EncryptionLevel { return EncryptionLevel0RTT }
 func NewZeroRTTProtectedPacket(conn *Connection) *ZeroRTTProtectedPacket {
 	p := new(ZeroRTTProtectedPacket)
-	p.header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)
+	p.Header = NewLongHeader(ZeroRTTProtected, conn, PNSpaceAppData)
 	return p
 }
 
 type StatelessResetPacket struct {
-	abstractPacket
+	AbstractPacket
 	UnpredictableBits []byte
 	StatelessResetToken [16]byte
 }

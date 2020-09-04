@@ -47,7 +47,7 @@ func (as *ConcreteSet) Clear() {
 
 func (cs ConcreteSet) String() string {
 	if cs.internalSet.Cardinality() == 0 {
-		return "[]"
+		return "{}"
 	}
 
 	setSlice := cs.internalSet.ToSlice()
@@ -57,7 +57,7 @@ func (cs ConcreteSet) String() string {
 	}
 	sort.Strings(stringSlice)
 
-	return fmt.Sprintf("[%v]", strings.Join(stringSlice, ","))
+	return fmt.Sprintf("{%v}", strings.Join(stringSlice, ","))
 }
 
 type ConcreteOrderedPair struct {
@@ -101,3 +101,10 @@ func (ct ConcreteOrderedPair) String() string {
 	return fmt.Sprintf("(%v,%v)", ciString, coString)
 }
 
+type ConcreteFramer struct {
+
+}
+
+type ConcreteHeader struct {
+
+}

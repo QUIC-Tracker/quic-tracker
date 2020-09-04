@@ -50,7 +50,7 @@ func (a *RTTAgent) Run(conn *Connection) {
 			case i := <-outgoingPackets:
 				switch p := i.(type) {
 				case Framer:
-					packetNumber := p.Header().PacketNumber()
+					packetNumber := p.Header().GetPacketNumber()
 					if packetNumber > PacketNumber(a.LargestSentPackets[p.PNSpace()]) {
 						a.LargestSentPackets[p.PNSpace()] = packetNumber
 					}

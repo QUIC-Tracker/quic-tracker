@@ -45,7 +45,7 @@ wait:
 		select {
 		case i := <-incPackets:
 			p := i.(qt.Packet)
-			if fp, ok := p.(qt.Framer); ok && fp.Header().PacketType() == qt.ShortHeaderPacket && fp.Contains(qt.NewConnectionIdType) {
+			if fp, ok := p.(qt.Framer); ok && fp.Header().GetPacketType() == qt.ShortHeaderPacket && fp.Contains(qt.NewConnectionIdType) {
 				ncids := fp.GetAll(qt.NewConnectionIdType)
 				if len(ncids) > int(conn.TLSTPHandler.ActiveConnectionIdLimit) {
 					trace.MarkError(CM_TooManyCIDs, "", p)

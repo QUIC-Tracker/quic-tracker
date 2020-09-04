@@ -35,7 +35,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 		case i := <-incPackets:
 			p := i.(qt.Packet)
 			if p.PNSpace() != qt.PNSpaceNoSpace {
-				conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], p.Header().PacketNumber())
+				conn.AckQueue[p.PNSpace()] = append(conn.AckQueue[p.PNSpace()], p.Header().GetPacketNumber())
 			}
 			if p.ShouldBeAcknowledged() {
 				ackFrame := conn.GetAckFrame(p.PNSpace())
@@ -55,7 +55,7 @@ func (s *AckOnlyScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 				packet.AddFrame(ackFrame)
 				conn.DoSendPacket(packet, packet.EncryptionLevel())
 				if p.PNSpace() == qt.PNSpaceAppData {
-					ackOnlyPackets = append(ackOnlyPackets, packet.Header().PacketNumber())
+					ackOnlyPackets = append(ackOnlyPackets, packet.Header().GetPacketNumber())
 				}
 			} else if packet, ok := p.(*qt.ProtectedPacket); ok && packet.Contains(qt.AckType) {
 				ack := packet.GetFirst(qt.AckType).(*qt.AckFrame)

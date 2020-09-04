@@ -111,22 +111,22 @@ func (c *Connection) EncodeAndEncrypt(packet Packet, level EncryptionLevel) []by
 
 		payload := packet.EncodePayload()
 		if h, ok := packet.Header().(*LongHeader); ok {
-			h.Length = NewVarInt(uint64(h.TruncatedPN().Length + len(payload) + cryptoState.Write.Overhead()))
+			h.Length = NewVarInt(uint64(h.GetTruncatedPN().Length + len(payload) + cryptoState.Write.Overhead()))
 		}
 
 		header := packet.EncodeHeader()
-		protectedPayload := cryptoState.Write.Encrypt(payload, uint64(packet.Header().PacketNumber()), header)
+		protectedPayload := cryptoState.Write.Encrypt(payload, uint64(packet.Header().GetPacketNumber()), header)
 		packetBytes := append(header, protectedPayload...)
 
 		firstByteMask := byte(0x1F)
-		if packet.Header().PacketType() != ShortHeaderPacket {
+		if packet.Header().GetPacketType() != ShortHeaderPacket {
 			firstByteMask = 0x0F
 		}
 		sample, pnOffset := GetPacketSample(packet.Header(), packetBytes)
 		mask := cryptoState.HeaderWrite.Encrypt(sample, make([]byte, 5, 5))
 		packetBytes[0] ^= mask[0] & firstByteMask
 
-		for i := 0; i < packet.Header().TruncatedPN().Length; i++ {
+		for i := 0; i < packet.Header().GetTruncatedPN().Length; i++ {
 			packetBytes[pnOffset+i] ^= mask[1+i]
 		}
 
@@ -147,11 +147,11 @@ func (c *Connection) DoSendPacket(packet Packet, level EncryptionLevel) {
 	switch packet.PNSpace() {
 	case PNSpaceInitial, PNSpaceHandshake, PNSpaceAppData:
 		if c.CryptoState(level) == nil {
-			c.Logger.Printf("Unable to send packet {type=%s, number=%d} with EL %v yet.\n", packet.Header().PacketType().String(), packet.Header().PacketNumber(), level.String())
+			c.Logger.Printf("Unable to send packet {type=%s, number=%d} with EL %v yet.\n", packet.Header().GetPacketType().String(), packet.Header().GetPacketNumber(), level.String())
 			return
 		}
 
-		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().PacketType().String(), packet.Header().PacketNumber())
+		c.Logger.Printf("Sending packet {type=%s, number=%d}\n", packet.Header().GetPacketType().String(), packet.Header().GetPacketNumber())
 
 		packetBytes := c.EncodeAndEncrypt(packet, level)
 		n, err := c.UdpConnection.Write(packetBytes)

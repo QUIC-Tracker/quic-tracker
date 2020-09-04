@@ -77,10 +77,10 @@ func NewAbstractSymbol(packetType qt.PacketType, headerOptions HeaderOptions, fr
 func NewAbstractSymbolFromString(message string) AbstractSymbol {
 	messageStringRegex := regexp.MustCompile(`^([A-Z]+)(\(([0-9a-zx]+)\))?\[([A-Z,]+)\]$`)
 	subgroups := messageStringRegex.FindStringSubmatch(message)
-	// The PacketType is the second group, we can get the type with a map.
+	// The GetPacketType is the second group, we can get the type with a map.
 	packetType := stringToPacketType[subgroups[1]]
 
-	// Header options contain options that might be optional, SHORT packets for example don't have QUICVersion.
+	// GetHeader options contain options that might be optional, SHORT packets for example don't have QUICVersion.
 	headerOptions := HeaderOptions{}
 	// The fourth group has the content of header options.
 	if subgroups[3] != "" {
@@ -123,7 +123,7 @@ func (as *AbstractSet) Clear() {
 
 func (as AbstractSet) String() string {
 	if as.internalSet.Cardinality() == 0 {
-		return "[]"
+		return "{}"
 	}
 
 	setSlice := as.internalSet.ToSlice()
@@ -133,7 +133,7 @@ func (as AbstractSet) String() string {
 	}
 	sort.Strings(stringSlice)
 
-	return fmt.Sprintf("[%v]", strings.Join(stringSlice, ","))
+	return fmt.Sprintf("{%v}", strings.Join(stringSlice, ","))
 }
 
 type AbstractOrderedPair struct {

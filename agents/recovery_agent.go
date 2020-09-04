@@ -90,10 +90,10 @@ func (a *RecoveryAgent) Run(conn *Connection) {
 			case i := <-outgoingPackets:
 				switch p := i.(type) {
 				case Framer:
-					a.packetsSent[p.PNSpace()][p.Header().PacketNumber()] = true
+					a.packetsSent[p.PNSpace()][p.Header().GetPacketNumber()] = true
 					frames := p.GetRetransmittableFrames()
 					if len(frames) > 0 {
-						a.retransmissionBuffer[p.PNSpace()][p.Header().PacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
+						a.retransmissionBuffer[p.PNSpace()][p.Header().GetPacketNumber()] = *NewRetransmittableFrames(frames, p.EncryptionLevel())
 					}
 					if (p.Contains(ConnectionCloseType) || p.Contains(ApplicationCloseType)) && (len(a.retransmissionBuffer[PNSpaceInitial]) > 0 || len(a.retransmissionBuffer[PNSpaceHandshake]) > 0 || len(a.retransmissionBuffer[PNSpaceAppData]) > 0) {
 						a.Logger.Println("Connection is closing, emptying retransmit buffers")

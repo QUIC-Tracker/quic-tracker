@@ -32,7 +32,7 @@ func (s *PaddingScenario) Run(conn *qt.Connection, trace *qt.Trace, preferredPat
 
 		initialPacket := qt.NewInitialPacket(conn)
 		payloadLen := len(initialPacket.EncodePayload())
-		paddingLength := initialLength - (len(initialPacket.Header().Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoState(qt.EncryptionLevelInitial).Write.Overhead())
+		paddingLength := initialLength - (len(initialPacket.GetHeader().Encode()) + int(VarIntLen(uint64(payloadLen))) + payloadLen + conn.CryptoState(qt.EncryptionLevelInitial).Write.Overhead())
 		for i := 0; i < paddingLength; i++ {
 			initialPacket.Frames = append(initialPacket.Frames, new(qt.PaddingFrame))
 		}

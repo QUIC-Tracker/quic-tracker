@@ -84,7 +84,7 @@ forLoop:
 			}
 		case i := <-outgoingPackets:
 			p := i.(qt.Packet)
-			if p.Header().PacketNumber() == 0 && p.Header().PacketType() == qt.Initial {
+			if p.Header().GetPacketNumber() == 0 && p.Header().GetPacketType() == qt.Initial {
 				initialLength = len(p.Encode(p.EncodePayload()))
 			}
 		case i := <-handshakeStatus:

@@ -37,14 +37,14 @@ forLoop:
 		case i := <-incomingPackets:
 			switch p := i.(type) {
 			case *ProtectedPacket:
-				hdr := p.Header().(*ShortHeader)
-				if hdr.PacketNumber() >= conn.LastSpinNumber {
+				hdr := p.GetHeader().(*ShortHeader)
+				if hdr.GetPacketNumber() >= conn.LastSpinNumber {
 					if hdr.SpinBit != lastServerSpin {
 						lastServerSpin = hdr.SpinBit
 						spins++
 					}
 					conn.SpinBit = !hdr.SpinBit
-					conn.LastSpinNumber = hdr.PacketNumber()
+					conn.LastSpinNumber = hdr.GetPacketNumber()
 				}
 				if conn.Streams.Get(0).ReadClosed && !conn.Streams.Get(4).WriteClosed {
 					http.SendRequest(preferredPath, "GET", trace.Host, nil)

@@ -150,7 +150,14 @@ func (a *Adapter) Run() {
 				packetType = qt.Retry
 				version = nil
 			case qt.Framer:
-				packetType = packet.Header().PacketType()
+				//switch header := packet.Header().(type) {
+				//case *qt.ShortHeader, *qt.LongHeader:
+				//	if header != nil {
+				//		ba, _ := json.Marshal(header)
+				//		fmt.Printf("%v", string(ba))
+				//	}
+				//}
+				packetType = packet.Header().GetPacketType()
 				// TODO: GetFrames() might not return a deterministic order. Idk yet.
 				for _, frame := range packet.GetFrames() {
 					if frame.FrameType() != qt.PaddingFrameType {

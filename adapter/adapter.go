@@ -44,6 +44,11 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string, http3 
 	adapter.incomingSulPackets = adapter.connection.IncomingPackets.RegisterNewChan(1000)
 	adapter.outgoingSulPackets = adapter.connection.OutgoingPackets.RegisterNewChan(1000)
 
+	adapter.outgoingPacket = nil
+	adapter.incomingPacketSet = *NewConcreteSet()
+	adapter.outgoingResponse = *NewAbstractSet()
+	adapter.oracleTable = *NewAbstractConcreteMap()
+
 	adapter.trace = qt.NewTrace("Adapter", 1, sulAddress)
 	adapter.trace.AttachTo(adapter.connection)
 	adapter.trace.StartedAt = time.Now().Unix()
@@ -191,6 +196,10 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.connection, _ = qt.NewDefaultConnection(a.connection.ConnectedIp().String(), a.connection.ServerName, nil, false, "hq", a.http3)
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.outgoingSulPackets = a.connection.OutgoingPackets.RegisterNewChan(1000)
+	a.outgoingPacket = nil
+	a.incomingPacketSet = *NewConcreteSet()
+	a.outgoingResponse = *NewAbstractSet()
+	a.oracleTable = *NewAbstractConcreteMap()
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
 	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true

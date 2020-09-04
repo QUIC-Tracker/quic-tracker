@@ -31,6 +31,11 @@ type ConcreteSet struct {
 	mapset.Set
 }
 
+func NewConcreteSet() *ConcreteSet {
+	cs := mapset.NewSet().(ConcreteSet)
+	return &cs
+}
+
 func (cs ConcreteSet) String() string {
 	if cs.Cardinality() == 0 {
 		return "[]"

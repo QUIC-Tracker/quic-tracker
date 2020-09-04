@@ -108,6 +108,11 @@ type AbstractSet struct {
 	mapset.Set // type: AbstractSymbol
 }
 
+func NewAbstractSet() *AbstractSet {
+	as := mapset.NewSet().(AbstractSet)
+	return &as
+}
+
 func (as AbstractSet) String() string {
 	if as.Cardinality() == 0 {
 		return "[]"

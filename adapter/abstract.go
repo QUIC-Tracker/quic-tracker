@@ -128,8 +128,8 @@ func (as AbstractSet) String() string {
 
 	setSlice := as.internalSet.ToSlice()
 	stringSlice := []string{}
-	for index, setElement := range setSlice {
-		stringSlice[index] = setElement.(AbstractSymbol).String()
+	for _, setElement := range setSlice {
+		stringSlice = append(stringSlice, setElement.(AbstractSymbol).String())
 	}
 	sort.Strings(stringSlice)
 

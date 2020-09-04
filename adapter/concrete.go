@@ -52,8 +52,8 @@ func (cs ConcreteSet) String() string {
 
 	setSlice := cs.internalSet.ToSlice()
 	stringSlice := []string{}
-	for index, setElement := range setSlice {
-		stringSlice[index] = setElement.(ConcreteSymbol).String()
+	for _, setElement := range setSlice {
+		stringSlice = append(stringSlice, setElement.(ConcreteSymbol).String())
 	}
 	sort.Strings(stringSlice)
 

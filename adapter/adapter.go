@@ -102,7 +102,11 @@ func (a *Adapter) Run() {
 			if as.headerOptions.QUICVersion != nil {
 				a.connection.Version = *as.headerOptions.QUICVersion
 			}
+			frameTypesSlice := []qt.FrameType{}
 			for _, frameType := range as.frameTypes.ToSlice() {
+				frameTypesSlice = append(frameTypesSlice, frameType.(qt.FrameType))
+			}
+			for _, frameType := range frameTypesSlice {
 				switch frameType {
 				case qt.AckType:
 					a.agents.Get("AckAgent").(*agents.AckAgent).SendFromQueue <- pnSpace

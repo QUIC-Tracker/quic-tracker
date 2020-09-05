@@ -10,7 +10,7 @@ import (
 
 type GenericPacket interface{}
 type ConcreteSymbol struct {
-	GenericPacket
+	GenericPacket `json:"Packet"`
 }
 
 func NewConcreteSymbol(packet interface{}) ConcreteSymbol {

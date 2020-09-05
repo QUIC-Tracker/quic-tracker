@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -20,6 +21,14 @@ func (acm AbstractConcreteMap) String() string {
 		sb.WriteString(fmt.Sprintf("%v->%v\n", key, value.String()))
 	}
 	return sb.String()
+}
+
+func (acm AbstractConcreteMap) JSON() string {
+	ba, err := json.Marshal(acm)
+	if err != nil {
+		fmt.Printf("Failed to Marshal AbstractConcreteMap: %v", err.Error())
+	}
+	return string(ba)
 }
 
 func (acm *AbstractConcreteMap) AddOPs(abstractOrderedPair AbstractOrderedPair, concreteOrderedPair ConcreteOrderedPair) {

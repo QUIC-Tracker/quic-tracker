@@ -84,7 +84,6 @@ func NewAdapter(adapterAddress string, sulAddress string, sulName string, http3 
 
 	adapter.server.OnNewMessage(adapter.handleNewServerInput)
 
-
 	return adapter, nil
 }
 
@@ -304,7 +303,7 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		fmt.Printf(err.Error())
 	}
 
-	out := a.oracleTable.String()
+	out := a.oracleTable.JSON()
 	a.Logger.Printf(out)
 }
 

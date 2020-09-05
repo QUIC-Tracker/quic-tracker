@@ -303,7 +303,7 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		fmt.Printf(err.Error())
 	}
 
-	out := a.oracleTable.JSON()
+	out := a.oracleTable.String()
 	a.Logger.Printf(out)
 }
 

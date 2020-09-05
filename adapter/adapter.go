@@ -96,13 +96,13 @@ func (a *Adapter) Run() {
 		select {
 		case i := <-incomingSymbolChannel:
 			as := i.(AbstractSymbol)
-			pnSpace := qt.PacketTypeToPNSpace[as.packetType]
-			encLevel := qt.PacketTypeToEncryptionLevel[as.packetType]
-			if as.headerOptions.QUICVersion != nil {
-				a.connection.Version = *as.headerOptions.QUICVersion
+			pnSpace := qt.PacketTypeToPNSpace[as.PacketType]
+			encLevel := qt.PacketTypeToEncryptionLevel[as.PacketType]
+			if as.HeaderOptions.QUICVersion != nil {
+				a.connection.Version = *as.HeaderOptions.QUICVersion
 			}
 			frameTypesSlice := []qt.FrameType{}
-			for _, frameType := range as.frameTypes.ToSlice() {
+			for _, frameType := range as.FrameTypes.ToSlice() {
 				frameTypesSlice = append(frameTypesSlice, frameType.(qt.FrameType))
 			}
 			for _, frameType := range frameTypesSlice {
@@ -274,11 +274,11 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		abstractInputs = append(abstractInputs, abstractSymbol)
 
 		// If there we don't have the requested encryption level, skip and return EMPTY.
-		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType]) != nil {
+		if a.connection.CryptoState(qt.PacketTypeToEncryptionLevel[abstractSymbol.PacketType]) != nil {
 			a.incomingLearnerSymbols.Submit(abstractSymbol)
 			time.Sleep(waitTime)
 		} else {
-			a.Logger.Printf("Unable to send packet at " + qt.PacketTypeToEncryptionLevel[abstractSymbol.packetType].String() + " EL.")
+			a.Logger.Printf("Unable to send packet at " + qt.PacketTypeToEncryptionLevel[abstractSymbol.PacketType].String() + " EL.")
 		}
 
 		abstractOutputs = append(abstractOutputs, a.outgoingResponse)
@@ -303,7 +303,7 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 		fmt.Printf(err.Error())
 	}
 
-	out := a.oracleTable.String()
+	out := a.oracleTable.JSON()
 	a.Logger.Printf(out)
 }
 

@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -22,12 +23,20 @@ func (acm AbstractConcreteMap) String() string {
 	return sb.String()
 }
 
+func (acm AbstractConcreteMap) JSON() string {
+	ba, err := json.Marshal(acm)
+	if err != nil {
+		fmt.Printf("Failed to Marshal AbstractConcreteMap: %v", err.Error())
+	}
+	return string(ba)
+}
+
 func (acm *AbstractConcreteMap) AddOPs(abstractOrderedPair AbstractOrderedPair, concreteOrderedPair ConcreteOrderedPair) {
 	(*acm)[abstractOrderedPair.String()] = concreteOrderedPair
 }
 
 func (acm *AbstractConcreteMap) AddIOs(abstractInputs []AbstractSymbol, abstractOutputs []AbstractSet, concreteInputs []*ConcreteSymbol, concreteOutputs []ConcreteSet) {
-	abstractOP := AbstractOrderedPair{abstractInputs: abstractInputs, abstractOutputs: abstractOutputs}
-	concreteOP := ConcreteOrderedPair{concreteInputs: concreteInputs, concreteOutputs: concreteOutputs}
+	abstractOP := AbstractOrderedPair{AbstractInputs: abstractInputs, AbstractOutputs: abstractOutputs}
+	concreteOP := ConcreteOrderedPair{ConcreteInputs: concreteInputs, ConcreteOutputs: concreteOutputs}
 	acm.AddOPs(abstractOP, concreteOP)
 }

@@ -29,28 +29,28 @@ func (cs ConcreteSymbol) String() string {
 }
 
 type ConcreteSet struct {
-	internalSet mapset.Set // type: ConcreteSymbol
+	SymbolSet mapset.Set // type: ConcreteSymbol
 }
 
 func NewConcreteSet() *ConcreteSet {
-	cs := ConcreteSet{internalSet: mapset.NewSet()}
+	cs := ConcreteSet{SymbolSet: mapset.NewSet()}
 	return &cs
 }
 
 func (as *ConcreteSet) Add(concreteSymbol ConcreteSymbol) {
-	as.internalSet.Add(concreteSymbol)
+	as.SymbolSet.Add(concreteSymbol)
 }
 
 func (as *ConcreteSet) Clear() {
-	as.internalSet.Clear()
+	as.SymbolSet.Clear()
 }
 
 func (cs ConcreteSet) String() string {
-	if cs.internalSet.Cardinality() == 0 {
+	if cs.SymbolSet.Cardinality() == 0 {
 		return "{}"
 	}
 
-	setSlice := cs.internalSet.ToSlice()
+	setSlice := cs.SymbolSet.ToSlice()
 	stringSlice := []string{}
 	for _, setElement := range setSlice {
 		stringSlice = append(stringSlice, setElement.(ConcreteSymbol).String())
@@ -61,29 +61,29 @@ func (cs ConcreteSet) String() string {
 }
 
 type ConcreteOrderedPair struct {
-	concreteInputs []*ConcreteSymbol
-	concreteOutputs []ConcreteSet
+	ConcreteInputs  []*ConcreteSymbol
+	ConcreteOutputs []ConcreteSet
 }
 
 func (ct *ConcreteOrderedPair) Input() *[]*ConcreteSymbol {
-	return &ct.concreteInputs
+	return &ct.ConcreteInputs
 }
 
 func (ct *ConcreteOrderedPair) Output() *[]ConcreteSet {
-	return &ct.concreteOutputs
+	return &ct.ConcreteOutputs
 }
 
 func (ct *ConcreteOrderedPair) SetInput(concreteSymbols []*ConcreteSymbol) {
-	(*ct).concreteInputs = concreteSymbols
+	(*ct).ConcreteInputs = concreteSymbols
 }
 
 func (ct *ConcreteOrderedPair) SetOutput(concreteSets []ConcreteSet) {
-	(*ct).concreteOutputs = concreteSets
+	(*ct).ConcreteOutputs = concreteSets
 }
 
 func (ct ConcreteOrderedPair) String() string {
 	ciStringSlice := []string{}
-	for _, value := range ct.concreteInputs {
+	for _, value := range ct.ConcreteInputs {
 		if value != nil {
 			ciStringSlice = append(ciStringSlice, value.String())
 		} else {
@@ -94,7 +94,7 @@ func (ct ConcreteOrderedPair) String() string {
 	ciString := fmt.Sprintf("[%v]", strings.Join(ciStringSlice, ","))
 
 	coStringSlice := []string{}
-	for _, value := range ct.concreteOutputs {
+	for _, value := range ct.ConcreteOutputs {
 		coStringSlice = append(coStringSlice, value.String())
 	}
 	coString := fmt.Sprintf("[%v]", strings.Join(coStringSlice, ","))

@@ -45,20 +45,20 @@ func (ho *HeaderOptions) String() string {
 }
 // INITIAL(0xff00001d)[ACK,CRYPTO]
 // Is represented as:
-// packetType: Initial
-// headerOptions: HeaderOptions{ QUICVersion: 0xff00001d }
+// PacketType: Initial
+// HeaderOptions: HeaderOptions{ QUICVersion: 0xff00001d }
 // frames: [ qt.AckFrame, qt.CryptoFrame ]
 type AbstractSymbol struct {
-	packetType qt.PacketType
-	headerOptions HeaderOptions
-	frameTypes mapset.Set // type: qt.FrameType
+	PacketType    qt.PacketType
+	HeaderOptions HeaderOptions
+	FrameTypes    mapset.Set // type: qt.FrameType
 }
 
 func (as AbstractSymbol) String() string {
-	packetType := packetTypeToString[as.packetType]
-	headerOptions := as.headerOptions.String()
+	packetType := packetTypeToString[as.PacketType]
+	headerOptions := as.HeaderOptions.String()
 	frameStrings := []string{}
-	for _, frameType := range as.frameTypes.ToSlice() {
+	for _, frameType := range as.FrameTypes.ToSlice() {
 		frameStrings = append(frameStrings, frameType.(qt.FrameType).String())
 	}
 	sort.Strings(frameStrings)
@@ -68,9 +68,9 @@ func (as AbstractSymbol) String() string {
 
 func NewAbstractSymbol(packetType qt.PacketType, headerOptions HeaderOptions, frameTypes mapset.Set) AbstractSymbol {
 	return AbstractSymbol{
-		packetType:    packetType,
-		headerOptions: headerOptions,
-		frameTypes:    frameTypes,
+		PacketType:    packetType,
+		HeaderOptions: headerOptions,
+		FrameTypes:    frameTypes,
 	}
 }
 
@@ -105,28 +105,28 @@ func NewAbstractSymbolFromString(message string) AbstractSymbol {
 }
 
 type AbstractSet struct {
-	internalSet mapset.Set // type: AbstractSymbol
+	SymbolSet mapset.Set // type: AbstractSymbol
 }
 
 func NewAbstractSet() *AbstractSet {
-	as := AbstractSet{internalSet: mapset.NewSet()}
+	as := AbstractSet{SymbolSet: mapset.NewSet()}
 	return &as
 }
 
 func (as *AbstractSet) Add(abstractSymbol AbstractSymbol) {
-	as.internalSet.Add(abstractSymbol)
+	as.SymbolSet.Add(abstractSymbol)
 }
 
 func (as *AbstractSet) Clear() {
-	as.internalSet.Clear()
+	as.SymbolSet.Clear()
 }
 
 func (as AbstractSet) String() string {
-	if as.internalSet.Cardinality() == 0 {
+	if as.SymbolSet.Cardinality() == 0 {
 		return "{}"
 	}
 
-	setSlice := as.internalSet.ToSlice()
+	setSlice := as.SymbolSet.ToSlice()
 	stringSlice := []string{}
 	for _, setElement := range setSlice {
 		stringSlice = append(stringSlice, setElement.(AbstractSymbol).String())
@@ -137,35 +137,35 @@ func (as AbstractSet) String() string {
 }
 
 type AbstractOrderedPair struct {
-	abstractInputs  []AbstractSymbol
-	abstractOutputs []AbstractSet
+	AbstractInputs  []AbstractSymbol
+	AbstractOutputs []AbstractSet
 }
 
 func (ct *AbstractOrderedPair) Input() *[]AbstractSymbol {
-	return &ct.abstractInputs
+	return &ct.AbstractInputs
 }
 
 func (ct *AbstractOrderedPair) Output() *[]AbstractSet {
-	return &ct.abstractOutputs
+	return &ct.AbstractOutputs
 }
 
 func (ct *AbstractOrderedPair) SetInput(abstractSymbols []AbstractSymbol) {
-	(*ct).abstractInputs = abstractSymbols
+	(*ct).AbstractInputs = abstractSymbols
 }
 
 func (ct *AbstractOrderedPair) SetOutput(abstractSets []AbstractSet) {
-	(*ct).abstractOutputs = abstractSets
+	(*ct).AbstractOutputs = abstractSets
 }
 
 func (ct AbstractOrderedPair) String() string {
 	aiStringSlice := []string{}
-	for _, value := range ct.abstractInputs {
+	for _, value := range ct.AbstractInputs {
 		aiStringSlice = append(aiStringSlice, value.String())
 	}
 	aiString := fmt.Sprintf("[%v]", strings.Join(aiStringSlice, ","))
 
 	aoStringSlice := []string{}
-	for _, value := range ct.abstractOutputs {
+	for _, value := range ct.AbstractOutputs {
 		aoStringSlice = append(aoStringSlice, value.String())
 	}
 	aoString := fmt.Sprintf("[%v]", strings.Join(aoStringSlice, ","))

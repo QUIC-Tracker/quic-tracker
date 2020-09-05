@@ -137,7 +137,6 @@ func (a *Adapter) Run() {
 			a.Logger.Printf("Submitting request: %v", as.String())
 			a.connection.PreparePacket.Submit(encLevel)
 		case o := <-a.incomingSulPackets:
-			a.incomingPacketSet.Add(NewConcreteSymbol(o))
 			var packetType qt.PacketType
 			version := &a.connection.Version
 			frameTypes := mapset.NewSet()
@@ -150,13 +149,6 @@ func (a *Adapter) Run() {
 				packetType = qt.Retry
 				version = nil
 			case qt.Framer:
-				//switch header := packet.GetHeader().(type) {
-				//case *qt.ShortHeader, *qt.LongHeader:
-				//	if header != nil {
-				//		ba, _ := json.Marshal(header)
-				//		fmt.Printf("%v", string(ba))
-				//	}
-				//}
 				packetType = packet.GetHeader().GetPacketType()
 				// TODO: GetFrames() might not return a deterministic order. Idk yet.
 				for _, frame := range packet.GetFrames() {
@@ -174,6 +166,7 @@ func (a *Adapter) Run() {
 				panic(fmt.Sprintf("Error: Packet '%T' not implemented!", packet))
 			}
 
+			a.incomingPacketSet.Add(NewConcreteSymbol(o))
 			abstractSymbol := NewAbstractSymbol(
 				packetType,
 				HeaderOptions{QUICVersion: version},

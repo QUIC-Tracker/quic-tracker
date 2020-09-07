@@ -201,8 +201,8 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.outgoingSulPackets = a.connection.OutgoingPackets.RegisterNewChan(1000)
 	a.outgoingPacket = nil
-	a.incomingPacketSet = *NewConcreteSet()
-	a.outgoingResponse = *NewAbstractSet()
+	a.incomingPacketSet.Clear()
+	a.outgoingResponse.Clear()
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
 	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true
@@ -293,7 +293,6 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 	}
 
 	a.oracleTable.AddIOs(abstractInputs, abstractOutputs, concreteInputs, concreteOutputs)
-	fmt.Println(a.oracleTable.JSON())
 
 	aoStringSlice := []string{}
 	for _, value := range abstractOutputs {
@@ -325,6 +324,5 @@ func (a *Adapter) SaveTrace(filename string) {
 }
 
 func (a *Adapter) SaveOracleTable(filename string) {
-	fmt.Println(a.oracleTable.JSON())
 	writeJson(filename, a.oracleTable)
 }

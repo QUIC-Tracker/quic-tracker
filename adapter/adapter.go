@@ -254,6 +254,7 @@ func (a *Adapter) handleNewServerInput(client *tcp.Client, message string) {
 		case "STOP":
 			a.Stop()
 			_ = client.Close()
+			os.Exit(0)
 		default:
 			a.handleNewAbstractQuery(client, query, waitTime)
 		}
@@ -324,5 +325,6 @@ func (a *Adapter) SaveTrace(filename string) {
 }
 
 func (a *Adapter) SaveOracleTable(filename string) {
+	fmt.Println(a.oracleTable.JSON())
 	writeJson(filename, a.oracleTable)
 }

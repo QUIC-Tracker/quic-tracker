@@ -19,7 +19,7 @@ func NewConcreteSymbol(packet interface{}) ConcreteSymbol {
 	return cs
 }
 
-func (cs ConcreteSymbol) String() string {
+func (cs *ConcreteSymbol) String() string {
 	ba, err := json.Marshal(cs)
 	if err != nil {
 		fmt.Printf("Failed to Marshal ConcreteSymbol: %v", err.Error())
@@ -45,7 +45,7 @@ func (as *ConcreteSet) Clear() {
 	as.SymbolSet.Clear()
 }
 
-func (cs ConcreteSet) String() string {
+func (cs *ConcreteSet) String() string {
 	if cs.SymbolSet.Cardinality() == 0 {
 		return "{}"
 	}
@@ -53,7 +53,8 @@ func (cs ConcreteSet) String() string {
 	setSlice := cs.SymbolSet.ToSlice()
 	stringSlice := []string{}
 	for _, setElement := range setSlice {
-		stringSlice = append(stringSlice, setElement.(ConcreteSymbol).String())
+		symbol := setElement.(ConcreteSymbol)
+		stringSlice = append(stringSlice, (&symbol).String())
 	}
 	sort.Strings(stringSlice)
 
@@ -81,7 +82,7 @@ func (ct *ConcreteOrderedPair) SetOutput(concreteSets []ConcreteSet) {
 	(*ct).ConcreteOutputs = concreteSets
 }
 
-func (ct ConcreteOrderedPair) String() string {
+func (ct *ConcreteOrderedPair) String() string {
 	ciStringSlice := []string{}
 	for _, value := range ct.ConcreteInputs {
 		if value != nil {
@@ -99,12 +100,4 @@ func (ct ConcreteOrderedPair) String() string {
 	}
 	coString := fmt.Sprintf("[%v]", strings.Join(coStringSlice, ","))
 	return fmt.Sprintf("(%v,%v)", ciString, coString)
-}
-
-type ConcreteFramer struct {
-
-}
-
-type ConcreteHeader struct {
-
 }

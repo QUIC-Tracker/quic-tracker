@@ -15,7 +15,7 @@ func NewAbstractConcreteMap() *AbstractConcreteMap {
 	return (*AbstractConcreteMap)(&acm)
 }
 
-func (acm AbstractConcreteMap) String() string {
+func (acm *AbstractConcreteMap) String() string {
 	var sb strings.Builder
 	for key, value := range acm {
 		sb.WriteString(fmt.Sprintf("%v->%v\n", key, value.String()))
@@ -23,7 +23,7 @@ func (acm AbstractConcreteMap) String() string {
 	return sb.String()
 }
 
-func (acm AbstractConcreteMap) JSON() string {
+func (acm *AbstractConcreteMap) JSON() string {
 	ba, err := json.Marshal(acm)
 	if err != nil {
 		fmt.Printf("Failed to Marshal AbstractConcreteMap: %v", err.Error())

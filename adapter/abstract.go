@@ -54,7 +54,7 @@ type AbstractSymbol struct {
 	FrameTypes    mapset.Set // type: qt.FrameType
 }
 
-func (as AbstractSymbol) String() string {
+func (as *AbstractSymbol) String() string {
 	packetType := packetTypeToString[as.PacketType]
 	headerOptions := as.HeaderOptions.String()
 	frameStrings := []string{}
@@ -121,7 +121,7 @@ func (as *AbstractSet) Clear() {
 	as.SymbolSet.Clear()
 }
 
-func (as AbstractSet) String() string {
+func (as *AbstractSet) String() string {
 	if as.SymbolSet.Cardinality() == 0 {
 		return "{}"
 	}
@@ -129,7 +129,8 @@ func (as AbstractSet) String() string {
 	setSlice := as.SymbolSet.ToSlice()
 	stringSlice := []string{}
 	for _, setElement := range setSlice {
-		stringSlice = append(stringSlice, setElement.(AbstractSymbol).String())
+		symbol := setElement.(AbstractSymbol)
+		stringSlice = append(stringSlice, (&symbol).String())
 	}
 	sort.Strings(stringSlice)
 
@@ -157,7 +158,7 @@ func (ct *AbstractOrderedPair) SetOutput(abstractSets []AbstractSet) {
 	(*ct).AbstractOutputs = abstractSets
 }
 
-func (ct AbstractOrderedPair) String() string {
+func (ct *AbstractOrderedPair) String() string {
 	aiStringSlice := []string{}
 	for _, value := range ct.AbstractInputs {
 		aiStringSlice = append(aiStringSlice, value.String())

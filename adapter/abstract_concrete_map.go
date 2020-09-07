@@ -17,7 +17,7 @@ func NewAbstractConcreteMap() *AbstractConcreteMap {
 
 func (acm *AbstractConcreteMap) String() string {
 	var sb strings.Builder
-	for key, value := range acm {
+	for key, value := range *acm {
 		sb.WriteString(fmt.Sprintf("%v->%v\n", key, value.String()))
 	}
 	return sb.String()

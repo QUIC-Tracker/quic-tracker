@@ -294,6 +294,7 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 	}
 
 	a.oracleTable.AddIOs(abstractInputs, abstractOutputs, concreteInputs, concreteOutputs)
+	fmt.Println(a.oracleTable.JSON())
 
 	aoStringSlice := []string{}
 	for _, value := range abstractOutputs {

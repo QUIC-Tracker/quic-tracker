@@ -201,8 +201,8 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.incomingSulPackets = a.connection.IncomingPackets.RegisterNewChan(1000)
 	a.outgoingSulPackets = a.connection.OutgoingPackets.RegisterNewChan(1000)
 	a.outgoingPacket = nil
-	a.incomingPacketSet.Clear()
-	a.outgoingResponse.Clear()
+	a.incomingPacketSet = *NewConcreteSet()
+	a.outgoingResponse = *NewAbstractSet()
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
 	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true

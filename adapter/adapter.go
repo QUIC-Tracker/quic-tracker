@@ -186,6 +186,7 @@ func (a *Adapter) Run() {
 func (a *Adapter) Stop() {
 	a.trace.Complete(a.connection)
 	a.SaveTrace("trace.json")
+	a.SaveOracleTable("oracleTable.json")
 	a.agents.Stop("SendingAgent")
 	a.agents.StopAll()
 	a.stop <- true
@@ -302,21 +303,26 @@ func (a *Adapter) handleNewAbstractQuery(client *tcp.Client, query []string, wai
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
+}
 
-	out := a.oracleTable.JSON()
-	a.Logger.Printf(out)
+func writeJson(filename string, object interface{}) {
+	outFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err == nil {
+		content, err := json.Marshal(object)
+		if err == nil {
+			outFile.Write(content)
+			outFile.Close()
+		}
+	}
 }
 
 func (a *Adapter) SaveTrace(filename string) {
 	a.connection.QLog.Title = "QUIC Adapter Trace"
 	a.connection.QLogTrace.Sort()
 	a.trace.QLog = a.connection.QLog
-	outFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
-	if err == nil {
-		content, err := json.Marshal(a.trace)
-		if err == nil {
-			outFile.Write(content)
-			outFile.Close()
-		}
-	}
+	writeJson(filename, a.trace)
+}
+
+func (a *Adapter) SaveOracleTable(filename string) {
+	writeJson(filename, a.oracleTable)
 }

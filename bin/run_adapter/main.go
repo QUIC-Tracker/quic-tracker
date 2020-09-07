@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/tiferrei/quic-tracker/adapter"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 
@@ -26,6 +28,11 @@ func main() {
 		return
 	}
 
+	SetupCloseHandler(sulAdapter)
+	defer func() {
+		sulAdapter.Stop()
+	}()
+
 	sulAdapter.Run()
 }
 
@@ -35,4 +42,15 @@ func readEnvWithFallback(envName string, fallback string) string {
 		value = fallback
 	}
 	return value
+}
+
+func SetupCloseHandler(adapter *adapter.Adapter) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("\r- Ctrl+C pressed in Terminal")
+		adapter.Stop()
+		os.Exit(0)
+	}()
 }

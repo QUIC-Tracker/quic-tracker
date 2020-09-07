@@ -203,7 +203,6 @@ func (a *Adapter) Reset(client *tcp.Client) {
 	a.outgoingPacket = nil
 	a.incomingPacketSet = *NewConcreteSet()
 	a.outgoingResponse = *NewAbstractSet()
-	a.oracleTable = *NewAbstractConcreteMap()
 	a.trace.AttachTo(a.connection)
 	a.agents = agents.AttachAgentsToConnection(a.connection, agents.GetBasicAgents()...)
 	a.agents.Get("ClosingAgent").(*agents.ClosingAgent).WaitForFirstPacket = true

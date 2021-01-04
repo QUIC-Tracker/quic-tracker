@@ -17,4 +17,4 @@ quic.seemann.io:443	/	443	h3
 pandora.cm.in.tum.de:4433	/index.html	4433	hq
 ietf.akaquic.com:443	/	443	h3
 test.pquic.org:443	/	443	hq
-mew.org:443	/	443	h3
+mew.org:443	/	443	hq

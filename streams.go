@@ -144,10 +144,12 @@ func NewStream() *Stream {
 func (s *Stream) addToRead(f *StreamFrame) { // TODO: Flag implementations that retransmit different data for a given offset
 	if f.Offset > s.ReadCloseOffset {
 		// TODO: report this: write past fin bit
+		return
 	}
 	if f.FinBit {
 		if s.ReadCloseOffset != math.MaxUint64 && s.ReadCloseOffset != f.Offset+f.Length {
 			// TODO: report this: new fin bit offset
+			return
 		} else {
 			s.ReadCloseOffset = f.Offset + f.Length
 		}
@@ -156,9 +158,11 @@ func (s *Stream) addToRead(f *StreamFrame) { // TODO: Flag implementations that 
 	if f.Offset == s.ReadOffset && f.Offset == s.maxReadReceived {
 		s.ReadOffset += f.Length
 		s.maxReadReceived = s.ReadOffset
-		s.ReadData = append(s.ReadData, f.StreamData...)
-		s.ReadChan.Submit(f.StreamData)
-		<-s.readFeedback // Makes sure it propagates before returning
+		if len(f.StreamData) > 0 {
+			s.ReadData = append(s.ReadData, f.StreamData...)
+			s.ReadChan.Submit(f.StreamData)
+			<-s.readFeedback // Makes sure it propagates before returning
+		}
 	} else if f.Offset+f.Length > s.maxReadReceived {
 		if s.maxReadReceived < f.Offset {
 			s.gaps.Add(byteInterval{s.maxReadReceived, f.Offset})
@@ -168,7 +172,7 @@ func (s *Stream) addToRead(f *StreamFrame) { // TODO: Flag implementations that 
 		copy(newSlice, s.ReadData)
 		copy(newSlice[f.Offset:int(f.Offset)+len(f.StreamData)], f.StreamData)
 		s.ReadData = newSlice
-	} else {
+	} else if len(f.StreamData) > 0 {
 		s.gaps.Fill(byteInterval{f.Offset, f.Offset + f.Length})
 		copy(s.ReadData[f.Offset:], f.StreamData)
 		var firstGap uint64

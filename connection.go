@@ -119,6 +119,11 @@ func (c *Connection) EncodeAndEncrypt(packet Packet, level EncryptionLevel) []by
 			firstByteMask = 0x0F
 		}
 		sample, pnOffset := GetPacketSample(packet.Header(), packetBytes)
+		if sample == nil {
+			paddedSize := pnOffset + 4
+			packet.(Framer).PadTo(paddedSize)
+			return c.EncodeAndEncrypt(packet, level)
+		}
 		mask := cryptoState.HeaderWrite.Encrypt(sample, make([]byte, 5, 5))
 		packetBytes[0] ^= mask[0] & firstByteMask
 

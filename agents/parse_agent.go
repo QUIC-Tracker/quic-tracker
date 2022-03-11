@@ -56,6 +56,10 @@ func (a *ParsingAgent) Run(conn *Connection) {
 							}
 
 							sample, pnOffset := GetPacketSample(header, ciphertext)
+							if sample == nil {
+								a.Logger.Printf("Packet is too short to for header protection, dropping it\n")
+								break packetSelect
+							}
 							mask := cryptoState.HeaderRead.Encrypt(sample, make([]byte, 5, 5))
 							ciphertext[0] ^= mask[0] & firstByteMask
 

@@ -149,9 +149,8 @@ func GetPacketSample(header Header, packetBytes []byte) ([]byte, int) {
 	sampleOffset := pnOffset + 4
 
 	if sampleOffset+sampleLength > len(packetBytes) {
-		paddedBytes := make([]byte, sampleOffset+sampleLength)
-		copy(paddedBytes, packetBytes)
-		packetBytes = paddedBytes
+		// Packet is too short for sampling header protection, it must be padded first
+		return nil, pnOffset
 	}
 
 	return packetBytes[sampleOffset:sampleOffset+sampleLength], pnOffset

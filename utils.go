@@ -5,6 +5,7 @@ import "github.com/dustin/go-broadcast"
 type Broadcaster struct {
 	broadcast.Broadcaster
 	channels []chan interface{}
+	isClosed bool
 }
 
 func NewBroadcaster(buflen int) Broadcaster {
@@ -19,8 +20,15 @@ func (b *Broadcaster) RegisterNewChan(size int) chan interface{} {
 }
 
 func (b *Broadcaster) Close() error {
+	if b.isClosed {
+		return nil
+	}
+	b.isClosed = true
 	for _, c := range b.channels {
 		close(c)
 	}
 	return b.Broadcaster.Close()
+}
+func (b *Broadcaster) IsClosed() bool {
+	return b.isClosed
 }

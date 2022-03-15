@@ -251,7 +251,11 @@ func (a *HTTP3Agent) SendRequest(path, method, authority string, headers map[str
 	a.responseBuffer[streamID] = response
 
 	go func() { // Pipes the data from the response stream to the agent
-		defer stream.ReadChan.Unregister(streamChan)
+		defer func() {
+			if !stream.ReadChan.IsClosed() {
+				stream.ReadChan.Unregister(streamChan)
+			}
+		}()
 		for {
 			select {
 			case i := <-streamChan:

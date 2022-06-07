@@ -125,8 +125,6 @@ func AttachAgentsToConnection(conn *Connection, agents ...Agent) *ConnectionAgen
 					a.Join()
 				}
 				conn.ConnectionRestart = make(chan bool, 1)
-				conn.UdpConnection.Close()
-				conn.UdpConnection, _ = EstablishUDPConnection(conn.Host)
 				for _, a := range agents {
 					a.Run(conn)
 				}
